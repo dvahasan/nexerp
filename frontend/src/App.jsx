@@ -195,42 +195,58 @@ function ModalShell({title,onClose,wide,children}){
 }
 
 // ── Barcode Scanner (ZXing — all browsers) ───────────────────────────────────
-function BarcodeScanner({onDetect,onClose,t}){
+function BarcodeScanner({onDetect,onClose,t,lang}){
+  const isAR=lang==="ar";
   const st=t.scanner;
   const videoRef=useRef(null);
   const readerRef=useRef(null);
+  const streamRef=useRef(null);
   const [detected,setDetected]=useState(null);
   const [error,setError]=useState(null);
   const [manual,setManual]=useState("");
   const [ready,setReady]=useState(false);
 
-  const stopReader=()=>{try{readerRef.current?.reset();}catch{}};
+  const stopReader=()=>{
+    try{readerRef.current?.reset();}catch{}
+    try{streamRef.current?.getTracks().forEach(t=>t.stop());}catch{}
+  };
 
   const startCamera=async()=>{
     setError(null);
+    setReady(false);
     try{
+      // Step 1: explicitly request camera permission first (required for Edge/Firefox/Safari)
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
+      streamRef.current=stream;
+      // attach stream to video so user sees something immediately
+      if(videoRef.current){videoRef.current.srcObject=stream;videoRef.current.play().catch(()=>{});}
+
+      // Step 2: load ZXing and start decoding
       const {BrowserMultiFormatReader}=await import("@zxing/browser");
       const reader=new BrowserMultiFormatReader();
       readerRef.current=reader;
-      // enumerate devices — required in Edge/Firefox before getUserMedia
+
+      // Step 3: enumerate devices (now permission is already granted)
       const devices=await BrowserMultiFormatReader.listVideoInputDevices();
-      // prefer rear camera on mobile, otherwise take first available
       const device=devices.find(d=>/(back|rear|environment)/i.test(d.label))||devices[0];
-      if(!device){setError(st.error);return;}
+      const deviceId=device?.deviceId||undefined;
+
       setReady(true);
-      await reader.decodeFromVideoDevice(device.deviceId,videoRef.current,(result)=>{
+      await reader.decodeFromVideoDevice(deviceId,videoRef.current,(result,err)=>{
         if(result){stopReader();setDetected(result.getText());}
       });
     }catch(e){
-      const msg=e?.message||"";
-      if(msg.includes("Permission")||msg.includes("NotAllowed")){
-        setError(
-          t.lang==="ar"
-            ? "🔒 تم رفض إذن الكاميرا. في Edge: اضغط على أيقونة القفل في شريط العنوان ← السماح بالكاميرا ← أعد تحميل الصفحة."
-            : "🔒 Camera permission denied. In Edge: click the lock icon in the address bar → Allow Camera → reload the page."
-        );
+      const msg=(e?.message||e?.name||"").toLowerCase();
+      if(msg.includes("notallowed")||msg.includes("permission")||msg.includes("denied")){
+        setError(isAR
+          ?"🔒 تم رفض إذن الكاميرا.\nفي Edge أو Chrome: انقر على أيقونة القفل 🔒 في شريط العنوان ← السماح بالكاميرا ← أعد تحميل الصفحة."
+          :"🔒 Camera permission denied.\nClick the lock icon 🔒 in the address bar → Allow Camera → reload the page.");
+      }else if(msg.includes("notfound")||msg.includes("devicenotfound")){
+        setError(isAR?"❌ لم يتم العثور على كاميرا في هذا الجهاز.":"❌ No camera found on this device.");
+      }else if(msg.includes("notreadable")||msg.includes("trackstart")){
+        setError(isAR?"⚠️ الكاميرا مستخدمة من تطبيق آخر. أغلقه وحاول مجدداً.":"⚠️ Camera is in use by another app. Close it and retry.");
       }else{
-        setError(st.error);
+        setError((isAR?"❌ خطأ في الكاميرا: ":"❌ Camera error: ")+e?.message);
       }
     }
   };
@@ -355,7 +371,7 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
 
   return(
     <>
-      {scanning&&<BarcodeScanner t={t} onClose={()=>setScanning(false)} onDetect={code=>{s("barcode",code);setScanning(false);}}/>}
+      {scanning&&<BarcodeScanner t={t} lang={lang} onClose={()=>setScanning(false)} onDetect={code=>{s("barcode",code);setScanning(false);}}/>}
       <div>
         {f.photo&&<div style={{borderRadius:R.md,overflow:"hidden",height:140,background:C.surf2,marginBottom:14}}>
           <img src={f.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
@@ -1012,6 +1028,14 @@ export default function App(){
   const [txItemId,setTxItemId]=useState(null);
   const [delQ,setDelQ]=useState(null);
   const [toast,setToast]=useState(null);
+  const [sidebarOpen,setSidebarOpen]=useState(window.innerWidth>=768);
+  const isMobile=()=>window.innerWidth<768;
+
+  useEffect(()=>{
+    const onResize=()=>{ if(window.innerWidth>=768) setSidebarOpen(true); };
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
 
   const showToast=(msg,type="success")=>setToast({msg,type});
   const closeModal=()=>{setModal(null);setEditItem(null);setTxItemId(null);};
@@ -1194,8 +1218,20 @@ export default function App(){
         fontFamily:"'Segoe UI',system-ui,'Noto Sans Arabic',sans-serif",
         background:C.bg,color:C.tx,direction:isAR?"rtl":"ltr"}}>
 
+        {/* Sidebar backdrop (mobile) */}
+        {sidebarOpen&&isMobile()&&(
+          <div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:40}}/>
+        )}
+
         {/* Sidebar */}
-        <aside style={{width:220,minWidth:220,background:C.sidebar,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0}}>
+        <aside style={{
+          width:220,minWidth:220,background:C.sidebar,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0,
+          ...(isMobile()?{position:"fixed",inset:"0 auto 0 0",zIndex:50,transform:sidebarOpen?"translateX(0)":"translateX(-100%)",transition:"transform .25s ease"}:{
+            transform:sidebarOpen?"translateX(0)":"translateX(-220px)",
+            marginInlineStart:sidebarOpen?0:-220,
+            transition:"transform .25s ease, margin .25s ease",
+          })
+        }}>
           <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${C.sidebarBdr}`,display:"flex",alignItems:"center",gap:10}}>
             <div style={{fontSize:22}}>📦</div>
             <div style={{minWidth:0}}>
@@ -1245,7 +1281,8 @@ export default function App(){
 
         {/* Main */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-          <div style={{height:54,background:C.surf,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",padding:"0 20px",gap:12,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
+          <div style={{height:54,background:C.surf,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",padding:"0 12px 0 16px",gap:12,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>\
+            <button onClick={()=>setSidebarOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:34,border:"none",background:"none",cursor:"pointer",borderRadius:R.sm,color:C.tx,fontSize:18,flexShrink:0}} title="Toggle menu">☰</button>
             {page==="item"&&selectedItem?(
               <div style={{flex:1,display:"flex",alignItems:"center",gap:8,fontSize:14}}>
                 <button onClick={()=>setPage("inv")} style={{background:"none",border:"none",cursor:"pointer",color:C.tx3,fontFamily:"inherit",fontSize:13,fontWeight:500,padding:0}}>
