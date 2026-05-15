@@ -1223,10 +1223,12 @@ function UserProfilePage({currentUser,txs,lang,t,perm}){
 
 // ── Item Detail Page ──────────────────────────────────────────────────────────
 function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
+  const mobile=useMobile();
   const tablet=useTablet();
   const dept=depts.find(d=>(d._id||d.id)===(item.deptId?._id||item.deptId));
   const cat=cats.find(c=>(c._id||c.id)===(item.catId?._id||item.catId));
   const itemTxs=[...txs].filter(tx=>(tx.itemId?._id||tx.itemId)===(item._id||item.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const{slice:txSlice,page:txPg,total:txTotal,setPg:setTxPg,perPage:txPP,setPerPage:setTxPP}=usePaginate(itemTxs,10);
   const inQty=itemTxs.filter(tx=>tx.type==="IN").reduce((s,tx)=>s+tx.qty,0);
   const outQty=itemTxs.filter(tx=>tx.type==="OUT").reduce((s,tx)=>s+tx.qty,0);
   const st=stOf(item);
@@ -1237,26 +1239,26 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
   return(
     <div>
       {/* Breadcrumb */}
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:20,fontSize:13}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
         <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:C.surf,
           border:`1px solid ${C.bdr2}`,borderRadius:R.sm,padding:"6px 12px",cursor:"pointer",
-          fontSize:13,fontWeight:600,color:C.tx2,fontFamily:"inherit"}}>
+          fontSize:13,fontWeight:600,color:C.tx2,fontFamily:"inherit",flexShrink:0}}>
           {lang==="ar"?"→ ":"← "}{t.nav.inv}
         </button>
-        <span style={{color:C.tx3}}>/</span>
-        <span style={{fontWeight:700,color:C.tx}}>{lang==="ar"?item.name:item.nameEn||item.name}</span>
+        <span style={{color:C.tx3,flexShrink:0}}>/</span>
+        <span style={{fontWeight:700,color:C.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{lang==="ar"?item.name:item.nameEn||item.name}</span>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:tablet?"1fr":"300px 1fr",gap:20,alignItems:"start"}}>
+      <div style={{display:"grid",gridTemplateColumns:tablet?"1fr":"300px 1fr",gap:16,alignItems:"start"}}>
         {/* Left column */}
         <div>
-          <Card style={{overflow:"hidden",marginBottom:14}}>
-            <div style={{height:260,background:C.surf2,position:"relative"}}>
+          <Card style={{overflow:"hidden",marginBottom:12}}>
+            <div style={{height:mobile?180:260,background:C.surf2,position:"relative"}}>
               {photoSrc?(
                 <img src={photoSrc} alt={item.name} style={{width:"100%",height:"100%",objectFit:"cover"}}
                   onError={e=>{e.target.style.display="none";}}/>
               ):(
-                <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:64,color:C.bdr2}}>📦</div>
+                <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:mobile?48:64,color:C.bdr2}}>📦</div>
               )}
               <div style={{position:"absolute",bottom:8,insetInlineStart:8,background:stClr,color:"#fff",
                 padding:"3px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>{stLabel}</div>
@@ -1267,35 +1269,35 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
             </div>
           </Card>
 
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
             {[
               [lang==="ar"?"الكمية":"Stock",item.qty,stClr],
-              [lang==="ar"?"الحد الأدنى":"Min Threshold",item.minThreshold,C.amber],
-              [lang==="ar"?"إجمالي وارد":"Total IN",inQty,C.green],
-              [lang==="ar"?"إجمالي صادر":"Total OUT",outQty,C.red],
-              [lang==="ar"?"سعر الوحدة":"Unit Price","$"+money(item.price),C.tx],
-              [lang==="ar"?"قيمة المخزون":"Stock Value","$"+money(item.qty*item.price),C.primary],
+              [lang==="ar"?"الحد الأدنى":"Min",item.minThreshold,C.amber],
+              [lang==="ar"?"وارد":"IN",inQty,C.green],
+              [lang==="ar"?"صادر":"OUT",outQty,C.red],
+              [lang==="ar"?"السعر":"Price","$"+money(item.price),C.tx],
+              [lang==="ar"?"القيمة":"Value","$"+money(item.qty*item.price),C.primary],
             ].map(([l,v,c])=>(
-              <div key={l} style={{background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"10px 12px"}}>
-                <div style={{fontSize:9.5,fontWeight:600,color:C.tx3,textTransform:"uppercase",letterSpacing:.4,marginBottom:3}}>{l}</div>
-                <div style={{fontSize:17,fontWeight:800,color:c}}>{v}</div>
+              <div key={l} style={{background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:mobile?"8px 10px":"10px 12px"}}>
+                <div style={{fontSize:9,fontWeight:600,color:C.tx3,textTransform:"uppercase",letterSpacing:.4,marginBottom:2}}>{l}</div>
+                <div style={{fontSize:mobile?14:17,fontWeight:800,color:c}}>{v}</div>
               </div>
             ))}
           </div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",gap:8,flexDirection:mobile?"row":"column"}}>
             {perm.canTx&&<Btn color="primary" full onClick={()=>onTx(item._id||item.id)}>↕ {t.tx.record}</Btn>}
             {perm.canEdit&&<Btn color="ghost" full onClick={()=>onEdit(item)}>✏️ {t.inv.edit}</Btn>}
           </div>
         </div>
 
         {/* Right column */}
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-          <Card style={{padding:20}}>
-            <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>{item.name}</div>
-            {item.nameEn&&<div style={{fontSize:13,color:C.tx3,marginBottom:14}}>{item.nameEn}</div>}
-            <div style={{height:1,background:C.bdr,marginBottom:14}}/>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <Card style={{padding:mobile?14:20}}>
+            <div style={{fontWeight:700,fontSize:mobile?14:15,marginBottom:4}}>{item.name}</div>
+            {item.nameEn&&<div style={{fontSize:13,color:C.tx3,marginBottom:12}}>{item.nameEn}</div>}
+            <div style={{height:1,background:C.bdr,marginBottom:12}}/>
+            <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"1fr 1fr",gap:8}}>
               {[
                 ["SKU",item.sku||"—","monospace"],
                 [lang==="ar"?"الباركود":"Barcode",item.barcode||"—","monospace"],
@@ -1304,9 +1306,9 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
                 [lang==="ar"?"نوع التعبئة":"Package Type",t.types[item.type]||item.type,null],
                 [lang==="ar"?"الحالة":"Status",t.status[item.status]||item.status,null],
               ].map(([label,value,ff])=>(
-                <div key={label} style={{background:C.surf2,borderRadius:R.sm,padding:"10px 12px"}}>
-                  <div style={{fontSize:10.5,color:C.tx3,fontWeight:600,marginBottom:3}}>{label}</div>
-                  <div style={{fontSize:13,fontWeight:600,color:C.tx,fontFamily:ff||"inherit"}}>{value}</div>
+                <div key={label} style={{background:C.surf2,borderRadius:R.sm,padding:"9px 11px"}}>
+                  <div style={{fontSize:10,color:C.tx3,fontWeight:600,marginBottom:3}}>{label}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.tx,fontFamily:ff||"inherit",wordBreak:"break-all"}}>{value}</div>
                 </div>
               ))}
             </div>
@@ -1319,12 +1321,29 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
           </Card>
 
           <Card style={{overflow:"hidden"}}>
-            <div style={{padding:"13px 16px",fontWeight:700,fontSize:13,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{padding:"12px 16px",fontWeight:700,fontSize:13,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <span>📋 {lang==="ar"?"سجل الحركات":"Transaction History"}</span>
               <span style={{background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:99,padding:"2px 10px",fontSize:12,fontWeight:700,color:C.tx2}}>{itemTxs.length}</span>
             </div>
             {itemTxs.length===0?(
               <div style={{padding:32,textAlign:"center",color:C.tx3,fontSize:13}}>{t.noData}</div>
+            ):mobile?(
+              /* Mobile: card list instead of table */
+              <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:8}}>
+                {txSlice.map(tx=>(
+                  <div key={tx._id} style={{background:C.surf2,borderRadius:R.sm,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{background:tx.type==="IN"?C.greenSoft:C.redSoft,color:tx.type==="IN"?C.green:C.red,
+                      padding:"3px 8px",borderRadius:99,fontSize:11,fontWeight:700,flexShrink:0}}>
+                      {tx.type==="IN"?"↓ IN":"↑ OUT"}
+                    </span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.tx}}>{tx.source||tx.dest||"—"}</div>
+                      <div style={{fontSize:11,color:C.tx3}}>{new Date(tx.date).toLocaleDateString()} · 👤 {tx.userName}</div>
+                    </div>
+                    <div style={{fontSize:16,fontWeight:800,color:tx.type==="IN"?C.green:C.red,flexShrink:0}}>×{tx.qty}</div>
+                  </div>
+                ))}
+              </div>
             ):(
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
@@ -1334,7 +1353,7 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
                     ))}</tr>
                   </thead>
                   <tbody>
-                    {itemTxs.map(tx=>(
+                    {txSlice.map(tx=>(
                       <tr key={tx._id} style={{borderBottom:`1px solid ${C.surf2}`}}>
                         <td style={{padding:"10px 12px",color:C.tx3,fontSize:11.5,whiteSpace:"nowrap"}}>{new Date(tx.date).toLocaleDateString(lang==="ar"?"ar-EG":"en-GB")}</td>
                         <td style={{padding:"10px 12px"}}>
@@ -1352,6 +1371,9 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
                 </table>
               </div>
             )}
+            {itemTxs.length>0&&<div style={{padding:"8px 12px 12px"}}>
+              <Paginate page={txPg} total={txTotal} setPg={setTxPg} perPage={txPP} setPerPage={setTxPP} t={t} totalItems={itemTxs.length}/>
+            </div>}
           </Card>
         </div>
       </div>
