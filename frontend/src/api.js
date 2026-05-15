@@ -50,6 +50,7 @@ export const api = {
 
   // Users
   getUsers:   ()      => req("GET",    "/users"),
+  getUser:    (id)    => req("GET",    `/users/${id}`),
   addUser:    (d)     => req("POST",   "/users", d),
   updateUser: (id, d) => req("PUT",    `/users/${id}`, d),
   deleteUser: (id)    => req("DELETE", `/users/${id}`),

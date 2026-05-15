@@ -10,7 +10,7 @@ const T = {
     login:"تسجيل الدخول", username:"اسم المستخدم", password:"كلمة المرور",
     enterSystem:"دخول النظام", logout:"خروج", demo:"تجريبي: admin / admin",
     badLogin:"بيانات غير صحيحة", loading:"جاري التحميل...",
-    nav:{dash:"لوحة التحكم",inv:"المخزون",tx:"الحركات",dept:"الأقسام",users:"المستخدمون"},
+    nav:{dash:"لوحة التحكم",inv:"المخزون",tx:"الحركات",dept:"الأقسام",users:"المستخدمون",profile:"ملفي الشخصي"},
     dash:{total:"إجمالي الأصناف",value:"قيمة المخزون",low:"مخزون منخفض",
       todayTx:"حركات اليوم",recent:"آخر الحركات"},
     inv:{title:"المخزون",add:"إضافة صنف",edit:"تعديل",del:"حذف",view:"عرض",
@@ -26,8 +26,13 @@ const T = {
       date:"التاريخ",user:"المسؤول",notes:"ملاحظات",item:"الصنف",qty:"الكمية",allType:"كل الحركات"},
     dept:{title:"الأقسام والتصنيفات",addDept:"إضافة قسم",addCat:"إضافة تصنيف",
       deptName:"اسم القسم",catName:"اسم التصنيف",color:"اللون"},
-    users:{title:"المستخدمون",add:"إضافة مستخدم",name:"الاسم الكامل",role:"الصلاحية",
-      roles:{admin:"مدير النظام",manager:"مدير تشغيل",warehouse:"أمين مخزن",viewer:"مشاهد"}},
+    users:{title:"المستخدمون",add:"إضافة مستخدم",edit:"تعديل المستخدم",name:"الاسم الكامل",email:"البريد الإلكتروني",role:"الصلاحية",
+      newPass:"كلمة مرور جديدة (اتركها فارغة للإبقاء)",permsTitle:"الصلاحيات",
+      roles:{admin:"مدير النظام",manager:"مدير تشغيل",warehouse:"أمين مخزن",viewer:"مشاهد"},
+      permLabels:{canAdd:"إضافة أصناف",canEdit:"تعديل أصناف",canDelete:"حذف أصناف",canTx:"تسجيل حركات",canManageUsers:"إدارة المستخدمين",canManageDepts:"إدارة الأقسام"},
+      inactive:"تعطيل",active:"تفعيل",joinedOn:"تاريخ الانضمام",lastActive:"آخر نشاط",txCount:"عدد الحركات"},
+    profile:{title:"الملف الشخصي",myPerms:"صلاحياتي",allowed:"مسموح",denied:"غير مسموح"},
+    prev:"السابق",next:"التالي",page:"صفحة",of:"من",
     status:{active:"نشط",inactive:"غير نشط",discontinued:"متوقف"},
     types:{unit:"وحدة",box:"صندوق",pack:"حزمة",group:"مجموعة",roll:"لفة",bag:"كيس",pallet:"منصة"},
     save:"حفظ",cancel:"إلغاء",delete:"حذف",confirm:"تأكيد الحذف",
@@ -46,7 +51,7 @@ const T = {
     login:"Login",username:"Username",password:"Password",
     enterSystem:"Enter System",logout:"Sign Out",demo:"Demo: admin / admin",
     badLogin:"Invalid credentials",loading:"Loading...",
-    nav:{dash:"Dashboard",inv:"Inventory",tx:"Transactions",dept:"Departments",users:"Users"},
+    nav:{dash:"Dashboard",inv:"Inventory",tx:"Transactions",dept:"Departments",users:"Users",profile:"My Profile"},
     dash:{total:"Total Items",value:"Inventory Value",low:"Low Stock",
       todayTx:"Today's Transactions",recent:"Recent Activity"},
     inv:{title:"Inventory",add:"Add Item",edit:"Edit",del:"Delete",view:"View",
@@ -62,8 +67,13 @@ const T = {
       date:"Date",user:"User",notes:"Notes",item:"Item",qty:"Quantity",allType:"All Types"},
     dept:{title:"Departments & Categories",addDept:"Add Department",addCat:"Add Category",
       deptName:"Department Name",catName:"Category Name",color:"Color"},
-    users:{title:"Users",add:"Add User",name:"Full Name",role:"Role",
-      roles:{admin:"System Admin",manager:"Manager",warehouse:"Warehouse Staff",viewer:"Viewer"}},
+    users:{title:"Users",add:"Add User",edit:"Edit User",name:"Full Name",email:"Email",role:"Role",
+      newPass:"New Password (leave blank to keep)",permsTitle:"Permissions",
+      roles:{admin:"System Admin",manager:"Manager",warehouse:"Warehouse Staff",viewer:"Viewer"},
+      permLabels:{canAdd:"Add Items",canEdit:"Edit Items",canDelete:"Delete Items",canTx:"Record Transactions",canManageUsers:"Manage Users",canManageDepts:"Manage Departments"},
+      inactive:"Deactivate",active:"Activate",joinedOn:"Joined",lastActive:"Last Active",txCount:"Transactions"},
+    profile:{title:"My Profile",myPerms:"My Permissions",allowed:"Allowed",denied:"Denied"},
+    prev:"Prev",next:"Next",page:"Page",of:"of",
     status:{active:"Active",inactive:"Inactive",discontinued:"Discontinued"},
     types:{unit:"Unit",box:"Box",pack:"Pack",group:"Group",roll:"Roll",bag:"Bag",pallet:"Pallet"},
     save:"Save",cancel:"Cancel",delete:"Delete",confirm:"Confirm Delete",
@@ -79,12 +89,14 @@ const T = {
   }
 };
 
-const PERMS={
+const ROLE_PERMS={
   admin:    {canAdd:true,canEdit:true,canDelete:true,canTx:true,canManageUsers:true,canManageDepts:true},
   manager:  {canAdd:true,canEdit:true,canDelete:false,canTx:true,canManageUsers:false,canManageDepts:true},
   warehouse:{canAdd:false,canEdit:false,canDelete:false,canTx:true,canManageUsers:false,canManageDepts:false},
   viewer:   {canAdd:false,canEdit:false,canDelete:false,canTx:false,canManageUsers:false,canManageDepts:false},
 };
+const PERM_KEYS=["canAdd","canEdit","canDelete","canTx","canManageUsers","canManageDepts"];
+const resolvePerms=u=>({...(ROLE_PERMS[u?.role]||ROLE_PERMS.viewer),...(u?.permissions||{})});
 
 const today=()=>new Date().toISOString().split("T")[0];
 const money=n=>Number(n||0).toLocaleString();
@@ -102,6 +114,51 @@ const R={sm:8,md:12,lg:16};
 const SH={sm:"0 1px 3px rgba(0,0,0,.07)",lg:"0 16px 48px rgba(0,0,0,.18)"};
 const baseInput={width:"100%",padding:"9px 12px",border:`1px solid ${C.bdr2}`,borderRadius:R.sm,
   fontSize:13.5,color:C.tx,background:C.surf,outline:"none",fontFamily:"inherit",boxSizing:"border-box"};
+
+// ── Responsive helpers ────────────────────────────────────────────────────────
+const useMobile=()=>{const[m,setM]=useState(window.innerWidth<640);useEffect(()=>{const h=()=>setM(window.innerWidth<640);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);return m;};
+const useTablet=()=>{const[m,setM]=useState(window.innerWidth<1024);useEffect(()=>{const h=()=>setM(window.innerWidth<1024);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);return m;};
+
+// ── Pagination hook ───────────────────────────────────────────────────────────
+function usePaginate(items,perPage=15){
+  const[pg,setPg]=useState(1);
+  const total=Math.max(1,Math.ceil(items.length/perPage));
+  const page=Math.min(pg,total);
+  const slice=items.slice((page-1)*perPage,page*perPage);
+  useEffect(()=>setPg(1),[items.length]);
+  return{slice,page,total,setPg:p=>setPg(Math.max(1,Math.min(total,p)))};
+}
+function Paginate({page,total,setPg,t}){
+  if(total<=1)return null;
+  return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:16,flexWrap:"wrap"}}>
+      <button onClick={()=>setPg(page-1)} disabled={page===1}
+        style={{padding:"6px 14px",borderRadius:R.sm,border:`1px solid ${C.bdr2}`,background:C.surf,cursor:page===1?"not-allowed":"pointer",color:page===1?C.tx3:C.tx,fontSize:13,fontFamily:"inherit"}}>
+        ‹ {t.prev}
+      </button>
+      {Array.from({length:Math.min(total,7)},(_,i)=>{
+        let p;
+        if(total<=7)p=i+1;
+        else if(page<=4)p=i+1;
+        else if(page>=total-3)p=total-6+i;
+        else p=page-3+i;
+        if(p<1||p>total)return null;
+        return(
+          <button key={p} onClick={()=>setPg(p)}
+            style={{width:34,height:34,borderRadius:R.sm,border:`1px solid ${page===p?C.primary:C.bdr2}`,
+              background:page===p?C.primary:C.surf,color:page===p?"#fff":C.tx,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:page===p?700:400}}>
+            {p}
+          </button>
+        );
+      })}
+      <button onClick={()=>setPg(page+1)} disabled={page===total}
+        style={{padding:"6px 14px",borderRadius:R.sm,border:`1px solid ${C.bdr2}`,background:C.surf,cursor:page===total?"not-allowed":"pointer",color:page===total?C.tx3:C.tx,fontSize:13,fontFamily:"inherit"}}>
+        {t.next} ›
+      </button>
+      <span style={{fontSize:12,color:C.tx3}}>{t.page} {page} {t.of} {total}</span>
+    </div>
+  );
+}
 
 // ── Tiny components ───────────────────────────────────────────────────────────
 function Btn({children,onClick,type="button",color="primary",size="md",disabled,full,style:sx}){
@@ -328,24 +385,52 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
     const code=(barcode||"").trim();
     if(!code){setLookMsg("");return;}
     setLooking(true);setLookMsg("");
+    // 1. Check own inventory first
     try{
       const existing=await api.getByBarcode(code);
       if(existing){
         setF(p=>({...p,name:existing.name,nameEn:existing.nameEn||p.nameEn,
-          description:existing.description||p.description,photo:existing.photo||p.photo}));
+          description:existing.description||p.description,photo:existing.photo||p.photo,
+          price:existing.price||p.price,type:existing.type||p.type}));
         setLookMsg(inv.found);setLooking(false);return;
       }
     }catch{}
+    // 2. Try Open Food Facts
     try{
-      const r=await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const r=await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`,{signal:AbortSignal.timeout(5000)});
       const d=await r.json();
       if(d.status===1&&d.product){
-        if(d.product.product_name)setF(p=>({...p,name:d.product.product_name}));
-        if(d.product.generic_name)setF(p=>({...p,description:d.product.generic_name}));
-        if(d.product.image_url)setF(p=>({...p,photo:d.product.image_url}));
-        setLookMsg(inv.found);
-      }else setLookMsg(inv.notFound);
-    }catch{setLookMsg(inv.notFound);}
+        const p=d.product;
+        const name=p.product_name_ar||p.product_name||p.generic_name||"";
+        const nameEn=p.product_name_en||p.product_name||"";
+        const desc=[p.ingredients_text_en||p.ingredients_text,p.quantity,p.packaging].filter(Boolean).join(" · ");
+        const photo=p.image_front_url||p.image_url||"";
+        const brand=p.brands||"";
+        setF(prev=>({...prev,
+          name:name||prev.name,
+          nameEn:nameEn||prev.nameEn,
+          description:desc?`${brand?brand+" — ":""}${desc}`:prev.description,
+          photo:photo||prev.photo,
+        }));
+        setLookMsg(inv.found);setLooking(false);return;
+      }
+    }catch{}
+    // 3. Try UPC Item DB
+    try{
+      const r=await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`,{signal:AbortSignal.timeout(5000)});
+      const d=await r.json();
+      if(d.code==="OK"&&d.items?.length){
+        const item=d.items[0];
+        setF(prev=>({...prev,
+          name:item.title||prev.name,
+          nameEn:item.title||prev.nameEn,
+          description:[item.description,item.brand,item.category].filter(Boolean).join(" · ")||prev.description,
+          photo:item.images?.[0]||prev.photo,
+        }));
+        setLookMsg(inv.found);setLooking(false);return;
+      }
+    }catch{}
+    setLookMsg(inv.notFound);
     setLooking(false);
   };
 
@@ -498,6 +583,7 @@ function TxForm({items,currentUser,t,onSave,onClose,prefillId}){
 
 function Dashboard({stats,lang,t,onNav}){
   const d=t.dash;
+  const mobile=useMobile();
   if(!stats)return <Spinner/>;
   const kpis=[
     {l:d.total,v:stats.totalItems,em:"📦",go:"inv"},
@@ -519,7 +605,7 @@ function Dashboard({stats,lang,t,onNav}){
           </button>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:mobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:12,marginBottom:20}}>
         {kpis.map((k,i)=>(
           <div key={i} onClick={k.go?()=>onNav(k.go):undefined}
             style={{background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.lg,
@@ -569,6 +655,7 @@ function Dashboard({stats,lang,t,onNav}){
 
 function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,onDetail,loading}){
   const inv=t.inv;
+  const mobile=useMobile();
   const [search,setSearch]=useState("");
   const [deptF,setDeptF]=useState("all");
   const [stF,setStF]=useState("all");
@@ -584,34 +671,48 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
     });
   },[items,search,deptF,stF]);
 
+  const{slice,page,total,setPg}=usePaginate(filtered,12);
+
   if(loading)return <Spinner/>;
   return(
     <div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:10,flexWrap:"wrap"}}>
         <div style={{display:"flex",gap:8,flex:1,flexWrap:"wrap"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"7px 12px",flex:1,minWidth:180}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"7px 12px",flex:1,minWidth:160}}>
             🔍<input placeholder={t.search} value={search} onChange={e=>setSearch(e.target.value)}
               style={{border:"none",background:"none",outline:"none",fontSize:12.5,color:C.tx,width:"100%",fontFamily:"inherit"}}/>
           </div>
-          <select value={deptF} onChange={e=>setDeptF(e.target.value)} style={{...baseInput,width:"auto",padding:"7px 10px",fontSize:12.5}}>
+          {!mobile&&<select value={deptF} onChange={e=>setDeptF(e.target.value)} style={{...baseInput,width:"auto",padding:"7px 10px",fontSize:12.5}}>
             <option value="all">{inv.allDept}</option>
             {depts.map(d=><option key={d._id||d.id} value={d._id||d.id}>{lang==="ar"?d.name:d.nameEn||d.name}</option>)}
-          </select>
-          <select value={stF} onChange={e=>setStF(e.target.value)} style={{...baseInput,width:"auto",padding:"7px 10px",fontSize:12.5}}>
+          </select>}
+          {!mobile&&<select value={stF} onChange={e=>setStF(e.target.value)} style={{...baseInput,width:"auto",padding:"7px 10px",fontSize:12.5}}>
             <option value="all">{inv.allStatus}</option>
             <option value="ok">✅ {lang==="ar"?"متوفر":"In Stock"}</option>
             <option value="low">⚠️ {lang==="ar"?"منخفض":"Low"}</option>
             <option value="out">🔴 {lang==="ar"?"نفد":"Out"}</option>
-          </select>
+          </select>}
         </div>
         <div style={{display:"flex",gap:8}}>
-          {perm.canTx&&<Btn color="ghost" onClick={()=>onTx(null)}>↕ {t.tx.record}</Btn>}
-          {perm.canAdd&&<Btn color="primary" onClick={onAdd}>＋ {inv.add}</Btn>}
+          {perm.canTx&&!mobile&&<Btn color="ghost" onClick={()=>onTx(null)}>↕ {t.tx.record}</Btn>}
+          {perm.canAdd&&<Btn color="primary" onClick={onAdd}>＋ {mobile?"":inv.add}</Btn>}
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(270px,1fr))",gap:14}}>
-        {filtered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:48,color:C.tx3}}>{t.noData}</div>}
-        {filtered.map(item=>{
+      {mobile&&<div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <select value={deptF} onChange={e=>setDeptF(e.target.value)} style={{...baseInput,flex:1,padding:"7px 10px",fontSize:12}}>
+          <option value="all">{inv.allDept}</option>
+          {depts.map(d=><option key={d._id||d.id} value={d._id||d.id}>{lang==="ar"?d.name:d.nameEn||d.name}</option>)}
+        </select>
+        <select value={stF} onChange={e=>setStF(e.target.value)} style={{...baseInput,flex:1,padding:"7px 10px",fontSize:12}}>
+          <option value="all">{inv.allStatus}</option>
+          <option value="ok">✅ {lang==="ar"?"متوفر":"In Stock"}</option>
+          <option value="low">⚠️ {lang==="ar"?"منخفض":"Low"}</option>
+          <option value="out">🔴 {lang==="ar"?"نفد":"Out"}</option>
+        </select>
+      </div>}
+      <div style={{display:"grid",gridTemplateColumns:mobile?"repeat(auto-fill,minmax(160px,1fr))":"repeat(auto-fill,minmax(260px,1fr))",gap:mobile?10:14}}>
+        {slice.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:48,color:C.tx3}}>{t.noData}</div>}
+        {slice.map(item=>{
           const dept=depts.find(d=>(d._id||d.id)===(item.deptId?._id||item.deptId));
           const cat=cats.find(c=>(c._id||c.id)===(item.catId?._id||item.catId));
           const st=stOf(item);
@@ -666,19 +767,22 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
           );
         })}
       </div>
+      <Paginate page={page} total={total} setPg={setPg} t={t}/>
     </div>
   );
 }
 
 function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
+  const mobile=useMobile();
   const [typeF,setTypeF]=useState("all");
   const [search,setSearch]=useState("");
-  const filtered=useMemo(()=>[...txs].filter(tx=>{
+  const filtered=useMemo(()=>[...txs].sort((a,b)=>new Date(b.date)-new Date(a.date)).filter(tx=>{
     const q=search.toLowerCase();
     const name=(tx.itemId?.name||"").toLowerCase();
     return(!q||name.includes(q)||(tx.source||"").toLowerCase().includes(q)||(tx.dest||"").toLowerCase().includes(q))
       &&(typeF==="all"||tx.type===typeF);
   }),[txs,typeF,search]);
+  const{slice,page,total,setPg}=usePaginate(filtered,20);
 
   if(loading)return <Spinner/>;
   return(
@@ -706,8 +810,8 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
               ))}</tr>
             </thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={8} style={{textAlign:"center",padding:40,color:C.tx3}}>{t.noData}</td></tr>}
-              {filtered.map(tx=>(
+              {slice.length===0&&<tr><td colSpan={8} style={{textAlign:"center",padding:40,color:C.tx3}}>{t.noData}</td></tr>}
+              {slice.map(tx=>(
                 <tr key={tx._id} style={{borderBottom:`1px solid ${C.surf2}`}}>
                   <td style={{padding:"11px 13px",color:C.tx3,fontSize:12,whiteSpace:"nowrap"}}>{new Date(tx.date).toLocaleDateString(lang==="ar"?"ar-EG":"en-GB")}</td>
                   <td style={{padding:"11px 13px"}}>
@@ -727,16 +831,18 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
           </table>
         </div>
       </Card>
+      <Paginate page={page} total={total} setPg={setPg} t={t}/>
     </div>
   );
 }
 
 function DeptPage({depts,cats,items,lang,t,perm,onAddDept,onDelDept,onAddCat,onDelCat}){
   const dt=t.dept;
+  const tablet=useTablet();
   const [dName,setDName]=useState("");const[dColor,setDColor]=useState("#3b82f6");
   const [cName,setCName]=useState("");const[cDept,setCDept]=useState("");
   return(
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+    <div style={{display:"grid",gridTemplateColumns:tablet?"1fr":"1fr 1fr",gap:20}}>
       <div>
         <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>{lang==="ar"?"الأقسام":"Departments"}</div>
         {perm.canManageDepts&&<Card style={{padding:16,marginBottom:14}}>
@@ -795,64 +901,311 @@ function DeptPage({depts,cats,items,lang,t,perm,onAddDept,onDelDept,onAddCat,onD
   );
 }
 
-function UsersPage({users,currentUser,lang,t,perm,onAdd,onToggle,onDelete}){
+function UserEditModal({user,t,onSave,onClose}){
   const ut=t.users;
-  const [show,setShow]=useState(false);
-  const [f,setF]=useState({name:"",username:"",password:"",role:"warehouse"});
+  const roleBase=ROLE_PERMS[user.role]||ROLE_PERMS.viewer;
+  const [f,setF]=useState({
+    name:user.name||"",nameEn:user.nameEn||"",email:user.email||"",
+    role:user.role||"viewer",password:"",
+    permissions:{...roleBase,...(user.permissions||{})}
+  });
+  const[saving,setSaving]=useState(false);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const sp=(k,v)=>setF(p=>({...p,permissions:{...p.permissions,[k]:v}}));
+
+  useEffect(()=>{
+    const base=ROLE_PERMS[f.role]||ROLE_PERMS.viewer;
+    setF(p=>({...p,permissions:{...base,...(user.permissions||{})}}));
+  },[f.role]);
+
+  const submit=async()=>{
+    if(!f.name.trim())return;
+    setSaving(true);
+    const payload={name:f.name,nameEn:f.nameEn,email:f.email,role:f.role,permissions:f.permissions};
+    if(f.password.trim())payload.password=f.password;
+    try{await onSave(user._id||user.id,payload);}finally{setSaving(false);}
+  };
+
   return(
-    <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-        <div style={{fontWeight:700,fontSize:15}}>{ut.title}</div>
-        {perm.canManageUsers&&<Btn color="primary" onClick={()=>setShow(!show)}>{show?"✕":("＋ "+ut.add)}</Btn>}
-      </div>
-      {show&&<Card style={{padding:20,marginBottom:16}}>
-        <G2>
-          <Inp label={ut.name+"*"} value={f.name} onChange={e=>s("name",e.target.value)}/>
-          <Inp label="Username*" value={f.username} onChange={e=>s("username",e.target.value)}/>
-          <Inp label="Password*" type="password" value={f.password} onChange={e=>s("password",e.target.value)}/>
+    <ModalShell title={ut.edit} onClose={onClose}>
+      <G2>
+        <Inp label={ut.name+"*"} value={f.name} onChange={e=>s("name",e.target.value)}/>
+        <Inp label="Username" value={user.username} disabled style={{opacity:.6}}/>
+        <Inp label={ut.email} value={f.email} onChange={e=>s("email",e.target.value)} placeholder="user@example.com"/>
+        <Inp label={ut.newPass} type="password" value={f.password} onChange={e=>s("password",e.target.value)} placeholder="••••••••"/>
+        <S2>
           <Sel label={ut.role} value={f.role} onChange={e=>s("role",e.target.value)}>
             {Object.entries(t.users.roles).map(([k,v])=><option key={k} value={k}>{v}</option>)}
           </Sel>
+        </S2>
+      </G2>
+      <div style={{marginTop:16,padding:14,background:C.surf2,borderRadius:R.md}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🔑 {ut.permsTitle}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {PERM_KEYS.map(k=>(
+            <label key={k} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,padding:"6px 8px",borderRadius:R.sm,background:f.permissions[k]?C.greenSoft:C.redSoft,border:`1px solid ${f.permissions[k]?"#86efac":"#fca5a5"}`}}>
+              <input type="checkbox" checked={!!f.permissions[k]} onChange={e=>sp(k,e.target.checked)} style={{width:15,height:15,cursor:"pointer"}}/>
+              <span style={{color:f.permissions[k]?C.green:C.red,fontWeight:600}}>{ut.permLabels[k]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+        <Btn color="ghost" onClick={onClose}>{t.cancel}</Btn>
+        <Btn color="primary" onClick={submit} disabled={saving}>{saving?"⏳":t.save}</Btn>
+      </div>
+    </ModalShell>
+  );
+}
+
+function UsersPage({users,currentUser,txs,lang,t,perm,onAdd,onUpdate,onToggle,onDelete}){
+  const ut=t.users;
+  const mobile=useMobile();
+  const [showAdd,setShowAdd]=useState(false);
+  const [editUser,setEditUser]=useState(null);
+  const [viewUser,setViewUser]=useState(null);
+  const [f,setF]=useState({name:"",nameEn:"",email:"",username:"",password:"",role:"warehouse"});
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const{slice,page,total,setPg}=usePaginate(users,12);
+
+  const roleColors={admin:{bg:"#ede9fe",tx:"#5b21b6"},manager:{bg:C.primarySoft,tx:C.primary},warehouse:{bg:C.greenSoft,tx:C.green},viewer:{bg:"#f1f5f9",tx:C.tx2}};
+
+  if(viewUser){
+    const u=users.find(x=>(x._id||x.id)===(viewUser._id||viewUser.id))||viewUser;
+    const userTxs=txs.filter(tx=>(tx.userId===( u._id||u.id)||tx.userName===u.name));
+    const perms=resolvePerms(u);
+    return(
+      <div>
+        <button onClick={()=>setViewUser(null)} style={{display:"flex",alignItems:"center",gap:5,background:C.surf,border:`1px solid ${C.bdr2}`,borderRadius:R.sm,padding:"6px 12px",cursor:"pointer",fontSize:13,fontWeight:600,color:C.tx2,fontFamily:"inherit",marginBottom:20}}>
+          {lang==="ar"?"→ ":"← "}{ut.title}
+        </button>
+        <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"280px 1fr",gap:20,alignItems:"start"}}>
+          <div>
+            <Card style={{padding:20,marginBottom:14,textAlign:"center"}}>
+              <div style={{width:72,height:72,borderRadius:99,background:C.primary,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:28,margin:"0 auto 12px"}}>
+                {u.name.charAt(0)}
+              </div>
+              <div style={{fontWeight:800,fontSize:17,marginBottom:2}}>{u.name}</div>
+              {u.nameEn&&<div style={{fontSize:13,color:C.tx3,marginBottom:8}}>{u.nameEn}</div>}
+              <div style={{fontSize:12,color:C.tx3,fontFamily:"monospace",marginBottom:8}}>@{u.username}</div>
+              {u.email&&<div style={{fontSize:12,color:C.tx3,marginBottom:10}}>✉️ {u.email}</div>}
+              <span style={{background:roleColors[u.role]?.bg||"#f1f5f9",color:roleColors[u.role]?.tx||C.tx2,padding:"3px 12px",borderRadius:99,fontSize:12,fontWeight:700}}>
+                {t.users.roles[u.role]||u.role}
+              </span>
+              <div style={{marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:99,background:u.active?C.green:C.red}}/>
+                <span style={{fontSize:12,color:u.active?C.green:C.red}}>{u.active?(lang==="ar"?"نشط":"Active"):(lang==="ar"?"معطل":"Inactive")}</span>
+              </div>
+              {u.createdAt&&<div style={{fontSize:11,color:C.tx3,marginTop:8}}>📅 {ut.joinedOn}: {new Date(u.createdAt).toLocaleDateString()}</div>}
+            </Card>
+            <Card style={{padding:"12px 16px",marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>📊 {ut.txCount}</div>
+              <div style={{fontSize:28,fontWeight:800,color:C.primary,textAlign:"center"}}>{userTxs.length}</div>
+            </Card>
+            {perm.canManageUsers&&(u._id||u.id)!==(currentUser._id||currentUser.id)&&(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <Btn color="primary" full onClick={()=>setEditUser(u)}>✏️ {ut.edit}</Btn>
+                <Btn color="ghost" full onClick={()=>onToggle(u._id||u.id,!u.active)}>
+                  {u.active?"⏸ "+ut.inactive:"▶ "+ut.active}
+                </Btn>
+                <Btn color="red" full onClick={()=>{onDelete(u._id||u.id);setViewUser(null);}}>🗑️ {t.delete}</Btn>
+              </div>
+            )}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <Card style={{padding:20}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🔑 {ut.permsTitle}</div>
+              <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"1fr 1fr",gap:8}}>
+                {PERM_KEYS.map(k=>(
+                  <div key={k} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:R.sm,background:perms[k]?C.greenSoft:C.surf2,border:`1px solid ${perms[k]?"#86efac":C.bdr}`}}>
+                    <span style={{fontSize:16}}>{perms[k]?"✅":"❌"}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:perms[k]?C.green:C.tx3}}>{ut.permLabels[k]}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+            <Card style={{overflow:"hidden"}}>
+              <div style={{padding:"12px 16px",fontWeight:700,fontSize:13,borderBottom:`1px solid ${C.bdr}`}}>📋 {lang==="ar"?"آخر الحركات":"Recent Transactions"}</div>
+              {userTxs.length===0?(
+                <div style={{padding:24,textAlign:"center",color:C.tx3,fontSize:13}}>{t.noData}</div>
+              ):(
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+                    <thead style={{background:C.surf2}}>
+                      <tr>{[t.tx.date,t.tx.type,t.inv.name,t.tx.qty].map(h=>(
+                        <th key={h} style={{padding:"8px 12px",textAlign:"inherit",fontWeight:600,color:C.tx3,fontSize:10.5,textTransform:"uppercase",borderBottom:`1px solid ${C.bdr}`,whiteSpace:"nowrap"}}>{h}</th>
+                      ))}</tr>
+                    </thead>
+                    <tbody>
+                      {userTxs.slice(0,20).map(tx=>(
+                        <tr key={tx._id} style={{borderBottom:`1px solid ${C.surf2}`}}>
+                          <td style={{padding:"9px 12px",color:C.tx3,fontSize:11.5}}>{new Date(tx.date).toLocaleDateString()}</td>
+                          <td style={{padding:"9px 12px"}}>
+                            <span style={{background:tx.type==="IN"?C.greenSoft:C.redSoft,color:tx.type==="IN"?C.green:C.red,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>
+                              {tx.type==="IN"?"↓":"↑"} {tx.type}
+                            </span>
+                          </td>
+                          <td style={{padding:"9px 12px",fontWeight:600}}>{tx.itemId?.name||"—"}</td>
+                          <td style={{padding:"9px 12px",fontFamily:"monospace"}}>{tx.qty}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
+        {editUser&&<UserEditModal user={editUser} t={t} onClose={()=>setEditUser(null)} onSave={async(id,d)=>{await onUpdate(id,d);setEditUser(null);const updated=users.find(x=>(x._id||x.id)===id);if(updated)setViewUser({...updated,...d});}}/>}
+      </div>
+    );
+  }
+
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:15}}>{ut.title} ({users.length})</div>
+        {perm.canManageUsers&&<Btn color="primary" onClick={()=>setShowAdd(!showAdd)}>{showAdd?"✕":("＋ "+ut.add)}</Btn>}
+      </div>
+      {showAdd&&<Card style={{padding:20,marginBottom:16}}>
+        <G2>
+          <Inp label={ut.name+"*"} value={f.name} onChange={e=>s("name",e.target.value)}/>
+          <Inp label="Username*" value={f.username} onChange={e=>s("username",e.target.value)}/>
+          <Inp label={ut.email} value={f.email} onChange={e=>s("email",e.target.value)} placeholder="user@example.com"/>
+          <Inp label="Password*" type="password" value={f.password} onChange={e=>s("password",e.target.value)}/>
+          <S2>
+            <Sel label={ut.role} value={f.role} onChange={e=>s("role",e.target.value)}>
+              {Object.entries(t.users.roles).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+            </Sel>
+          </S2>
         </G2>
         <div style={{display:"flex",gap:8,marginTop:14}}>
-          <Btn color="ghost" onClick={()=>setShow(false)}>{t.cancel}</Btn>
+          <Btn color="ghost" onClick={()=>setShowAdd(false)}>{t.cancel}</Btn>
           <Btn color="primary" onClick={async()=>{
             if(!f.name||!f.username||!f.password)return;
-            await onAdd(f);setF({name:"",username:"",password:"",role:"warehouse"});setShow(false);
+            await onAdd(f);setF({name:"",nameEn:"",email:"",username:"",password:"",role:"warehouse"});setShowAdd(false);
           }}>{t.save}</Btn>
         </div>
       </Card>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
-        {users.map(u=>(
-          <Card key={u._id||u.id} style={{padding:18}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+        {slice.map(u=>(
+          <Card key={u._id||u.id} style={{padding:18,cursor:"pointer",transition:"box-shadow .15s"}}
+            onClick={()=>setViewUser(u)}
+            onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,.1)"}
+            onMouseLeave={e=>e.currentTarget.style.boxShadow=SH.sm}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-              <div style={{width:42,height:42,borderRadius:99,background:C.primary,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:16,flexShrink:0}}>
+              <div style={{width:44,height:44,borderRadius:99,background:C.primary,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:17,flexShrink:0}}>
                 {u.name.charAt(0)}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div>
                 <div style={{fontSize:11.5,color:C.tx3,fontFamily:"monospace"}}>@{u.username}</div>
+                {u.email&&<div style={{fontSize:11,color:C.tx3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>✉️ {u.email}</div>}
               </div>
               <div style={{width:8,height:8,borderRadius:99,background:u.active?C.green:C.red,flexShrink:0}}/>
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-              <span style={{background:{admin:"#ede9fe",manager:C.primarySoft,warehouse:C.greenSoft,viewer:"#f1f5f9"}[u.role]||"#f1f5f9",
-                color:{admin:"#5b21b6",manager:C.primary,warehouse:C.green,viewer:C.tx2}[u.role]||C.tx2,
-                padding:"2px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{background:roleColors[u.role]?.bg||"#f1f5f9",color:roleColors[u.role]?.tx||C.tx2,padding:"2px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>
                 {t.users.roles[u.role]||u.role}
               </span>
+              <span style={{fontSize:11,color:C.tx3}}>{txs.filter(tx=>tx.userName===u.name).length} {lang==="ar"?"حركة":"txs"}</span>
             </div>
-            {perm.canManageUsers&&(u._id||u.id)!==(currentUser._id||currentUser.id)&&(
-              <div style={{display:"flex",gap:6}}>
-                <Btn color="ghost" size="sm" onClick={()=>onToggle(u._id||u.id,!u.active)}>
-                  {u.active?"⏸ "+ut.inactive:"▶ "+ut.active}
-                </Btn>
-                <Btn color="red" size="sm" onClick={()=>onDelete(u._id||u.id)}>🗑️</Btn>
-              </div>
-            )}
           </Card>
         ))}
+      </div>
+      <Paginate page={page} total={total} setPg={setPg} t={t}/>
+      {editUser&&<UserEditModal user={editUser} t={t} onClose={()=>setEditUser(null)} onSave={async(id,d)=>{await onUpdate(id,d);setEditUser(null);}}/>}
+    </div>
+  );
+}
+
+// ── User Profile Page (own profile) ──────────────────────────────────────────
+function UserProfilePage({currentUser,txs,lang,t,perm}){
+  const mobile=useMobile();
+  const pr=t.profile;
+  const ut=t.users;
+  const myTxs=txs.filter(tx=>tx.userName===currentUser.name||tx.userId===(currentUser._id||currentUser.id));
+  const perms=resolvePerms(currentUser);
+  const{slice,page,total,setPg}=usePaginate(myTxs,15);
+  return(
+    <div>
+      <div style={{fontWeight:700,fontSize:16,marginBottom:20}}>👤 {pr.title}</div>
+      <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"280px 1fr",gap:20,alignItems:"start"}}>
+        <div>
+          <Card style={{padding:24,textAlign:"center",marginBottom:14}}>
+            <div style={{width:80,height:80,borderRadius:99,background:C.primary,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:32,margin:"0 auto 14px"}}>
+              {currentUser.name.charAt(0)}
+            </div>
+            <div style={{fontWeight:800,fontSize:18,marginBottom:4}}>{currentUser.name}</div>
+            {currentUser.nameEn&&<div style={{fontSize:13,color:C.tx3,marginBottom:6}}>{currentUser.nameEn}</div>}
+            <div style={{fontSize:12.5,color:C.tx3,fontFamily:"monospace",marginBottom:6}}>@{currentUser.username}</div>
+            {currentUser.email&&<div style={{fontSize:12,color:C.tx3,marginBottom:12}}>✉️ {currentUser.email}</div>}
+            <span style={{background:C.primarySoft,color:C.primary,padding:"4px 14px",borderRadius:99,fontSize:12,fontWeight:700}}>
+              {t.users.roles[currentUser.role]||currentUser.role}
+            </span>
+          </Card>
+          <Card style={{padding:16,marginBottom:14}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>📊 {lang==="ar"?"إحصائياتي":"My Stats"}</div>
+            {[
+              [lang==="ar"?"إجمالي الحركات":"Total Transactions",myTxs.length,C.primary],
+              [lang==="ar"?"حركات وارد":"Stock IN",myTxs.filter(x=>x.type==="IN").length,C.green],
+              [lang==="ar"?"حركات صادر":"Stock OUT",myTxs.filter(x=>x.type==="OUT").length,C.red],
+            ].map(([l,v,c])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.bdr}`}}>
+                <span style={{fontSize:13,color:C.tx2}}>{l}</span>
+                <span style={{fontSize:16,fontWeight:800,color:c}}>{v}</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <Card style={{padding:20}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>🔑 {pr.myPerms}</div>
+            <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"1fr 1fr",gap:8}}>
+              {PERM_KEYS.map(k=>(
+                <div key={k} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:R.sm,background:perms[k]?C.greenSoft:C.surf2,border:`1px solid ${perms[k]?"#86efac":C.bdr}`}}>
+                  <span style={{fontSize:16}}>{perms[k]?"✅":"❌"}</span>
+                  <div>
+                    <div style={{fontSize:12.5,fontWeight:600,color:perms[k]?C.green:C.tx3}}>{ut.permLabels[k]}</div>
+                    <div style={{fontSize:11,color:C.tx3}}>{perms[k]?pr.allowed:pr.denied}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card style={{overflow:"hidden"}}>
+            <div style={{padding:"12px 16px",fontWeight:700,fontSize:13,borderBottom:`1px solid ${C.bdr}`}}>📋 {lang==="ar"?"حركاتي":"My Transactions"} ({myTxs.length})</div>
+            {myTxs.length===0?(
+              <div style={{padding:32,textAlign:"center",color:C.tx3}}>{t.noData}</div>
+            ):(
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
+                  <thead style={{background:C.surf2}}>
+                    <tr>{[t.tx.date,t.tx.type,t.inv.name,t.tx.qty,lang==="ar"?"ملاحظات":"Notes"].map(h=>(
+                      <th key={h} style={{padding:"8px 12px",textAlign:"inherit",fontWeight:600,color:C.tx3,fontSize:10.5,textTransform:"uppercase",borderBottom:`1px solid ${C.bdr}`,whiteSpace:"nowrap"}}>{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody>
+                    {slice.map(tx=>(
+                      <tr key={tx._id} style={{borderBottom:`1px solid ${C.surf2}`}}>
+                        <td style={{padding:"9px 12px",color:C.tx3,fontSize:11.5,whiteSpace:"nowrap"}}>{new Date(tx.date).toLocaleDateString()}</td>
+                        <td style={{padding:"9px 12px"}}>
+                          <span style={{background:tx.type==="IN"?C.greenSoft:C.redSoft,color:tx.type==="IN"?C.green:C.red,padding:"2px 8px",borderRadius:99,fontSize:11,fontWeight:700}}>
+                            {tx.type==="IN"?"↓ IN":"↑ OUT"}
+                          </span>
+                        </td>
+                        <td style={{padding:"9px 12px",fontWeight:600}}>{tx.itemId?.name||"—"}</td>
+                        <td style={{padding:"9px 12px",fontFamily:"monospace"}}>{tx.qty}</td>
+                        <td style={{padding:"9px 12px",color:C.tx3,fontSize:11.5}}>{tx.notes||"—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div style={{padding:"8px 16px"}}><Paginate page={page} total={total} setPg={setPg} t={t}/></div>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -860,6 +1213,7 @@ function UsersPage({users,currentUser,lang,t,perm,onAdd,onToggle,onDelete}){
 
 // ── Item Detail Page ──────────────────────────────────────────────────────────
 function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
+  const tablet=useTablet();
   const dept=depts.find(d=>(d._id||d.id)===(item.deptId?._id||item.deptId));
   const cat=cats.find(c=>(c._id||c.id)===(item.catId?._id||item.catId));
   const itemTxs=[...txs].filter(tx=>(tx.itemId?._id||tx.itemId)===(item._id||item.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -883,7 +1237,7 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
         <span style={{fontWeight:700,color:C.tx}}>{lang==="ar"?item.name:item.nameEn||item.name}</span>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:20,alignItems:"start"}}>
+      <div style={{display:"grid",gridTemplateColumns:tablet?"1fr":"300px 1fr",gap:20,alignItems:"start"}}>
         {/* Left column */}
         <div>
           <Card style={{overflow:"hidden",marginBottom:14}}>
@@ -1039,7 +1393,7 @@ export default function App(){
 
   const showToast=(msg,type="success")=>setToast({msg,type});
   const closeModal=()=>{setModal(null);setEditItem(null);setTxItemId(null);};
-  const perm=currentUser?PERMS[currentUser.role]:{};
+  const perm=currentUser?resolvePerms(currentUser):{};
 
   // ── Check saved token on mount ────────────────────────────────────────────
   useEffect(()=>{
@@ -1063,7 +1417,7 @@ export default function App(){
       const [d,c,i,tx,s,u]=await Promise.all([
         api.getDepts(),api.getCats(),api.getItems(),
         api.getTxs(),api.getStats(),
-        PERMS[currentUser?.role]?.canManageUsers?api.getUsers():Promise.resolve([]),
+        resolvePerms(currentUser||{})?.canManageUsers?api.getUsers():Promise.resolve([]),
       ]);
       setDepts(d);setCats(c);setItems(i);setTxs(tx);setStats(s);setUsers(u);
     }catch(e){showToast(e.message,"error");}
@@ -1199,7 +1553,8 @@ export default function App(){
     {id:"inv",label:t.nav.inv,icon:"📦"},
     {id:"tx",label:t.nav.tx,icon:"📋"},
     {id:"dept",label:t.nav.dept,icon:"🗂"},
-    {id:"users",label:t.nav.users,icon:"👥"},
+    ...(perm.canManageUsers?[{id:"users",label:t.nav.users,icon:"👥"}]:[]),
+    {id:"profile",label:t.nav.profile,icon:"👤"},
   ];
 
   return(
@@ -1323,10 +1678,12 @@ export default function App(){
               onDelDept={id=>{setDelQ({type:"dept",id});setModal("confirm");}}
               onAddCat={async c=>{try{const nc=await api.addCat(c);setCats(ps=>[...ps,nc]);showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
               onDelCat={id=>{setDelQ({type:"cat",id});setModal("confirm");}}/>}
-            {page==="users"&&<UsersPage users={users} currentUser={currentUser} lang={lang} t={t} perm={perm}
+            {page==="users"&&<UsersPage users={users} currentUser={currentUser} txs={txs} lang={lang} t={t} perm={perm}
               onAdd={async u=>{try{const nu=await api.addUser(u);setUsers(ps=>[...ps,nu]);showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
-              onToggle={async(id,active)=>{try{const u=await api.updateUser(id,{active});setUsers(ps=>ps.map(x=>(x._id||x.id)===id?{...x,active}:x));showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
+              onUpdate={async(id,d)=>{try{const u=await api.updateUser(id,d);setUsers(ps=>ps.map(x=>(x._id||x.id)===id?u:x));showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
+              onToggle={async(id,active)=>{try{await api.updateUser(id,{active});setUsers(ps=>ps.map(x=>(x._id||x.id)===id?{...x,active}:x));showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
               onDelete={id=>{setDelQ({type:"user",id});setModal("confirm");}}/>}
+            {page==="profile"&&currentUser&&<UserProfilePage currentUser={currentUser} txs={txs} lang={lang} t={t} perm={perm}/>}
           </div>
         </div>
       </div>

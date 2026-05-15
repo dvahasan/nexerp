@@ -61,8 +61,10 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   nameEn: String,
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  email: { type: String, trim: true, lowercase: true, default: "" },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ["admin","manager","warehouse","viewer"], default: "viewer" },
+  permissions: { type: mongoose.Schema.Types.Mixed, default: null },
   active: { type: Boolean, default: true },
 }, { timestamps: true });
 UserSchema.methods.checkPass = function(p) { return bcrypt.compare(p, this.passwordHash); };
@@ -103,12 +105,13 @@ const Item        = mongoose.model("Item",        ItemSchema);
 const Transaction = mongoose.model("Transaction", TxSchema);
 
 // ── Permissions ───────────────────────────────────────────────────────────────
-const PERMS = {
+const ROLE_PERMS = {
   admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTx:true,  canManageUsers:true,  canManageDepts:true  },
   manager:   { canAdd:true,  canEdit:true,  canDelete:false, canTx:true,  canManageUsers:false, canManageDepts:true  },
   warehouse: { canAdd:false, canEdit:false, canDelete:false, canTx:true,  canManageUsers:false, canManageDepts:false },
   viewer:    { canAdd:false, canEdit:false, canDelete:false, canTx:false, canManageUsers:false, canManageDepts:false },
 };
+const resolvePerms = user => ({ ...ROLE_PERMS[user.role], ...(user.permissions||{}) });
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
 const protect = async (req, res, next) => {
@@ -118,7 +121,7 @@ const protect = async (req, res, next) => {
     const { id } = jwt.verify(h.split(" ")[1], SECRET);
     req.user = await User.findById(id).select("-passwordHash");
     if (!req.user?.active) return res.status(401).json({ message: "Unauthorized" });
-    req.perms = PERMS[req.user.role];
+    req.perms = resolvePerms(req.user);
     next();
   } catch { res.status(401).json({ message: "Invalid token" }); }
 };
@@ -137,13 +140,15 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user || !user.active || !(await user.checkPass(password)))
       return res.status(401).json({ message: "Invalid credentials" });
     const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: "7d" });
+    const perms = resolvePerms(user);
     res.json({ token, user: { id: user._id, name: user.name, nameEn: user.nameEn,
-      username: user.username, role: user.role, perms: PERMS[user.role] } });
+      username: user.username, email: user.email||"", role: user.role, permissions: user.permissions||null, perms } });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 app.get("/api/auth/me", protect, (req, res) => {
-  res.json({ user: { ...req.user.toObject(), passwordHash: undefined }, perms: req.perms });
+  const u = req.user.toObject(); delete u.passwordHash;
+  res.json({ user: u, perms: req.perms });
 });
 
 // ── Departments ───────────────────────────────────────────────────────────────
@@ -308,11 +313,11 @@ app.get("/api/users", protect, need("canManageUsers"), async (req, res) => {
 });
 app.post("/api/users", protect, need("canManageUsers"), async (req, res) => {
   try {
-    const { name, nameEn, username, password, role } = req.body;
+    const { name, nameEn, username, email, password, role, permissions } = req.body;
     if (!name || !username || !password) return res.status(400).json({ message: "Missing fields" });
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, nameEn, username: username.toLowerCase().trim(), passwordHash, role });
-    res.status(201).json({ id: user._id, name: user.name, username: user.username, role: user.role, active: user.active });
+    const user = await User.create({ name, nameEn, username: username.toLowerCase().trim(), email: email||"", passwordHash, role, permissions: permissions||null });
+    res.status(201).json({ id: user._id, _id: user._id, name: user.name, nameEn: user.nameEn, username: user.username, email: user.email, role: user.role, permissions: user.permissions, active: user.active });
   } catch (e) {
     res.status(e.code === 11000 ? 409 : 400).json({ message: e.code === 11000 ? "Username taken" : e.message });
   }
@@ -324,6 +329,13 @@ app.put("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, rest, { new: true }).select("-passwordHash");
     res.json(user);
   } catch (e) { res.status(400).json({ message: e.message }); }
+});
+app.get("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-passwordHash");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
 app.delete("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
   try {
