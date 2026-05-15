@@ -33,6 +33,8 @@ const T = {
       inactive:"تعطيل",active:"تفعيل",joinedOn:"تاريخ الانضمام",lastActive:"آخر نشاط",txCount:"عدد الحركات"},
     profile:{title:"الملف الشخصي",myPerms:"صلاحياتي",allowed:"مسموح",denied:"غير مسموح"},
     prev:"السابق",next:"التالي",page:"صفحة",of:"من",
+    search:"بحث...",
+    globalSearch:{placeholder:"ابحث في النظام...",items:"أصناف",txs:"حركات",users:"مستخدمون",depts:"أقسام",noResults:"لا توجد نتائج",viewAll:"عرض الكل"},
     status:{active:"نشط",inactive:"غير نشط",discontinued:"متوقف"},
     types:{unit:"وحدة",box:"صندوق",pack:"حزمة",group:"مجموعة",roll:"لفة",bag:"كيس",pallet:"منصة"},
     save:"حفظ",cancel:"إلغاء",delete:"حذف",confirm:"تأكيد الحذف",
@@ -74,6 +76,8 @@ const T = {
       inactive:"Deactivate",active:"Activate",joinedOn:"Joined",lastActive:"Last Active",txCount:"Transactions"},
     profile:{title:"My Profile",myPerms:"My Permissions",allowed:"Allowed",denied:"Denied"},
     prev:"Prev",next:"Next",page:"Page",of:"of",
+    search:"Search...",
+    globalSearch:{placeholder:"Search system...",items:"Items",txs:"Transactions",users:"Users",depts:"Departments",noResults:"No results",viewAll:"View all"},
     status:{active:"Active",inactive:"Inactive",discontinued:"Discontinued"},
     types:{unit:"Unit",box:"Box",pack:"Pack",group:"Group",roll:"Roll",bag:"Bag",pallet:"Pallet"},
     save:"Save",cancel:"Cancel",delete:"Delete",confirm:"Confirm Delete",
@@ -120,18 +124,24 @@ const useMobile=()=>{const[m,setM]=useState(window.innerWidth<640);useEffect(()=
 const useTablet=()=>{const[m,setM]=useState(window.innerWidth<1024);useEffect(()=>{const h=()=>setM(window.innerWidth<1024);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);return m;};
 
 // ── Pagination hook ───────────────────────────────────────────────────────────
-function usePaginate(items,perPage=15){
+function usePaginate(items,defaultPerPage=15){
   const[pg,setPg]=useState(1);
+  const[perPage,setPerPageRaw]=useState(defaultPerPage);
   const total=Math.max(1,Math.ceil(items.length/perPage));
   const page=Math.min(pg,total);
   const slice=items.slice((page-1)*perPage,page*perPage);
+  const setPerPage=n=>{setPerPageRaw(n);setPg(1);};
   useEffect(()=>setPg(1),[items.length]);
-  return{slice,page,total,setPg:p=>setPg(Math.max(1,Math.min(total,p)))};
+  return{slice,page,total,perPage,setPerPage,setPg:p=>setPg(Math.max(1,Math.min(total,p)))};
 }
-function Paginate({page,total,setPg,t}){
-  if(total<=1)return null;
+function Paginate({page,total,setPg,perPage,setPerPage,t,totalItems}){
+  if(total<=1&&totalItems<=15)return null;
   return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:16,flexWrap:"wrap"}}>
+      <select value={perPage} onChange={e=>setPerPage(Number(e.target.value))}
+        style={{padding:"5px 8px",borderRadius:R.sm,border:`1px solid ${C.bdr2}`,background:C.surf,fontSize:12,color:C.tx,cursor:"pointer",fontFamily:"inherit"}}>
+        {[10,15,25,50,100].map(n=><option key={n} value={n}>{n}</option>)}
+      </select>
       <button onClick={()=>setPg(page-1)} disabled={page===1}
         style={{padding:"6px 14px",borderRadius:R.sm,border:`1px solid ${C.bdr2}`,background:C.surf,cursor:page===1?"not-allowed":"pointer",color:page===1?C.tx3:C.tx,fontSize:13,fontFamily:"inherit"}}>
         ‹ {t.prev}
@@ -671,7 +681,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
     });
   },[items,search,deptF,stF]);
 
-  const{slice,page,total,setPg}=usePaginate(filtered,12);
+  const{slice,page,total,setPg,perPage,setPerPage}=usePaginate(filtered,12);
 
   if(loading)return <Spinner/>;
   return(
@@ -710,7 +720,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
           <option value="out">🔴 {lang==="ar"?"نفد":"Out"}</option>
         </select>
       </div>}
-      <div style={{display:"grid",gridTemplateColumns:mobile?"repeat(auto-fill,minmax(160px,1fr))":"repeat(auto-fill,minmax(260px,1fr))",gap:mobile?10:14}}>
+      <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"repeat(auto-fill,minmax(260px,1fr))",gap:mobile?10:14}}>
         {slice.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:48,color:C.tx3}}>{t.noData}</div>}
         {slice.map(item=>{
           const dept=depts.find(d=>(d._id||d.id)===(item.deptId?._id||item.deptId));
@@ -767,7 +777,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
           );
         })}
       </div>
-      <Paginate page={page} total={total} setPg={setPg} t={t}/>
+      <Paginate page={page} total={total} setPg={setPg} perPage={perPage} setPerPage={setPerPage} totalItems={filtered?.length||0} t={t}/>
     </div>
   );
 }
@@ -782,7 +792,7 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
     return(!q||name.includes(q)||(tx.source||"").toLowerCase().includes(q)||(tx.dest||"").toLowerCase().includes(q))
       &&(typeF==="all"||tx.type===typeF);
   }),[txs,typeF,search]);
-  const{slice,page,total,setPg}=usePaginate(filtered,20);
+  const{slice,page,total,setPg,perPage,setPerPage}=usePaginate(filtered,20);
 
   if(loading)return <Spinner/>;
   return(
@@ -831,7 +841,7 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
           </table>
         </div>
       </Card>
-      <Paginate page={page} total={total} setPg={setPg} t={t}/>
+      <Paginate page={page} total={total} setPg={setPg} perPage={perPage} setPerPage={setPerPage} totalItems={filtered?.length||0} t={t}/>
     </div>
   );
 }
@@ -966,7 +976,7 @@ function UsersPage({users,currentUser,txs,lang,t,perm,onAdd,onUpdate,onToggle,on
   const [viewUser,setViewUser]=useState(null);
   const [f,setF]=useState({name:"",nameEn:"",email:"",username:"",password:"",role:"warehouse"});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
-  const{slice,page,total,setPg}=usePaginate(users,12);
+  const{slice,page,total,setPg,perPage,setPerPage}=usePaginate(users,12);
 
   const roleColors={admin:{bg:"#ede9fe",tx:"#5b21b6"},manager:{bg:C.primarySoft,tx:C.primary},warehouse:{bg:C.greenSoft,tx:C.green},viewer:{bg:"#f1f5f9",tx:C.tx2}};
 
@@ -1113,7 +1123,7 @@ function UsersPage({users,currentUser,txs,lang,t,perm,onAdd,onUpdate,onToggle,on
           </Card>
         ))}
       </div>
-      <Paginate page={page} total={total} setPg={setPg} t={t}/>
+      <Paginate page={page} total={total} setPg={setPg} perPage={perPage} setPerPage={setPerPage} totalItems={users.length} t={t}/>
       {editUser&&<UserEditModal user={editUser} t={t} onClose={()=>setEditUser(null)} onSave={async(id,d)=>{await onUpdate(id,d);setEditUser(null);}}/>}
     </div>
   );
@@ -1126,7 +1136,7 @@ function UserProfilePage({currentUser,txs,lang,t,perm}){
   const ut=t.users;
   const myTxs=txs.filter(tx=>tx.userName===currentUser.name||tx.userId===(currentUser._id||currentUser.id));
   const perms=resolvePerms(currentUser);
-  const{slice,page,total,setPg}=usePaginate(myTxs,15);
+  const{slice,page,total,setPg,perPage,setPerPage}=usePaginate(myTxs,15);
   return(
     <div>
       <div style={{fontWeight:700,fontSize:16,marginBottom:20}}>👤 {pr.title}</div>
@@ -1203,7 +1213,7 @@ function UserProfilePage({currentUser,txs,lang,t,perm}){
                 </table>
               </div>
             )}
-            <div style={{padding:"8px 16px"}}><Paginate page={page} total={total} setPg={setPg} t={t}/></div>
+            <div style={{padding:"8px 16px"}}><Paginate page={page} total={total} setPg={setPg} perPage={perPage} setPerPage={setPerPage} totalItems={myTxs.length} t={t}/></div>
           </Card>
         </div>
       </div>
@@ -1351,6 +1361,96 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
+// ── Global Search ─────────────────────────────────────────────────────────────
+function GlobalSearch({items,txs,users,depts,lang,t,isAR,onNavigate}){
+  const gs=t.globalSearch;
+  const[q,setQ]=useState("");
+  const[open,setOpen]=useState(false);
+  const ref=useRef(null);
+
+  useEffect(()=>{
+    const handler=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    document.addEventListener("mousedown",handler);
+    return()=>document.removeEventListener("mousedown",handler);
+  },[]);
+
+  const results=useMemo(()=>{
+    const qu=q.trim().toLowerCase();
+    if(!qu||qu.length<2)return null;
+    const ri=items.filter(i=>
+      i.name?.toLowerCase().includes(qu)||(i.nameEn||"").toLowerCase().includes(qu)||
+      (i.sku||"").toLowerCase().includes(qu)||(i.barcode||"").includes(qu)
+    ).slice(0,5).map(i=>({type:"item",id:i._id||i.id,label:lang==="ar"?i.name:i.nameEn||i.name,sub:(i.sku||i.barcode||""),icon:"📦",data:i}));
+    const rt=txs.filter(tx=>
+      (tx.itemId?.name||"").toLowerCase().includes(qu)||
+      (tx.source||"").toLowerCase().includes(qu)||(tx.dest||"").toLowerCase().includes(qu)||
+      (tx.userName||"").toLowerCase().includes(qu)
+    ).slice(0,3).map(tx=>({type:"tx",id:tx._id,label:tx.itemId?.name||"—",sub:`${tx.type} · ${tx.qty} · ${tx.userName}`,icon:tx.type==="IN"?"↓":"↑",data:tx}));
+    const ru=(users||[]).filter(u=>
+      u.name?.toLowerCase().includes(qu)||(u.username||"").toLowerCase().includes(qu)||
+      (u.email||"").toLowerCase().includes(qu)
+    ).slice(0,3).map(u=>({type:"user",id:u._id||u.id,label:u.name,sub:`@${u.username}`,icon:"👤",data:u}));
+    const rd=depts.filter(d=>
+      d.name?.toLowerCase().includes(qu)||(d.nameEn||"").toLowerCase().includes(qu)
+    ).slice(0,2).map(d=>({type:"dept",id:d._id||d.id,label:lang==="ar"?d.name:d.nameEn||d.name,sub:"",icon:"🗂",data:d}));
+    return[...ri,...rt,...ru,...rd];
+  },[q,items,txs,users,depts,lang]);
+
+  const handleSelect=r=>{
+    setQ("");setOpen(false);
+    if(r.type==="item")onNavigate("item",r.data);
+    else if(r.type==="tx")onNavigate("tx");
+    else if(r.type==="user")onNavigate("users");
+    else if(r.type==="dept")onNavigate("dept");
+  };
+
+  return(
+    <div ref={ref} style={{position:"relative",flex:1,maxWidth:400}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"6px 12px"}}>
+        <span style={{fontSize:14,color:C.tx3,flexShrink:0}}>🔍</span>
+        <input value={q} onChange={e=>{setQ(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)}
+          placeholder={gs.placeholder}
+          style={{border:"none",background:"none",outline:"none",fontSize:13,color:C.tx,width:"100%",fontFamily:"inherit"}}/>
+        {q&&<button onClick={()=>{setQ("");setOpen(false);}} style={{border:"none",background:"none",cursor:"pointer",color:C.tx3,fontSize:16,padding:0,flexShrink:0}}>✕</button>}
+      </div>
+      {open&&q.length>=2&&(
+        <div style={{position:"absolute",top:"calc(100% + 6px)",[isAR?"right":"left"]:0,width:"100%",minWidth:300,
+          background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.md,boxShadow:SH.lg,zIndex:200,overflow:"hidden"}}>
+          {(!results||results.length===0)?(
+            <div style={{padding:20,textAlign:"center",color:C.tx3,fontSize:13}}>{gs.noResults}</div>
+          ):(
+            <>
+              {[{key:"item",label:gs.items},{key:"tx",label:gs.txs},{key:"user",label:gs.users},{key:"dept",label:gs.depts}].map(({key,label})=>{
+                const group=results.filter(r=>r.type===key);
+                if(!group.length)return null;
+                return(
+                  <div key={key}>
+                    <div style={{padding:"6px 14px",fontSize:10.5,fontWeight:700,color:C.tx3,textTransform:"uppercase",letterSpacing:.5,background:C.surf2,borderBottom:`1px solid ${C.bdr}`}}>{label}</div>
+                    {group.map(r=>(
+                      <button key={r.id} onClick={()=>handleSelect(r)}
+                        style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",width:"100%",border:"none",
+                          background:"none",cursor:"pointer",textAlign:isAR?"right":"left",fontFamily:"inherit",
+                          borderBottom:`1px solid ${C.surf2}`}}
+                        onMouseEnter={e=>e.currentTarget.style.background=C.surf2}
+                        onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                        <span style={{fontSize:16,flexShrink:0}}>{r.icon}</span>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:C.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.label}</div>
+                          {r.sub&&<div style={{fontSize:11,color:C.tx3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.sub}</div>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App(){
   const [lang,setLang]=useState("ar");
@@ -1580,23 +1680,31 @@ export default function App(){
 
         {/* Sidebar */}
         <aside style={{
-          width:220,minWidth:220,background:C.sidebar,display:"flex",flexDirection:"column",height:"100vh",flexShrink:0,
-          ...(isMobile()?{position:"fixed",inset:"0 auto 0 0",zIndex:50,transform:sidebarOpen?"translateX(0)":"translateX(-100%)",transition:"transform .25s ease"}:{
-            transform:sidebarOpen?"translateX(0)":"translateX(-220px)",
+          width:220,minWidth:220,background:C.sidebar,display:"flex",flexDirection:"column",
+          height:"100vh",flexShrink:0,overflow:"hidden",
+          ...(isMobile()?{
+            position:"fixed",
+            top:0,bottom:0,
+            [isAR?"right":"left"]:0,
+            zIndex:50,
+            transform:sidebarOpen?"translateX(0)":`translateX(${isAR?"100%":"-100%"})`,
+            transition:"transform .25s ease",
+          }:{
+            transform:sidebarOpen?"translateX(0)":`translateX(${isAR?"220px":"-220px"})`,
             marginInlineStart:sidebarOpen?0:-220,
-            transition:"transform .25s ease, margin .25s ease",
+            transition:"transform .25s ease, margin-inline-start .25s ease",
           })
         }}>
-          <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${C.sidebarBdr}`,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{padding:"18px 16px 14px",borderBottom:`1px solid ${C.sidebarBdr}`,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <div style={{fontSize:22}}>📦</div>
             <div style={{minWidth:0}}>
               <div style={{fontSize:12.5,fontWeight:700,color:"#f1f5f9",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.appName}</div>
               <div style={{fontSize:10,color:"#475569"}}>{t.tag}</div>
             </div>
           </div>
-          <nav style={{flex:1,padding:"10px 8px",overflowY:"auto"}}>
+          <nav style={{flex:1,padding:"10px 8px",overflowY:"auto",minHeight:0}}>
             {navItems.map(n=>(
-              <button key={n.id} onClick={()=>{setPage(n.id);setSelectedItem(null);}}
+              <button key={n.id} onClick={()=>{setPage(n.id);setSelectedItem(null);if(isMobile())setSidebarOpen(false);}}
                 style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",borderRadius:R.sm,
                   border:"none",width:"100%",textAlign:isAR?"right":"left",cursor:"pointer",
                   fontFamily:"inherit",fontSize:13,fontWeight:500,marginBottom:2,
@@ -1636,24 +1744,18 @@ export default function App(){
 
         {/* Main */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-          <div style={{height:54,background:C.surf,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",padding:"0 12px 0 16px",gap:12,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>\
+          <div style={{height:54,background:C.surf,borderBottom:`1px solid ${C.bdr}`,display:"flex",alignItems:"center",padding:"0 12px 0 16px",gap:10,flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
             <button onClick={()=>setSidebarOpen(o=>!o)} style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:34,border:"none",background:"none",cursor:"pointer",borderRadius:R.sm,color:C.tx,fontSize:18,flexShrink:0}} title="Toggle menu">☰</button>
-            {page==="item"&&selectedItem?(
-              <div style={{flex:1,display:"flex",alignItems:"center",gap:8,fontSize:14}}>
-                <button onClick={()=>setPage("inv")} style={{background:"none",border:"none",cursor:"pointer",color:C.tx3,fontFamily:"inherit",fontSize:13,fontWeight:500,padding:0}}>
-                  {t.nav.inv}
-                </button>
-                <span style={{color:C.tx3}}>/</span>
-                <span style={{fontWeight:700,color:C.tx}}>{lang==="ar"?selectedItem.name:selectedItem.nameEn||selectedItem.name}</span>
-              </div>
-            ):(
-              <div style={{flex:1,fontSize:15,fontWeight:700}}>{navItems.find(n=>n.id===page)?.label}</div>
-            )}
-            {page==="inv"&&perm.canAdd&&<Btn color="primary" size="sm" onClick={()=>{setEditItem(null);setModal("item");}}>＋ {t.inv.add}</Btn>}
-            {page==="item"&&perm.canEdit&&selectedItem&&<Btn color="ghost" size="sm" onClick={()=>{setEditItem(selectedItem);setModal("item");}}>✏️ {t.inv.edit}</Btn>}
-            {page==="item"&&perm.canTx&&selectedItem&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(selectedItem._id||selectedItem.id);setModal("tx");}}>↕ {t.tx.record}</Btn>}
-            {page==="tx"&&perm.canTx&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(null);setModal("tx");}}>＋ {t.tx.record}</Btn>}
-            <div style={{fontSize:12,color:C.tx3,background:C.surf2,padding:"4px 10px",borderRadius:99,border:`1px solid ${C.bdr}`}}>
+            <GlobalSearch items={items} txs={txs} users={users} depts={depts} lang={lang} t={t} isAR={isAR}
+              onNavigate={(pg,data)=>{
+                if(pg==="item"&&data){setSelectedItem(data);setPage("item");}
+                else{setPage(pg);setSelectedItem(null);}
+              }}/>
+            {page==="inv"&&perm.canAdd&&<Btn color="primary" size="sm" onClick={()=>{setEditItem(null);setModal("item");}}>＋ {!isMobile()?t.inv.add:""}</Btn>}
+            {page==="item"&&perm.canEdit&&selectedItem&&<Btn color="ghost" size="sm" onClick={()=>{setEditItem(selectedItem);setModal("item");}}>✏️</Btn>}
+            {page==="item"&&perm.canTx&&selectedItem&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(selectedItem._id||selectedItem.id);setModal("tx");}}>↕</Btn>}
+            {page==="tx"&&perm.canTx&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(null);setModal("tx");}}>＋</Btn>}
+            <div style={{fontSize:11,color:C.tx3,background:C.surf2,padding:"3px 8px",borderRadius:99,border:`1px solid ${C.bdr}`,whiteSpace:"nowrap",flexShrink:0}}>
               {t.users.roles[currentUser.role]}
             </div>
           </div>
