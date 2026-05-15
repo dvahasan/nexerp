@@ -526,12 +526,66 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
 }
 
 // ── Transaction Form ──────────────────────────────────────────────────────────
-function TxForm({items,currentUser,t,onSave,onClose,prefillId}){
+function TxForm({items,currentUser,lang,t,onSave,onClose,prefillId}){
   const tx=t.tx;
+  const isAR=lang==="ar";
   const [f,setF]=useState({type:"OUT",itemId:prefillId||"",qty:"",source:"",dest:"",date:today(),notes:""});
   const [saving,setSaving]=useState(false);
+  const [q,setQ]=useState("");
+  const [showDrop,setShowDrop]=useState(false);
+  const [scanning,setScanning]=useState(false);
+  const [barcodeMsg,setBarcodeMsg]=useState("");
+  const dropRef=useRef(null);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const sel=items.find(i=>(i._id||i.id)===f.itemId);
+
+  const activeItems=useMemo(()=>items.filter(i=>i.status==="active"),[items]);
+  const filtered=useMemo(()=>{
+    const qu=q.trim().toLowerCase();
+    if(!qu)return activeItems;
+    return activeItems.filter(i=>
+      i.name?.toLowerCase().includes(qu)||
+      (i.nameEn||"").toLowerCase().includes(qu)||
+      (i.sku||"").toLowerCase().includes(qu)||
+      (i.barcode||"").includes(qu)
+    );
+  },[activeItems,q]);
+
+  useEffect(()=>{
+    const h=e=>{if(dropRef.current&&!dropRef.current.contains(e.target))setShowDrop(false);};
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
+
+  const selectItem=id=>{
+    s("itemId",id);
+    const found=activeItems.find(i=>(i._id||i.id)===id);
+    setQ(found?(isAR?found.name:found.nameEn||found.name):"");
+    setShowDrop(false);
+    setBarcodeMsg("");
+  };
+
+  useEffect(()=>{
+    if(prefillId){
+      const found=items.find(i=>(i._id||i.id)===prefillId);
+      if(found){setQ(isAR?found.name:found.nameEn||found.name);}
+    }
+  },[]);
+
+  const onBarcodeDetect=async code=>{
+    setScanning(false);
+    setBarcodeMsg(isAR?"⏳ جارٍ البحث...":"⏳ Searching...");
+    const found=activeItems.find(i=>i.barcode===code);
+    if(found){selectItem(found._id||found.id);setBarcodeMsg(isAR?"✓ تم العثور على الصنف":"✓ Item found");return;}
+    try{
+      const r=await api.getByBarcode(code);
+      if(r){
+        const match=activeItems.find(i=>(i._id||i.id)===(r._id||r.id));
+        if(match){selectItem(match._id||match.id);setBarcodeMsg(isAR?"✓ تم العثور على الصنف":"✓ Item found");return;}
+      }
+    }catch{}
+    setBarcodeMsg(isAR?"❌ لم يُعثر على صنف بهذا الباركود":"❌ No item found for this barcode");
+  };
 
   const submit=async()=>{
     if(!f.itemId||!f.qty)return;
@@ -542,6 +596,7 @@ function TxForm({items,currentUser,t,onSave,onClose,prefillId}){
 
   return(
     <div>
+      {scanning&&<BarcodeScanner t={t} lang={lang} onClose={()=>setScanning(false)} onDetect={onBarcodeDetect}/>}
       <div style={{display:"flex",background:C.surf2,borderRadius:R.md,padding:4,marginBottom:16,gap:4}}>
         {["IN","OUT"].map(tp=>(
           <button key={tp} type="button" onClick={()=>s("type",tp)}
@@ -555,14 +610,57 @@ function TxForm({items,currentUser,t,onSave,onClose,prefillId}){
       </div>
       <G2>
         <S2>
-          <Sel label={tx.item+"*"} value={f.itemId} onChange={e=>s("itemId",e.target.value)}>
-            <option value="">--</option>
-            {items.filter(i=>i.status==="active").map(i=>(
-              <option key={i._id||i.id} value={i._id||i.id}>
-                {i.name} — {t.inv.qty}: {i.qty}
-              </option>
-            ))}
-          </Sel>
+          <div style={{display:"flex",flexDirection:"column",gap:4}} ref={dropRef}>
+            <label style={{fontSize:11.5,fontWeight:600,color:C.tx2}}>{tx.item}*</label>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{position:"relative",flex:1}}>
+                <input value={q}
+                  onChange={e=>{setQ(e.target.value);setShowDrop(true);if(!e.target.value.trim())s("itemId","");}}
+                  onFocus={()=>setShowDrop(true)}
+                  placeholder={isAR?"ابحث بالاسم أو SKU أو الباركود...":"Search by name, SKU or barcode..."}
+                  style={{...baseInput,width:"100%",boxSizing:"border-box",paddingInlineEnd:sel?"28px":undefined}}/>
+                {sel&&<span style={{position:"absolute",insetInlineEnd:8,top:"50%",transform:"translateY(-50%)",
+                  fontSize:12,color:C.green,pointerEvents:"none",fontWeight:700}}>✓</span>}
+                {showDrop&&(
+                  <div style={{position:"absolute",top:"100%",insetInlineStart:0,insetInlineEnd:0,zIndex:200,
+                    background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.md,
+                    boxShadow:SH.lg,maxHeight:220,overflowY:"auto",marginTop:2}}>
+                    {filtered.length===0?(
+                      <div style={{padding:"12px 14px",color:C.tx3,fontSize:12.5,textAlign:"center"}}>{t.noData}</div>
+                    ):filtered.map(i=>(
+                      <div key={i._id||i.id} onMouseDown={e=>{e.preventDefault();selectItem(i._id||i.id);}}
+                        style={{padding:"9px 14px",cursor:"pointer",
+                          borderBottom:`1px solid ${C.surf2}`,
+                          background:(i._id||i.id)===f.itemId?C.primarySoft:"transparent",
+                          display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,color:C.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            {isAR?i.name:i.nameEn||i.name}
+                          </div>
+                          {i.sku&&<div style={{fontSize:10.5,color:C.tx3,fontFamily:"monospace"}}>{i.sku}</div>}
+                        </div>
+                        <div style={{fontSize:12,fontWeight:700,flexShrink:0,
+                          color:i.qty<=0?C.red:i.qty<=i.minThreshold?C.amber:C.green}}>
+                          {i.qty}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Btn color="ghost" size="sm" type="button" title={isAR?"مسح باركود":"Scan barcode"} onClick={()=>setScanning(true)}>📷</Btn>
+            </div>
+            {barcodeMsg&&<span style={{fontSize:12,color:barcodeMsg.includes("✓")?C.green:barcodeMsg.includes("⏳")?C.tx3:C.red}}>{barcodeMsg}</span>}
+            {sel&&<div style={{background:C.surf2,borderRadius:R.sm,padding:"7px 10px",fontSize:12,
+              color:C.tx2,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+              <span style={{fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                📦 {isAR?sel.name:sel.nameEn||sel.name}
+              </span>
+              <span style={{fontWeight:700,flexShrink:0,color:sel.qty<=0?C.red:sel.qty<=sel.minThreshold?C.amber:C.green}}>
+                {isAR?"المخزون":"Stock"}: {sel.qty}
+              </span>
+            </div>}
+          </div>
         </S2>
         <Inp label={tx.qty+"*"} required type="number" min="1"
           max={f.type==="OUT"&&sel?sel.qty:undefined}
@@ -1312,12 +1410,16 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
                 </div>
               ))}
             </div>
-            {item.description&&(
-              <div style={{marginTop:12,padding:12,background:C.surf2,borderRadius:R.sm}}>
-                <div style={{fontSize:10.5,color:C.tx3,fontWeight:600,marginBottom:4}}>{lang==="ar"?"الوصف":"Description"}</div>
+            <div style={{marginTop:12,padding:12,background:C.surf2,borderRadius:R.sm}}>
+              <div style={{fontSize:10.5,color:C.tx3,fontWeight:600,marginBottom:4}}>{lang==="ar"?"الوصف":"Description"}</div>
+              {item.description?(
                 <p style={{fontSize:13,color:C.tx2,lineHeight:1.6,margin:0}}>{item.description}</p>
-              </div>
-            )}
+              ):(
+                <p style={{fontSize:12.5,color:C.tx3,fontStyle:"italic",margin:0}}>
+                  {lang==="ar"?"لا يوجد وصف — أضف وصفاً عند تعديل الصنف أو عبر بحث الباركود":"No description — add one by editing the item or via barcode lookup"}
+                </p>
+              )}
+            </div>
           </Card>
 
           <Card style={{overflow:"hidden"}}>
