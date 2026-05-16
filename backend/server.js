@@ -32,7 +32,7 @@ function uploadToCloudinary(buffer, folder = "nexerp") {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       { folder },
-      (err, result) => err ? reject(err) : resolve(result.secure_url)
+      (err, result) => err ? reject(err) : resolve(result)
     ).end(buffer);
   });
 }
@@ -82,6 +82,9 @@ const ItemSchema = new mongoose.Schema({
   minThreshold: { type: Number, default: 0 },
   type: { type: String, enum: ["unit","box","pack","group","roll","bag","pallet"], default: "unit" },
   status: { type: String, enum: ["active","inactive","discontinued"], default: "active" },
+  datasheet: { type: String, trim: true, default: "" },
+  unitsPerPackage: { type: Number, default: 1, min: 1 },
+  images: [{ url: String, publicId: String }],
   photo: String,
 }, { timestamps: true });
 ItemSchema.index({ name: "text", nameEn: "text", sku: "text", barcode: "text" });
@@ -103,6 +106,9 @@ const Cat         = mongoose.model("Category",   CatSchema);
 const User        = mongoose.model("User",        UserSchema);
 const Item        = mongoose.model("Item",        ItemSchema);
 const Transaction = mongoose.model("Transaction", TxSchema);
+
+const SettingSchema = new mongoose.Schema({ key:{type:String,required:true,unique:true}, value:mongoose.Schema.Types.Mixed });
+const Setting = mongoose.model("Setting", SettingSchema);
 
 // ── Permissions ───────────────────────────────────────────────────────────────
 const ROLE_PERMS = {
@@ -254,9 +260,42 @@ app.delete("/api/items/:id", protect, need("canDelete"), async (req, res) => {
 // Photo upload → Cloudinary
 app.post("/api/items/:id/photo", protect, need("canEdit"), upload.single("photo"), async (req, res) => {
   try {
-    const photo = await uploadToCloudinary(req.file.buffer);
-    await Item.findByIdAndUpdate(req.params.id, { photo });
-    res.json({ photo });
+    const result = await uploadToCloudinary(req.file.buffer);
+    const image = { url: result.secure_url, publicId: result.public_id };
+    await Item.findByIdAndUpdate(req.params.id, {
+      photo: result.secure_url,
+      $push: { images: image }
+    });
+    res.json({ photo: result.secure_url, image });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Add extra image
+app.post("/api/items/:id/photos", protect, need("canEdit"), upload.single("photo"), async (req, res) => {
+  try {
+    const result = await uploadToCloudinary(req.file.buffer);
+    const image = { url: result.secure_url, publicId: result.public_id };
+    const item = await Item.findByIdAndUpdate(req.params.id, { $push: { images: image } }, { new: true });
+    res.json({ image, images: item.images });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Delete image
+app.delete("/api/items/:id/photos/:publicId", protect, need("canEdit"), async (req, res) => {
+  try {
+    const publicId = decodeURIComponent(req.params.publicId);
+    try { await cloudinary.uploader.destroy(publicId); } catch {}
+    const item = await Item.findByIdAndUpdate(req.params.id,
+      { $pull: { images: { publicId } } }, { new: true });
+    // If deleted image was the main photo, update photo field
+    const stillHas = item.images.find(img => img.publicId === publicId);
+    if (!stillHas && item.photo && item.images.length > 0) {
+      await Item.findByIdAndUpdate(req.params.id, { photo: item.images[0].url });
+    } else if (item.images.length === 0) {
+      await Item.findByIdAndUpdate(req.params.id, { photo: "" });
+    }
+    const updated = await Item.findById(req.params.id);
+    res.json({ success: true, images: updated.images, photo: updated.photo });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -306,6 +345,62 @@ app.post("/api/transactions", protect, need("canTx"), async (req, res) => {
   } finally { session.endSession(); }
 });
 
+app.put("/api/transactions/:id", protect, need("canManageUsers"), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const tx = await Transaction.findById(req.params.id).session(session);
+    if (!tx) throw new Error("Transaction not found");
+    const item = await Item.findById(tx.itemId).session(session);
+    if (!item) throw new Error("Item not found");
+    // Reverse old effect
+    if (tx.type === "IN") item.qty -= tx.qty;
+    else item.qty += tx.qty;
+    // Apply new effect
+    const newQty  = req.body.qty  !== undefined ? +req.body.qty  : tx.qty;
+    const newType = req.body.type || tx.type;
+    if (newType === "IN") item.qty += newQty;
+    else {
+      if (item.qty < newQty) throw new Error(`Insufficient stock — available: ${item.qty}`);
+      item.qty -= newQty;
+    }
+    await item.save({ session });
+    const updated = await Transaction.findByIdAndUpdate(req.params.id, {
+      qty: newQty, type: newType,
+      source: req.body.source !== undefined ? req.body.source : tx.source,
+      dest:   req.body.dest   !== undefined ? req.body.dest   : tx.dest,
+      date:   req.body.date   ? new Date(req.body.date) : tx.date,
+      notes:  req.body.notes  !== undefined ? req.body.notes  : tx.notes,
+    }, { new: true, session }).populate("itemId","name nameEn sku");
+    await session.commitTransaction();
+    res.json({ transaction: updated, updatedQty: item.qty });
+  } catch (e) {
+    await session.abortTransaction();
+    res.status(400).json({ message: e.message });
+  } finally { session.endSession(); }
+});
+
+app.delete("/api/transactions/:id", protect, need("canManageUsers"), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const tx = await Transaction.findById(req.params.id).session(session);
+    if (!tx) throw new Error("Transaction not found");
+    const item = await Item.findById(tx.itemId).session(session);
+    if (item) {
+      if (tx.type === "IN") item.qty = Math.max(0, item.qty - tx.qty);
+      else item.qty += tx.qty;
+      await item.save({ session });
+    }
+    await Transaction.findByIdAndDelete(req.params.id).session(session);
+    await session.commitTransaction();
+    res.json({ success: true, updatedQty: item?.qty });
+  } catch (e) {
+    await session.abortTransaction();
+    res.status(500).json({ message: e.message });
+  } finally { session.endSession(); }
+});
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 app.get("/api/users", protect, need("canManageUsers"), async (req, res) => {
   try { res.json(await User.find().select("-passwordHash").sort({ createdAt: 1 })); }
@@ -342,6 +437,24 @@ app.delete("/api/users/:id", protect, need("canManageUsers"), async (req, res) =
     if (req.params.id === req.user._id.toString())
       return res.status(400).json({ message: "Cannot delete yourself" });
     await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get("/api/settings", protect, async (req, res) => {
+  try {
+    const all = await Setting.find();
+    const obj = {};
+    all.forEach(s => { obj[s.key] = s.value; });
+    res.json(obj);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put("/api/settings", protect, need("canManageUsers"), async (req, res) => {
+  try {
+    for (const [key, value] of Object.entries(req.body)) {
+      await Setting.findOneAndUpdate({ key }, { value }, { upsert: true, new: true });
+    }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -403,19 +516,14 @@ async function seedData() {
     { name:"علبة تروس صناعية",   nameEn:"Industrial Gearbox",      deptId:depts[1]._id, catId:cats[3]._id, sku:"GB-006", barcode:"6221023001006", price:12000, qty:7,   minThreshold:3,  type:"unit", status:"active", description:"علبة تروس للماكينات الثقيلة" },
   ]);
 
-  const admin = await User.findOne({ username:"admin" });
-  const sara  = await User.findOne({ username:"sara" });
-  const ahmed = await User.findOne({ username:"ahmed" });
-
-  await Transaction.create([
-    { type:"OUT", itemId:items[0]._id, qty:2, dest:"مشروع خط التبريد", userId:sara._id,  userName:"سارة علي",   date:new Date("2024-05-01"), notes:"صرف للمشروع" },
-    { type:"IN",  itemId:items[2]._id, qty:200, source:"شركة الكابلات المتحدة", userId:ahmed._id, userName:"أحمد محمد", date:new Date("2024-05-02"), notes:"توريد شهري" },
-    { type:"OUT", itemId:items[3]._id, qty:5,  dest:"ورشة الصيانة",   userId:sara._id,  userName:"سارة علي",   date:new Date("2024-05-03") },
-    { type:"IN",  itemId:items[1]._id, qty:2,  source:"شركة المضخات الدولية", userId:ahmed._id, userName:"أحمد محمد", date:new Date("2024-05-04"), notes:"استبدال" },
-    { type:"OUT", itemId:items[4]._id, qty:1,  dest:"غرفة السيرفر",   userId:sara._id,  userName:"سارة علي",   date:new Date("2024-05-05"), notes:"تركيب" },
-  ]);
-
   console.log("🌱 Demo data seeded successfully");
 }
+
+app.get("/api/admin/cloudinary", protect, need("canManageUsers"), async (req, res) => {
+  try {
+    const usage = await cloudinary.api.usage();
+    res.json(usage);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
 
 app.listen(PORT, () => console.log(`🚀 NexERP API → http://localhost:${PORT}`));

@@ -43,10 +43,14 @@ export const api = {
   updateItem:     (id, d)       => req("PUT",    `/items/${id}`, d),
   deleteItem:     (id)          => req("DELETE", `/items/${id}`),
   uploadPhoto:    (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
+  addItemPhoto:   (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
+  deleteItemPhoto:(id, publicId)=> req("DELETE", `/items/${id}/photos/${encodeURIComponent(publicId)}`),
 
   // Transactions
-  getTxs:  (params = {}) => req("GET",  "/transactions?" + new URLSearchParams(params)),
-  addTx:   (d)           => req("POST", "/transactions", d),
+  getTxs:   (params = {}) => req("GET",    "/transactions?" + new URLSearchParams(params)),
+  addTx:    (d)           => req("POST",   "/transactions", d),
+  updateTx: (id, d)       => req("PUT",    `/transactions/${id}`, d),
+  deleteTx: (id)          => req("DELETE", `/transactions/${id}`),
 
   // Users
   getUsers:   ()      => req("GET",    "/users"),
@@ -57,4 +61,11 @@ export const api = {
 
   // Stats
   getStats: () => req("GET", "/stats"),
+
+  // Settings
+  getSettings:    ()  => req("GET", "/settings"),
+  updateSettings: (d) => req("PUT", "/settings", d),
+
+  // Admin
+  getCloudinaryUsage: () => req("GET", "/admin/cloudinary"),
 };

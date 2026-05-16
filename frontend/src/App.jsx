@@ -10,7 +10,7 @@ const T = {
     login:"تسجيل الدخول", username:"اسم المستخدم", password:"كلمة المرور",
     enterSystem:"دخول النظام", logout:"خروج", demo:"تجريبي: admin / admin",
     badLogin:"بيانات غير صحيحة", loading:"جاري التحميل...",
-    nav:{dash:"لوحة التحكم",inv:"المخزون",tx:"الحركات",dept:"الأقسام",users:"المستخدمون",profile:"ملفي الشخصي"},
+    nav:{dash:"لوحة التحكم",inv:"المخزون",tx:"الحركات",dept:"الأقسام",users:"المستخدمون",profile:"ملفي الشخصي",settings:"الإعدادات"},
     dash:{total:"إجمالي الأصناف",value:"قيمة المخزون",low:"مخزون منخفض",
       todayTx:"حركات اليوم",recent:"آخر الحركات"},
     inv:{title:"المخزون",add:"إضافة صنف",edit:"تعديل",del:"حذف",view:"عرض",
@@ -19,11 +19,18 @@ const T = {
       dept:"القسم",cat:"التصنيف",type:"نوع التعبئة",status:"الحالة",
       photo:"رابط الصورة",scan:"مسح الباركود",lookup:"بحث بالباركود",
       looking:"جاري البحث...",found:"تم العثور ✓",notFound:"لم يتم العثور",
-      stockIn:"وارد",stockOut:"صادر",allStatus:"كل الحالات",allDept:"كل الأقسام"},
+      stockIn:"وارد",stockOut:"صادر",allStatus:"كل الحالات",allDept:"كل الأقسام",
+      datasheet:"رقم الكتالوج / datasheet",unitsPerPkg:"وحدات في الحزمة",
+      addPhoto:"إضافة صورة",deletePhoto:"حذف الصورة",photos:"الصور"},
     tx:{title:"الحركات",record:"تسجيل حركة",type:"النوع",
       in:"وارد (إضافة)",out:"صادر (صرف)",
       source:"المصدر / المورد",dest:"الوجهة / المشروع",
-      date:"التاريخ",user:"المسؤول",notes:"ملاحظات",item:"الصنف",qty:"الكمية",allType:"كل الحركات"},
+      date:"التاريخ",user:"المسؤول",notes:"ملاحظات",item:"الصنف",qty:"الكمية",allType:"كل الحركات",
+      editTx:"تعديل الحركة",deleteTx:"حذف الحركة"},
+    settings:{title:"الإعدادات",currency:"العملة",currencyLabel:"عملة النظام",
+      cloudinary:"مساحة Cloudinary",storageUsed:"المساحة المستخدمة",
+      clearTxs:"حذف جميع الحركات",clearTxsConfirm:"سيتم حذف كل الحركات نهائياً. هل أنت متأكد؟",
+      saved:"تم حفظ الإعدادات ✓"},
     dept:{title:"الأقسام والتصنيفات",addDept:"إضافة قسم",addCat:"إضافة تصنيف",
       deptName:"اسم القسم",catName:"اسم التصنيف",color:"اللون"},
     users:{title:"المستخدمون",add:"إضافة مستخدم",edit:"تعديل المستخدم",name:"الاسم الكامل",email:"البريد الإلكتروني",role:"الصلاحية",
@@ -53,7 +60,7 @@ const T = {
     login:"Login",username:"Username",password:"Password",
     enterSystem:"Enter System",logout:"Sign Out",demo:"Demo: admin / admin",
     badLogin:"Invalid credentials",loading:"Loading...",
-    nav:{dash:"Dashboard",inv:"Inventory",tx:"Transactions",dept:"Departments",users:"Users",profile:"My Profile"},
+    nav:{dash:"Dashboard",inv:"Inventory",tx:"Transactions",dept:"Departments",users:"Users",profile:"My Profile",settings:"Settings"},
     dash:{total:"Total Items",value:"Inventory Value",low:"Low Stock",
       todayTx:"Today's Transactions",recent:"Recent Activity"},
     inv:{title:"Inventory",add:"Add Item",edit:"Edit",del:"Delete",view:"View",
@@ -62,11 +69,18 @@ const T = {
       dept:"Department",cat:"Category",type:"Package Type",status:"Status",
       photo:"Photo URL",scan:"Scan Barcode",lookup:"Lookup",
       looking:"Looking up...",found:"Found ✓",notFound:"Not found",
-      stockIn:"IN",stockOut:"OUT",allStatus:"All Status",allDept:"All Departments"},
+      stockIn:"IN",stockOut:"OUT",allStatus:"All Status",allDept:"All Departments",
+      datasheet:"Datasheet No.",unitsPerPkg:"Units per Package",
+      addPhoto:"Add Photo",deletePhoto:"Delete Photo",photos:"Photos"},
     tx:{title:"Transactions",record:"Record Transaction",type:"Type",
       in:"Stock In",out:"Stock Out",
       source:"Source / Supplier",dest:"Destination / Project",
-      date:"Date",user:"User",notes:"Notes",item:"Item",qty:"Quantity",allType:"All Types"},
+      date:"Date",user:"User",notes:"Notes",item:"Item",qty:"Quantity",allType:"All Types",
+      editTx:"Edit Transaction",deleteTx:"Delete Transaction"},
+    settings:{title:"Settings",currency:"Currency",currencyLabel:"System Currency",
+      cloudinary:"Cloudinary Storage",storageUsed:"Storage Used",
+      clearTxs:"Clear All Transactions",clearTxsConfirm:"All transactions will be permanently deleted. Are you sure?",
+      saved:"Settings saved ✓"},
     dept:{title:"Departments & Categories",addDept:"Add Department",addCat:"Add Category",
       deptName:"Department Name",catName:"Category Name",color:"Color"},
     users:{title:"Users",add:"Add User",edit:"Edit User",name:"Full Name",email:"Email",role:"Role",
@@ -92,6 +106,24 @@ const T = {
     perm:"You don't have permission for this action",
   }
 };
+
+const CURRENCIES=[
+  {code:"USD",symbol:"$",    name:"US Dollar"},
+  {code:"EUR",symbol:"€",    name:"Euro"},
+  {code:"GBP",symbol:"£",    name:"British Pound"},
+  {code:"EGP",symbol:"ج.م", name:"Egyptian Pound"},
+  {code:"SAR",symbol:"ر.س", name:"Saudi Riyal"},
+  {code:"AED",symbol:"د.إ", name:"UAE Dirham"},
+  {code:"QAR",symbol:"ر.ق", name:"Qatari Riyal"},
+  {code:"KWD",symbol:"د.ك", name:"Kuwaiti Dinar"},
+  {code:"BHD",symbol:"د.ب", name:"Bahraini Dinar"},
+  {code:"OMR",symbol:"ر.ع", name:"Omani Rial"},
+  {code:"JOD",symbol:"د.أ", name:"Jordanian Dinar"},
+  {code:"TRY",symbol:"₺",   name:"Turkish Lira"},
+  {code:"INR",symbol:"₹",   name:"Indian Rupee"},
+  {code:"PKR",symbol:"₨",   name:"Pakistani Rupee"},
+];
+const getCurrencySymbol=code=>(CURRENCIES.find(c=>c.code===code)||CURRENCIES[0]).symbol;
 
 const ROLE_PERMS={
   admin:    {canAdd:true,canEdit:true,canDelete:true,canTx:true,canManageUsers:true,canManageDepts:true},
@@ -377,19 +409,29 @@ function BarcodeScanner({onDetect,onClose,t,lang}){
 // ── Item Form ─────────────────────────────────────────────────────────────────
 function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
   const inv=t.inv;
+  const isAR=lang==="ar";
   const [f,setF]=useState({
     name:"",nameEn:"",deptId:"",catId:"",sku:"",barcode:"",
     price:"",qty:"",minThreshold:"",type:"unit",status:"active",description:"",photo:"",
-    ...(init?{...init,deptId:init.deptId?._id||init.deptId||"",catId:init.catId?._id||init.catId||""}:{})
+    datasheet:"",unitsPerPackage:1,images:[],
+    ...(init?{...init,deptId:init.deptId?._id||init.deptId||"",catId:init.catId?._id||init.catId||"",
+      images:init.images||[],datasheet:init.datasheet||"",unitsPerPackage:init.unitsPerPackage||1}:{})
   });
   const [scanning,setScanning]=useState(false);
   const [lookMsg,setLookMsg]=useState("");
   const [looking,setLooking]=useState(false);
   const [photoFile,setPhotoFile]=useState(null);
+  const [extraFiles,setExtraFiles]=useState([]);
+  const [uploadingExtra,setUploadingExtra]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [imgIdx,setImgIdx]=useState(0);
   const debounceRef=useRef(null);
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const deptCats=cats.filter(c=>(c.deptId?._id||c.deptId)===f.deptId);
+  const needsUnits=f.type!=="unit"&&f.type!=="roll";
+  // Merged image list for preview (existing images array + photoUrl if no images)
+  const allImgs=[...f.images];
+  if(f.photo&&!allImgs.find(img=>img.url===f.photo))allImgs.unshift({url:f.photo,publicId:""});
 
   const lookup=async(barcode)=>{
     const code=(barcode||"").trim();
@@ -452,14 +494,34 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
     return()=>clearTimeout(debounceRef.current);
   },[f.barcode]);
 
+  const deleteExistingImg=async(publicId,url)=>{
+    if(init?._id&&publicId){
+      try{const r=await api.deleteItemPhoto(init._id,publicId);s("images",r.images||[]);if(r.photo!==undefined)s("photo",r.photo);}
+      catch{}
+    } else {
+      s("images",f.images.filter(img=>img.url!==url));
+      if(f.photo===url)s("photo","");
+    }
+  };
+
   const submit=async()=>{
     if(!f.name.trim())return;
     setSaving(true);
     try{
-      const payload={...f,price:+f.price||0,qty:+f.qty||0,minThreshold:+f.minThreshold||0};
+      const payload={...f,price:+f.price||0,qty:+f.qty||0,minThreshold:+f.minThreshold||0,
+        unitsPerPackage:+f.unitsPerPackage||1};
       const saved=await onSave(payload,init?._id);
+      // Upload primary photo if file selected
       if(photoFile&&saved?._id){
         try{await api.uploadPhoto(saved._id,photoFile);}catch{}
+      }
+      // Upload extra images
+      if(extraFiles.length&&saved?._id){
+        setUploadingExtra(true);
+        for(const file of extraFiles){
+          try{await api.addItemPhoto(saved._id,file);}catch{}
+        }
+        setUploadingExtra(false);
       }
     }finally{setSaving(false);}
   };
@@ -468,19 +530,50 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
     <>
       {scanning&&<BarcodeScanner t={t} lang={lang} onClose={()=>setScanning(false)} onDetect={code=>{s("barcode",code);setScanning(false);}}/>}
       <div>
-        {f.photo&&<div style={{borderRadius:R.md,overflow:"hidden",height:140,background:C.surf2,marginBottom:14}}>
-          <img src={f.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";}}/>
-        </div>}
+        {/* Image gallery */}
+        {allImgs.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div style={{borderRadius:R.md,overflow:"hidden",height:160,background:C.surf2,position:"relative",marginBottom:8}}>
+              <img src={allImgs[imgIdx]?.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain",background:C.surf2}}
+                onError={e=>{e.target.style.display="none";}}/>
+              {allImgs.length>1&&(
+                <>
+                  <button onClick={()=>setImgIdx(i=>Math.max(0,i-1))} disabled={imgIdx===0}
+                    style={{position:"absolute",top:"50%",insetInlineStart:6,transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",border:"none",color:"#fff",borderRadius:99,width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+                  <button onClick={()=>setImgIdx(i=>Math.min(allImgs.length-1,i+1))} disabled={imgIdx===allImgs.length-1}
+                    style={{position:"absolute",top:"50%",insetInlineEnd:6,transform:"translateY(-50%)",background:"rgba(0,0,0,.5)",border:"none",color:"#fff",borderRadius:99,width:28,height:28,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+                </>
+              )}
+              <div style={{position:"absolute",bottom:6,insetInlineEnd:6,display:"flex",gap:4}}>
+                <button onClick={()=>deleteExistingImg(allImgs[imgIdx]?.publicId,allImgs[imgIdx]?.url)}
+                  style={{background:"rgba(220,38,38,.85)",border:"none",color:"#fff",borderRadius:R.sm,padding:"3px 7px",cursor:"pointer",fontSize:11,fontWeight:700}}>
+                  🗑 {inv.deletePhoto}
+                </button>
+              </div>
+            </div>
+            {allImgs.length>1&&(
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+                {allImgs.map((img,i)=>(
+                  <div key={i} onClick={()=>setImgIdx(i)}
+                    style={{width:52,height:52,borderRadius:R.sm,overflow:"hidden",flexShrink:0,cursor:"pointer",
+                      border:`2px solid ${i===imgIdx?C.primary:C.bdr}`,background:C.surf2}}>
+                    <img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>{e.target.style.display="none";}}/>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <G2>
           <Inp label={inv.name+"*"} required value={f.name} onChange={e=>s("name",e.target.value)}/>
           <Inp label={inv.nameEn} value={f.nameEn} onChange={e=>s("nameEn",e.target.value)}/>
           <Sel label={inv.dept+"*"} value={f.deptId} onChange={e=>{s("deptId",e.target.value);s("catId","");}}>
             <option value="">--</option>
-            {depts.map(d=><option key={d._id||d.id} value={d._id||d.id}>{lang==="ar"?d.name:d.nameEn||d.name}</option>)}
+            {depts.map(d=><option key={d._id||d.id} value={d._id||d.id}>{isAR?d.name:d.nameEn||d.name}</option>)}
           </Sel>
           <Sel label={inv.cat} value={f.catId} onChange={e=>s("catId",e.target.value)}>
             <option value="">--</option>
-            {deptCats.map(c=><option key={c._id||c.id} value={c._id||c.id}>{lang==="ar"?c.name:c.nameEn||c.name}</option>)}
+            {deptCats.map(c=><option key={c._id||c.id} value={c._id||c.id}>{isAR?c.name:c.nameEn||c.name}</option>)}
           </Sel>
           <S2>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -497,24 +590,35 @@ function ItemForm({init,depts,cats,lang,t,onSave,onClose}){
             </div>
           </S2>
           <Inp label="SKU" value={f.sku} onChange={e=>s("sku",e.target.value)} placeholder="XX-001"/>
+          <Inp label={inv.datasheet} value={f.datasheet||""} onChange={e=>s("datasheet",e.target.value)} placeholder="e.g. DS-2024-001"/>
           <Sel label={inv.type} value={f.type} onChange={e=>s("type",e.target.value)}>
             {Object.entries(t.types).map(([k,v])=><option key={k} value={k}>{v}</option>)}
           </Sel>
+          {needsUnits&&<Inp label={inv.unitsPerPkg} type="number" min="1" value={f.unitsPerPackage} onChange={e=>s("unitsPerPackage",e.target.value)}/>}
           <Inp label={inv.price+"*"} required type="number" step="0.01" min="0" value={f.price} onChange={e=>s("price",e.target.value)}/>
           <Inp label={inv.qty+"*"} required type="number" min="0" value={f.qty} onChange={e=>s("qty",e.target.value)}/>
           <Inp label={inv.min} type="number" min="0" value={f.minThreshold} onChange={e=>s("minThreshold",e.target.value)}/>
           <Sel label={inv.status} value={f.status} onChange={e=>s("status",e.target.value)}>
             {Object.entries(t.status).map(([k,v])=><option key={k} value={k}>{v}</option>)}
           </Sel>
-          <S2><Inp label={inv.photo+" (URL)"} value={f.photo} onChange={e=>s("photo",e.target.value)} placeholder="https://..."/></S2>
+          <S2><Inp label={inv.photo+" (URL)"} value={f.photo||""} onChange={e=>s("photo",e.target.value)} placeholder="https://..."/></S2>
           <S2>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
-              <label style={{fontSize:11.5,fontWeight:600,color:C.tx2}}>{lang==="ar"?"رفع صورة":"Upload Photo"}</label>
+              <label style={{fontSize:11.5,fontWeight:600,color:C.tx2}}>{isAR?"الصورة الرئيسية":"Primary Photo"}</label>
               <input type="file" accept="image/*" onChange={e=>setPhotoFile(e.target.files[0])}
                 style={{...baseInput,padding:"6px"}}/>
             </div>
           </S2>
-          <S2><Txt label={inv.desc} value={f.description} onChange={e=>s("description",e.target.value)}/></S2>
+          {init?._id&&<S2>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{fontSize:11.5,fontWeight:600,color:C.tx2}}>📸 {inv.addPhoto} ({isAR?"متعددة":"multiple"})</label>
+              <input type="file" accept="image/*" multiple onChange={e=>setExtraFiles(Array.from(e.target.files))}
+                style={{...baseInput,padding:"6px"}}/>
+              {uploadingExtra&&<span style={{fontSize:12,color:C.tx3}}>⏳ {isAR?"جاري رفع الصور...":"Uploading images..."}</span>}
+              {extraFiles.length>0&&!uploadingExtra&&<span style={{fontSize:12,color:C.green}}>✓ {extraFiles.length} {isAR?"ملف محدد":"file(s) selected — will upload on save"}</span>}
+            </div>
+          </S2>}
+          <S2><Txt label={inv.desc} value={f.description||""} onChange={e=>s("description",e.target.value)}/></S2>
         </G2>
         <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:18}}>
           <Btn color="ghost" onClick={onClose}>{t.cancel}</Btn>
@@ -689,13 +793,14 @@ function TxForm({items,currentUser,lang,t,onSave,onClose,prefillId}){
 // PAGES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function Dashboard({stats,lang,t,onNav}){
+function Dashboard({stats,lang,t,currency,onNav}){
   const d=t.dash;
   const mobile=useMobile();
+  const sym=getCurrencySymbol(currency||"USD");
   if(!stats)return <Spinner/>;
   const kpis=[
     {l:d.total,v:stats.totalItems,em:"📦",go:"inv"},
-    {l:d.value,v:"$"+money(stats.totalValue),em:"💰"},
+    {l:d.value,v:sym+money(stats.totalValue),em:"💰"},
     {l:d.low,v:(stats.lowStock||0)+(stats.outOfStock||0),em:"⚠️",warn:true,go:"inv"},
     {l:d.todayTx,v:stats.todayTransactions,em:"📋",go:"tx"},
   ];
@@ -833,7 +938,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
               <div style={{height:140,background:C.surf2,overflow:"hidden",position:"relative",flexShrink:0}}>
                 {item.photo?(
                   <img src={item.photo.startsWith("/")?`http://localhost:5000${item.photo}`:item.photo}
-                    alt={item.name} style={{width:"100%",height:"100%",objectFit:"cover"}}
+                    alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain",background:C.surf2}}
                     onError={e=>{e.target.style.display="none";}}/>
                 ):(
                   <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,color:C.bdr2}}>📦</div>
@@ -880,7 +985,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
   );
 }
 
-function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
+function TxPage({txs,items,depts,lang,t,perm,onRecord,onEditTx,onDeleteTx,loading}){
   const mobile=useMobile();
   const [typeF,setTypeF]=useState("all");
   const [search,setSearch]=useState("");
@@ -891,6 +996,7 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
       &&(typeF==="all"||tx.type===typeF);
   }),[txs,typeF,search]);
   const{slice,page,total,setPg,perPage,setPerPage}=usePaginate(filtered,20);
+  const canAdmin=perm.canManageUsers;
 
   if(loading)return <Spinner/>;
   return(
@@ -913,12 +1019,15 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead style={{background:C.surf2}}>
-              <tr>{[t.tx.date,t.tx.type,t.inv.name,t.tx.qty,lang==="ar"?"المصدر":"Source",lang==="ar"?"الوجهة":"Destination",t.tx.user,lang==="ar"?"ملاحظات":"Notes"].map(h=>(
-                <th key={h} style={{padding:"10px 13px",textAlign:"inherit",fontWeight:600,color:C.tx3,fontSize:10.5,textTransform:"uppercase",borderBottom:`1px solid ${C.bdr}`,whiteSpace:"nowrap"}}>{h}</th>
-              ))}</tr>
+              <tr>
+                {[t.tx.date,t.tx.type,t.inv.name,t.tx.qty,lang==="ar"?"المصدر":"Source",lang==="ar"?"الوجهة":"Destination",t.tx.user,lang==="ar"?"ملاحظات":"Notes"].map(h=>(
+                  <th key={h} style={{padding:"10px 13px",textAlign:"inherit",fontWeight:600,color:C.tx3,fontSize:10.5,textTransform:"uppercase",borderBottom:`1px solid ${C.bdr}`,whiteSpace:"nowrap"}}>{h}</th>
+                ))}
+                {canAdmin&&<th style={{padding:"10px 13px",borderBottom:`1px solid ${C.bdr}`}}/>}
+              </tr>
             </thead>
             <tbody>
-              {slice.length===0&&<tr><td colSpan={8} style={{textAlign:"center",padding:40,color:C.tx3}}>{t.noData}</td></tr>}
+              {slice.length===0&&<tr><td colSpan={canAdmin?9:8} style={{textAlign:"center",padding:40,color:C.tx3}}>{t.noData}</td></tr>}
               {slice.map(tx=>(
                 <tr key={tx._id} style={{borderBottom:`1px solid ${C.surf2}`}}>
                   <td style={{padding:"11px 13px",color:C.tx3,fontSize:12,whiteSpace:"nowrap"}}>{new Date(tx.date).toLocaleDateString(lang==="ar"?"ar-EG":"en-GB")}</td>
@@ -933,6 +1042,16 @@ function TxPage({txs,items,depts,lang,t,perm,onRecord,loading}){
                   <td style={{padding:"11px 13px",color:C.tx2,fontSize:12}}>{tx.dest||"—"}</td>
                   <td style={{padding:"11px 13px",color:C.tx3,fontSize:12,whiteSpace:"nowrap"}}>👤 {tx.userName}</td>
                   <td style={{padding:"11px 13px",color:C.tx3,fontSize:12}}>{tx.notes||"—"}</td>
+                  {canAdmin&&(
+                    <td style={{padding:"8px 10px",whiteSpace:"nowrap"}}>
+                      <div style={{display:"flex",gap:4}}>
+                        <button title={t.tx.editTx} onClick={()=>onEditTx&&onEditTx(tx)}
+                          style={{padding:"4px 8px",border:`1px solid ${C.bdr2}`,borderRadius:R.sm,background:C.surf,cursor:"pointer",fontSize:12,color:C.primary,fontFamily:"inherit"}}>✏️</button>
+                        <button title={t.tx.deleteTx} onClick={()=>onDeleteTx&&onDeleteTx(tx._id||tx.id)}
+                          style={{padding:"4px 8px",border:`1px solid ${C.redSoft}`,borderRadius:R.sm,background:C.redSoft,cursor:"pointer",fontSize:12,color:C.red,fontFamily:"inherit"}}>🗑</button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -1320,9 +1439,11 @@ function UserProfilePage({currentUser,txs,lang,t,perm}){
 }
 
 // ── Item Detail Page ──────────────────────────────────────────────────────────
-function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
+function ItemDetailPage({item,depts,cats,txs,lang,t,perm,currency,onBack,onEdit,onTx}){
   const mobile=useMobile();
   const tablet=useTablet();
+  const isAR=lang==="ar";
+  const sym=getCurrencySymbol(currency);
   const dept=depts.find(d=>(d._id||d.id)===(item.deptId?._id||item.deptId));
   const cat=cats.find(c=>(c._id||c.id)===(item.catId?._id||item.catId));
   const itemTxs=[...txs].filter(tx=>(tx.itemId?._id||tx.itemId)===(item._id||item.id)).sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -1331,8 +1452,13 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
   const outQty=itemTxs.filter(tx=>tx.type==="OUT").reduce((s,tx)=>s+tx.qty,0);
   const st=stOf(item);
   const stClr={ok:C.green,low:C.amber,out:C.red}[st];
-  const stLabel={ok:lang==="ar"?"متوفر":"In Stock",low:lang==="ar"?"منخفض":"Low Stock",out:lang==="ar"?"نفد":"Out of Stock"}[st];
-  const photoSrc=item.photo?(item.photo.startsWith("/")?`http://localhost:5000${item.photo}`:item.photo):null;
+  const stLabel={ok:isAR?"متوفر":"In Stock",low:isAR?"منخفض":"Low Stock",out:isAR?"نفد":"Out of Stock"}[st];
+
+  // Build image list: images array takes priority, fallback to photo field
+  const allImgs=item.images?.length>0?item.images
+    :item.photo?[{url:item.photo.startsWith("/")?`http://localhost:5000${item.photo}`:item.photo,publicId:""}]:[];
+  const [imgIdx,setImgIdx]=useState(0);
+  const safeIdx=Math.min(imgIdx,Math.max(0,allImgs.length-1));
 
   return(
     <div>
@@ -1351,30 +1477,49 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
         {/* Left column */}
         <div>
           <Card style={{overflow:"hidden",marginBottom:12}}>
-            <div style={{height:mobile?180:260,background:C.surf2,position:"relative"}}>
-              {photoSrc?(
-                <img src={photoSrc} alt={item.name} style={{width:"100%",height:"100%",objectFit:"cover"}}
+            {/* Main image */}
+            <div style={{height:mobile?200:280,background:C.surf2,position:"relative"}}>
+              {allImgs.length>0?(
+                <img src={allImgs[safeIdx].url} alt={item.name}
+                  style={{width:"100%",height:"100%",objectFit:"contain",background:C.surf2}}
                   onError={e=>{e.target.style.display="none";}}/>
               ):(
                 <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:mobile?48:64,color:C.bdr2}}>📦</div>
               )}
+              {allImgs.length>1&&<>
+                <button onClick={()=>setImgIdx(i=>Math.max(0,i-1))} disabled={safeIdx===0}
+                  style={{position:"absolute",top:"50%",insetInlineStart:6,transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"none",color:"#fff",borderRadius:99,width:30,height:30,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+                <button onClick={()=>setImgIdx(i=>Math.min(allImgs.length-1,i+1))} disabled={safeIdx===allImgs.length-1}
+                  style={{position:"absolute",top:"50%",insetInlineEnd:6,transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"none",color:"#fff",borderRadius:99,width:30,height:30,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+                <div style={{position:"absolute",bottom:6,insetInlineEnd:8,background:"rgba(0,0,0,.55)",color:"#fff",fontSize:10.5,fontWeight:700,padding:"2px 8px",borderRadius:99}}>{safeIdx+1}/{allImgs.length}</div>
+              </>}
               <div style={{position:"absolute",bottom:8,insetInlineStart:8,background:stClr,color:"#fff",
                 padding:"3px 10px",borderRadius:99,fontSize:11,fontWeight:700}}>{stLabel}</div>
               {dept&&<div style={{position:"absolute",top:8,insetInlineStart:8,background:dept.color,color:"#fff",
                 padding:"2px 9px",borderRadius:99,fontSize:10.5,fontWeight:700}}>
-                {lang==="ar"?dept.name:dept.nameEn||dept.name}
+                {isAR?dept.name:dept.nameEn||dept.name}
               </div>}
             </div>
+            {/* Thumbnail strip */}
+            {allImgs.length>1&&<div style={{display:"flex",gap:6,padding:"8px 10px",overflowX:"auto",background:C.surf2,borderTop:`1px solid ${C.bdr}`}}>
+              {allImgs.map((img,i)=>(
+                <div key={i} onClick={()=>setImgIdx(i)}
+                  style={{width:46,height:46,borderRadius:R.sm,overflow:"hidden",flexShrink:0,cursor:"pointer",
+                    border:`2px solid ${i===safeIdx?C.primary:C.bdr}`,background:C.surf}}>
+                  <img src={img.url} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>{e.target.style.display="none";}}/>
+                </div>
+              ))}
+            </div>}
           </Card>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
             {[
-              [lang==="ar"?"الكمية":"Stock",item.qty,stClr],
-              [lang==="ar"?"الحد الأدنى":"Min",item.minThreshold,C.amber],
-              [lang==="ar"?"وارد":"IN",inQty,C.green],
-              [lang==="ar"?"صادر":"OUT",outQty,C.red],
-              [lang==="ar"?"السعر":"Price","$"+money(item.price),C.tx],
-              [lang==="ar"?"القيمة":"Value","$"+money(item.qty*item.price),C.primary],
+              [isAR?"الكمية":"Stock",item.qty,stClr],
+              [isAR?"الحد الأدنى":"Min",item.minThreshold,C.amber],
+              [isAR?"وارد":"IN",inQty,C.green],
+              [isAR?"صادر":"OUT",outQty,C.red],
+              [isAR?"السعر":"Price",sym+money(item.price),C.tx],
+              [isAR?"القيمة":"Value",sym+money(item.qty*item.price),C.primary],
             ].map(([l,v,c])=>(
               <div key={l} style={{background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:mobile?"8px 10px":"10px 12px"}}>
                 <div style={{fontSize:9,fontWeight:600,color:C.tx3,textTransform:"uppercase",letterSpacing:.4,marginBottom:2}}>{l}</div>
@@ -1398,11 +1543,13 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
             <div style={{display:"grid",gridTemplateColumns:mobile?"1fr":"1fr 1fr",gap:8}}>
               {[
                 ["SKU",item.sku||"—","monospace"],
-                [lang==="ar"?"الباركود":"Barcode",item.barcode||"—","monospace"],
-                [lang==="ar"?"القسم":"Department",dept?(lang==="ar"?dept.name:dept.nameEn||dept.name):"—",null],
-                [lang==="ar"?"التصنيف":"Category",cat?(lang==="ar"?cat.name:cat.nameEn||cat.name):"—",null],
-                [lang==="ar"?"نوع التعبئة":"Package Type",t.types[item.type]||item.type,null],
-                [lang==="ar"?"الحالة":"Status",t.status[item.status]||item.status,null],
+                [isAR?"الباركود":"Barcode",item.barcode||"—","monospace"],
+                [isAR?"القسم":"Department",dept?(isAR?dept.name:dept.nameEn||dept.name):"—",null],
+                [isAR?"التصنيف":"Category",cat?(isAR?cat.name:cat.nameEn||cat.name):"—",null],
+                [isAR?"نوع التعبئة":"Package Type",t.types[item.type]||item.type,null],
+                [isAR?"الحالة":"Status",t.status[item.status]||item.status,null],
+                ...(item.datasheet?[[t.inv.datasheet,item.datasheet,"monospace"]]:[]),
+                ...(item.unitsPerPackage>1&&item.type!=="unit"?[[t.inv.unitsPerPkg,`${item.unitsPerPackage} ${isAR?"وحدة":"units"}`,null]]:[]),
               ].map(([label,value,ff])=>(
                 <div key={label} style={{background:C.surf2,borderRadius:R.sm,padding:"9px 11px"}}>
                   <div style={{fontSize:10,color:C.tx3,fontWeight:600,marginBottom:3}}>{label}</div>
@@ -1479,6 +1626,156 @@ function ItemDetailPage({item,depts,cats,txs,lang,t,perm,onBack,onEdit,onTx}){
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Transaction Edit Modal (admin) ────────────────────────────────────────────
+function TxEditModal({tx,items,t,lang,onSave,onClose}){
+  const isAR=lang==="ar";
+  const [f,setF]=useState({
+    type:tx.type,qty:tx.qty,
+    source:tx.source||"",dest:tx.dest||"",
+    date:tx.date?new Date(tx.date).toISOString().split("T")[0]:today(),
+    notes:tx.notes||""
+  });
+  const [saving,setSaving]=useState(false);
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const txItem=items.find(i=>(i._id||i.id)===(tx.itemId?._id||tx.itemId));
+  const submit=async()=>{
+    if(!f.qty)return;
+    setSaving(true);
+    try{await onSave(tx._id,{...f,qty:+f.qty});}finally{setSaving(false);}
+  };
+  return(
+    <ModalShell title={t.tx.editTx} onClose={onClose}>
+      <div style={{background:C.primarySoft,borderRadius:R.sm,padding:"8px 12px",marginBottom:14,fontSize:13,color:C.tx2}}>
+        📦 {isAR?txItem?.name:txItem?.nameEn||txItem?.name||"—"}
+      </div>
+      <G2>
+        <S2>
+          <div style={{display:"flex",background:C.surf2,borderRadius:R.md,padding:4,gap:4}}>
+            {["IN","OUT"].map(tp=>(
+              <button key={tp} type="button" onClick={()=>s("type",tp)}
+                style={{flex:1,padding:"9px",borderRadius:R.sm,border:"none",cursor:"pointer",
+                  fontWeight:700,fontSize:13,fontFamily:"inherit",
+                  background:f.type===tp?(tp==="IN"?C.green:C.red):"transparent",
+                  color:f.type===tp?"#fff":C.tx2}}>
+                {tp==="IN"?"↓ "+t.inv.stockIn:"↑ "+t.inv.stockOut}
+              </button>
+            ))}
+          </div>
+        </S2>
+        <Inp label={t.tx.qty+"*"} type="number" min="1" value={f.qty} onChange={e=>s("qty",e.target.value)}/>
+        <Inp label={t.tx.date+"*"} type="date" value={f.date} onChange={e=>s("date",e.target.value)}/>
+        <Inp label={t.tx.source} value={f.source} onChange={e=>s("source",e.target.value)}/>
+        <Inp label={t.tx.dest} value={f.dest} onChange={e=>s("dest",e.target.value)}/>
+        <S2><Txt label={t.tx.notes} value={f.notes} onChange={e=>s("notes",e.target.value)} rows={2}/></S2>
+      </G2>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+        <Btn color="ghost" onClick={onClose}>{t.cancel}</Btn>
+        <Btn color="primary" onClick={submit} disabled={saving}>{saving?"⏳":t.save}</Btn>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ── Settings Page ─────────────────────────────────────────────────────────────
+function SettingsPage({lang,t,currency,onCurrencyChange}){
+  const isAR=lang==="ar";
+  const st=t.settings;
+  const [cloudUsage,setCloudUsage]=useState(null);
+  const [cloudLoading,setCloudLoading]=useState(false);
+  const [cloudErr,setCloudErr]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [localCurrency,setLocalCurrency]=useState(currency||"USD");
+
+  useEffect(()=>{
+    setCloudLoading(true);
+    api.getCloudinaryUsage()
+      .then(d=>setCloudUsage(d))
+      .catch(()=>setCloudErr(isAR?"تعذّر تحميل بيانات Cloudinary":"Could not load Cloudinary data"))
+      .finally(()=>setCloudLoading(false));
+  },[]);
+
+  const saveCurrency=async()=>{
+    setSaving(true);
+    try{
+      await api.updateSettings({currency:localCurrency});
+      onCurrencyChange(localCurrency);
+    }catch{}
+    finally{setSaving(false);}
+  };
+
+  const storPct=cloudUsage?Math.min(100,Math.round((cloudUsage.storage?.used||0)/(cloudUsage.storage?.limit||1)*100)):0;
+  const transPct=cloudUsage?Math.min(100,Math.round((cloudUsage.transformations?.used||0)/(cloudUsage.transformations?.limit||1)*100)):0;
+  const fmtBytes=b=>{if(!b)return"0 B";const k=1024,s=["B","KB","MB","GB"];const i=Math.floor(Math.log(b)/Math.log(k));return(b/Math.pow(k,i)).toFixed(1)+" "+s[i];};
+
+  return(
+    <div style={{maxWidth:640}}>
+      <div style={{fontWeight:700,fontSize:16,marginBottom:20}}>⚙️ {st.title}</div>
+
+      {/* Currency */}
+      <Card style={{padding:20,marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>💱 {st.currencyLabel}</div>
+        <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:200}}>
+            <label style={{fontSize:11.5,fontWeight:600,color:C.tx2,display:"block",marginBottom:6}}>{st.currency}</label>
+            <select value={localCurrency} onChange={e=>setLocalCurrency(e.target.value)}
+              style={{...baseInput,cursor:"pointer"}}>
+              {CURRENCIES.map(c=>(
+                <option key={c.code} value={c.code}>{c.symbol} — {c.name} ({c.code})</option>
+              ))}
+            </select>
+          </div>
+          <Btn color="primary" onClick={saveCurrency} disabled={saving}>{saving?"⏳":t.save}</Btn>
+        </div>
+        <div style={{marginTop:10,fontSize:12,color:C.tx3}}>
+          {isAR?"الرمز الحالي: ":"Current symbol: "}
+          <strong style={{fontSize:15,color:C.primary}}>{getCurrencySymbol(localCurrency)}</strong>
+          {" "}{CURRENCIES.find(c=>c.code===localCurrency)?.name}
+        </div>
+      </Card>
+
+      {/* Cloudinary */}
+      <Card style={{padding:20,marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>☁️ {st.cloudinary}</div>
+        {cloudLoading&&<div style={{color:C.tx3,fontSize:13}}>⏳ {isAR?"جاري التحميل...":"Loading..."}</div>}
+        {cloudErr&&<div style={{color:C.red,fontSize:13}}>{cloudErr}</div>}
+        {cloudUsage&&(
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {[
+              [isAR?"التخزين":"Storage",storPct,fmtBytes(cloudUsage.storage?.used),fmtBytes(cloudUsage.storage?.limit)],
+              [isAR?"التحويلات":"Transformations",transPct,cloudUsage.transformations?.used?.toLocaleString(),cloudUsage.transformations?.limit?.toLocaleString()],
+            ].map(([label,pct,used,limit])=>(
+              <div key={label}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12.5,fontWeight:600,marginBottom:6}}>
+                  <span>{label}</span>
+                  <span style={{color:pct>80?C.red:pct>50?C.amber:C.green}}>{pct}%</span>
+                </div>
+                <Prog pct={pct} color={pct>80?C.red:pct>50?C.amber:C.green} h={10}/>
+                <div style={{fontSize:11,color:C.tx3,marginTop:4}}>{used} / {limit}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* System info */}
+      <Card style={{padding:20}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>ℹ️ {isAR?"معلومات النظام":"System Info"}</div>
+        {[
+          [isAR?"الإصدار":"Version","NexERP v1.0.0"],
+          [isAR?"قاعدة البيانات":"Database","MongoDB Atlas"],
+          [isAR?"التخزين السحابي":"Cloud Storage","Cloudinary"],
+          [isAR?"الاستضافة":"Hosting","Railway + Vercel"],
+        ].map(([k,v])=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.bdr}`,fontSize:13}}>
+            <span style={{color:C.tx3}}>{k}</span>
+            <span style={{fontWeight:600}}>{v}</span>
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }
@@ -1597,6 +1894,8 @@ export default function App(){
   const [txs,setTxs]=useState([]);
   const [stats,setStats]=useState(null);
   const [loading,setLoading]=useState(false);
+  const [currency,setCurrency]=useState("USD");
+  const [editTxData,setEditTxData]=useState(null);
 
   // UI
   const [page,setPage]=useState("dash");
@@ -1638,12 +1937,14 @@ export default function App(){
   const loadAll=async()=>{
     setLoading(true);
     try{
-      const [d,c,i,tx,s,u]=await Promise.all([
+      const [d,c,i,tx,s,u,sett]=await Promise.all([
         api.getDepts(),api.getCats(),api.getItems(),
         api.getTxs(),api.getStats(),
         resolvePerms(currentUser||{})?.canManageUsers?api.getUsers():Promise.resolve([]),
+        api.getSettings().catch(()=>({})),
       ]);
       setDepts(d);setCats(c);setItems(i);setTxs(tx);setStats(s);setUsers(u);
+      if(sett?.currency)setCurrency(sett.currency);
     }catch(e){showToast(e.message,"error");}
     finally{setLoading(false);}
   };
@@ -1707,11 +2008,30 @@ export default function App(){
   const doDelete=async()=>{
     if(!delQ)return;
     try{
-      if(delQ.type==="item"){await api.deleteItem(delQ.id);setItems(ps=>ps.filter(p=>(p._id||p.id)!==delQ.id));}
+      if(delQ.type==="item"){await api.deleteItem(delQ.id);setItems(ps=>ps.filter(p=>(p._id||p.id)!==delQ.id));await refreshStats();}
       if(delQ.type==="dept"){await api.deleteDept(delQ.id);setDepts(ps=>ps.filter(d=>(d._id||d.id)!==delQ.id));}
       if(delQ.type==="cat"){await api.deleteCat(delQ.id);setCats(ps=>ps.filter(c=>(c._id||c.id)!==delQ.id));}
       if(delQ.type==="user"){await api.deleteUser(delQ.id);setUsers(ps=>ps.filter(u=>(u._id||u.id)!==delQ.id));}
+      if(delQ.type==="tx"){
+        await api.deleteTx(delQ.id);
+        setTxs(ps=>ps.filter(tx=>(tx._id||tx.id)!==delQ.id));
+        await refreshStats();
+      }
       setDelQ(null);setModal(null);
+      showToast(t.saved);
+    }catch(e){showToast(e.message,"error");}
+  };
+
+  const doEditTx=async(id,data)=>{
+    try{
+      const res=await api.updateTx(id,data);
+      setTxs(ps=>ps.map(tx=>(tx._id||tx.id)===id?{...tx,...res.transaction,itemId:tx.itemId}:tx));
+      // Update item qty if stock changed
+      if(res.updatedQty!==undefined&&res.itemId){
+        setItems(ps=>ps.map(p=>(p._id||p.id)===res.itemId?{...p,qty:res.updatedQty}:p));
+      }
+      await refreshStats();
+      setEditTxData(null);
       showToast(t.saved);
     }catch(e){showToast(e.message,"error");}
   };
@@ -1732,8 +2052,7 @@ export default function App(){
                 <div style={{fontSize:11,color:C.tx3}}>{t.tag}</div>
               </div>
             </div>
-            <div style={{fontSize:21,fontWeight:800,color:C.tx,marginBottom:6}}>{t.login}</div>
-            <div style={{fontSize:12.5,color:C.tx3,background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"8px 12px",marginBottom:22}}>{t.demo}</div>
+            <div style={{fontSize:21,fontWeight:800,color:C.tx,marginBottom:22}}>{t.login}</div>
             <div style={{display:"flex",flexDirection:"column",gap:13,marginBottom:16}}>
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:C.tx2,marginBottom:5}}>{t.username}</div>
@@ -1779,6 +2098,7 @@ export default function App(){
     {id:"dept",label:t.nav.dept,icon:"🗂"},
     ...(perm.canManageUsers?[{id:"users",label:t.nav.users,icon:"👥"}]:[]),
     {id:"profile",label:t.nav.profile,icon:"👤"},
+    ...(perm.canManageUsers?[{id:"settings",label:t.nav.settings,icon:"⚙️"}]:[]),
   ];
 
   return(
@@ -1884,7 +2204,7 @@ export default function App(){
             </div>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"20px 22px"}}>
-            {page==="dash"&&<Dashboard stats={stats} lang={lang} t={t} onNav={setPage}/>}
+            {page==="dash"&&<Dashboard stats={stats} lang={lang} t={t} currency={currency} onNav={setPage}/>}
             {page==="inv"&&<InventoryPage items={items} depts={depts} cats={cats} lang={lang} t={t} perm={perm} loading={loading}
               onAdd={()=>{setEditItem(null);setModal("item");}}
               onEdit={item=>{setEditItem(item);setModal("item");}}
@@ -1893,12 +2213,15 @@ export default function App(){
               onDetail={item=>{setSelectedItem(item);setPage("item");}}/>}
             {page==="item"&&selectedItem&&<ItemDetailPage
               item={items.find(i=>(i._id||i.id)===(selectedItem._id||selectedItem.id))||selectedItem}
-              depts={depts} cats={cats} txs={txs} lang={lang} t={t} perm={perm}
+              depts={depts} cats={cats} txs={txs} lang={lang} t={t} perm={perm} currency={currency}
               onBack={()=>setPage("inv")}
               onEdit={item=>{setEditItem(item);setModal("item");}}
               onTx={id=>{setTxItemId(id);setModal("tx");}}/>}
             {page==="tx"&&<TxPage txs={txs} items={items} depts={depts} lang={lang} t={t} perm={perm} loading={loading}
-              onRecord={id=>{setTxItemId(id);setModal("tx");}}/>}
+              onRecord={id=>{setTxItemId(id);setModal("tx");}}
+              onEditTx={tx=>setEditTxData(tx)}
+              onDeleteTx={id=>{setDelQ({type:"tx",id});setModal("confirm");}}/>}
+            {page==="settings"&&perm.canManageUsers&&<SettingsPage lang={lang} t={t} currency={currency} onCurrencyChange={c=>{setCurrency(c);showToast(t.settings.saved);}}/>}
             {page==="dept"&&<DeptPage depts={depts} cats={cats} items={items} lang={lang} t={t} perm={perm}
               onAddDept={async d=>{try{const nd=await api.addDept(d);setDepts(ps=>[...ps,nd]);showToast(t.saved);}catch(e){showToast(e.message,"error");}}}
               onDelDept={id=>{setDelQ({type:"dept",id});setModal("confirm");}}
@@ -1933,6 +2256,11 @@ export default function App(){
             <Btn color="red" onClick={doDelete}>{t.delete}</Btn>
           </div>
         </ModalShell>
+      )}
+      {editTxData&&(
+        <TxEditModal tx={editTxData} items={items} t={t} lang={lang}
+          onSave={(id,data)=>doEditTx(id,data)}
+          onClose={()=>setEditTxData(null)}/>
       )}
     </>
   );
