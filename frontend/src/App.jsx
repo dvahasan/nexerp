@@ -40,7 +40,6 @@ const T = {
       inactive:"تعطيل",active:"تفعيل",joinedOn:"تاريخ الانضمام",lastActive:"آخر نشاط",txCount:"عدد الحركات"},
     profile:{title:"الملف الشخصي",myPerms:"صلاحياتي",allowed:"مسموح",denied:"غير مسموح"},
     prev:"السابق",next:"التالي",page:"صفحة",of:"من",
-    search:"بحث...",
     globalSearch:{placeholder:"ابحث في النظام...",items:"أصناف",txs:"حركات",users:"مستخدمون",depts:"أقسام",noResults:"لا توجد نتائج",viewAll:"عرض الكل"},
     status:{active:"نشط",inactive:"غير نشط",discontinued:"متوقف"},
     types:{unit:"وحدة",box:"صندوق",pack:"حزمة",group:"مجموعة",roll:"لفة",bag:"كيس",pallet:"منصة"},
@@ -90,7 +89,6 @@ const T = {
       inactive:"Deactivate",active:"Activate",joinedOn:"Joined",lastActive:"Last Active",txCount:"Transactions"},
     profile:{title:"My Profile",myPerms:"My Permissions",allowed:"Allowed",denied:"Denied"},
     prev:"Prev",next:"Next",page:"Page",of:"of",
-    search:"Search...",
     globalSearch:{placeholder:"Search system...",items:"Items",txs:"Transactions",users:"Users",depts:"Departments",noResults:"No results",viewAll:"View all"},
     status:{active:"Active",inactive:"Inactive",discontinued:"Discontinued"},
     types:{unit:"Unit",box:"Box",pack:"Pack",group:"Group",roll:"Roll",bag:"Bag",pallet:"Pallet"},
@@ -866,9 +864,10 @@ function Dashboard({stats,lang,t,currency,onNav}){
   );
 }
 
-function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,onDetail,loading}){
+function InventoryPage({items,depts,cats,lang,t,perm,currency,onAdd,onEdit,onDelete,onTx,onDetail,loading}){
   const inv=t.inv;
   const mobile=useMobile();
+  const sym=getCurrencySymbol(currency||"USD");
   const [search,setSearch]=useState("");
   const [deptF,setDeptF]=useState("all");
   const [stF,setStF]=useState("all");
@@ -959,7 +958,7 @@ function InventoryPage({items,depts,cats,lang,t,perm,onAdd,onEdit,onDelete,onTx,
                   </div>
                   <div style={{background:C.surf2,borderRadius:R.sm,padding:"6px 8px",textAlign:"center"}}>
                     <div style={{fontSize:10,color:C.tx3,fontWeight:600}}>{lang==="ar"?"السعر":"Price"}</div>
-                    <div style={{fontSize:13,fontWeight:700}}>${money(item.price)}</div>
+                    <div style={{fontSize:13,fontWeight:700}}>{sym}{money(item.price)}</div>
                   </div>
                   <div style={{background:C.surf2,borderRadius:R.sm,padding:"6px 8px",textAlign:"center"}}>
                     <div style={{fontSize:10,color:C.tx3,fontWeight:600}}>{t.types[item.type]||item.type}</div>
@@ -1690,6 +1689,8 @@ function SettingsPage({lang,t,currency,onCurrencyChange}){
   const [saving,setSaving]=useState(false);
   const [localCurrency,setLocalCurrency]=useState(currency||"USD");
 
+  useEffect(()=>setLocalCurrency(currency||"USD"),[currency]);
+
   useEffect(()=>{
     setCloudLoading(true);
     api.getCloudinaryUsage()
@@ -1703,7 +1704,7 @@ function SettingsPage({lang,t,currency,onCurrencyChange}){
     try{
       await api.updateSettings({currency:localCurrency});
       onCurrencyChange(localCurrency);
-    }catch{}
+    }catch(e){alert(e.message||t.error);}
     finally{setSaving(false);}
   };
 
@@ -2240,7 +2241,7 @@ export default function App(){
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"20px 22px"}}>
             {page==="dash"&&<Dashboard stats={stats} lang={lang} t={t} currency={currency} onNav={setPage}/>}
-            {page==="inv"&&<InventoryPage items={items} depts={depts} cats={cats} lang={lang} t={t} perm={perm} loading={loading}
+            {page==="inv"&&<InventoryPage items={items} depts={depts} cats={cats} lang={lang} t={t} perm={perm} currency={currency} loading={loading}
               onAdd={()=>{setEditItem(null);setModal("item");}}
               onEdit={item=>{setEditItem(item);setModal("item");}}
               onDelete={id=>{setDelQ({type:"item",id});setModal("confirm");}}
