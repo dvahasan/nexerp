@@ -526,4 +526,4 @@ app.get("/api/admin/cloudinary", protect, need("canManageUsers"), async (req, re
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.listen(PORT, () => console.log(`🚀 NexERP API → http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 NexERP API v1.1 → http://localhost:${PORT} | routes: settings, cloudinary, tx-crud`));
