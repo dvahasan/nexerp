@@ -1787,6 +1787,8 @@ function GlobalSearch({items,txs,users,depts,lang,t,isAR,onNavigate}){
   const gs=t.globalSearch;
   const[q,setQ]=useState("");
   const[open,setOpen]=useState(false);
+  const[scanning,setScanning]=useState(false);
+  const[scanMsg,setScanMsg]=useState("");
   const ref=useRef(null);
 
   useEffect(()=>{
@@ -1825,15 +1827,48 @@ function GlobalSearch({items,txs,users,depts,lang,t,isAR,onNavigate}){
     else if(r.type==="dept")onNavigate("dept");
   };
 
+  const handleBarcodeDetect=async code=>{
+    const clean=String(code||"").trim();
+    if(!clean)return;
+    setScanning(false);
+    setScanMsg("");
+    const local=items.find(i=>String(i.barcode||"").trim()===clean);
+    if(local){
+      setQ("");setOpen(false);
+      onNavigate("item",local);
+      return;
+    }
+    try{
+      const found=await api.getByBarcode(clean);
+      if(found){
+        setQ("");setOpen(false);
+        onNavigate("item",found);
+        return;
+      }
+    }catch{}
+    setQ(clean);
+    setOpen(true);
+    setScanMsg(isAR?"لم يتم العثور على صنف بهذا الباركود":"No item found for this barcode");
+  };
+
   return(
     <div ref={ref} style={{position:"relative",flex:1,maxWidth:400}}>
+      {scanning&&<BarcodeScanner t={t} lang={lang} onClose={()=>setScanning(false)} onDetect={handleBarcodeDetect}/>}
       <div style={{display:"flex",alignItems:"center",gap:8,background:C.surf2,border:`1px solid ${C.bdr}`,borderRadius:R.sm,padding:"6px 12px"}}>
         <span style={{fontSize:14,color:C.tx3,flexShrink:0}}>🔍</span>
         <input value={q} onChange={e=>{setQ(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)}
           placeholder={gs.placeholder}
           style={{border:"none",background:"none",outline:"none",fontSize:13,color:C.tx,width:"100%",fontFamily:"inherit"}}/>
+        <button onClick={()=>setScanning(true)} title={isAR?"مسح باركود":"Scan barcode"}
+          style={{border:"none",background:"none",cursor:"pointer",color:C.tx3,fontSize:16,padding:0,flexShrink:0,lineHeight:1}}>
+          📷
+        </button>
         {q&&<button onClick={()=>{setQ("");setOpen(false);}} style={{border:"none",background:"none",cursor:"pointer",color:C.tx3,fontSize:16,padding:0,flexShrink:0}}>✕</button>}
       </div>
+      {scanMsg&&<div style={{position:"absolute",top:"calc(100% + 4px)",[isAR?"right":"left"]:0,zIndex:201,
+        background:C.redSoft,color:C.red,border:`1px solid #fca5a5`,borderRadius:R.sm,padding:"6px 10px",fontSize:12,boxShadow:SH.sm}}>
+        {scanMsg}
+      </div>}
       {open&&q.length>=2&&(
         <div style={{position:"absolute",top:"calc(100% + 6px)",[isAR?"right":"left"]:0,width:"100%",minWidth:300,
           background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:R.md,boxShadow:SH.lg,zIndex:200,overflow:"hidden"}}>
