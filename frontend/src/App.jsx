@@ -136,13 +136,33 @@ const today=()=>new Date().toISOString().split("T")[0];
 const money=n=>Number(n||0).toLocaleString();
 const stOf=p=>p.qty===0?"out":p.qty<=p.minThreshold?"low":"ok";
 const C={
-  bg:"#f1f5f9",surf:"#fff",surf2:"#f8fafc",bdr:"#e2e8f0",bdr2:"#cbd5e1",
-  tx:"#0f172a",tx2:"#475569",tx3:"#94a3b8",
-  primary:"#1d4ed8",primarySoft:"#eff6ff",
-  green:"#16a34a",greenSoft:"#f0fdf4",
-  red:"#dc2626",redSoft:"#fef2f2",
-  amber:"#d97706",amberSoft:"#fffbeb",
-  sidebar:"#0f172a",sidebarBdr:"#1e293b",
+  bg:"var(--c-bg)",surf:"var(--c-surf)",surf2:"var(--c-surf2)",bdr:"var(--c-bdr)",bdr2:"var(--c-bdr2)",
+  tx:"var(--c-tx)",tx2:"var(--c-tx2)",tx3:"var(--c-tx3)",
+  primary:"var(--c-primary)",primarySoft:"var(--c-primary-soft)",
+  green:"var(--c-green)",greenSoft:"var(--c-green-soft)",
+  red:"var(--c-red)",redSoft:"var(--c-red-soft)",
+  amber:"var(--c-amber)",amberSoft:"var(--c-amber-soft)",
+  sidebar:"var(--c-sidebar)",sidebarBdr:"var(--c-sidebar-bdr)",
+};
+const THEME_VARS={
+  light:{
+    "--c-bg":"#f1f5f9","--c-surf":"#fff","--c-surf2":"#f8fafc","--c-bdr":"#e2e8f0","--c-bdr2":"#cbd5e1",
+    "--c-tx":"#0f172a","--c-tx2":"#475569","--c-tx3":"#94a3b8",
+    "--c-primary":"#1d4ed8","--c-primary-soft":"#eff6ff",
+    "--c-green":"#16a34a","--c-green-soft":"#f0fdf4",
+    "--c-red":"#dc2626","--c-red-soft":"#fef2f2",
+    "--c-amber":"#d97706","--c-amber-soft":"#fffbeb",
+    "--c-sidebar":"#0f172a","--c-sidebar-bdr":"#1e293b",
+  },
+  dark:{
+    "--c-bg":"#0b1120","--c-surf":"#111827","--c-surf2":"#1f2937","--c-bdr":"#263244","--c-bdr2":"#334155",
+    "--c-tx":"#e5e7eb","--c-tx2":"#cbd5e1","--c-tx3":"#94a3b8",
+    "--c-primary":"#60a5fa","--c-primary-soft":"#172554",
+    "--c-green":"#4ade80","--c-green-soft":"#052e16",
+    "--c-red":"#f87171","--c-red-soft":"#450a0a",
+    "--c-amber":"#fbbf24","--c-amber-soft":"#422006",
+    "--c-sidebar":"#020617","--c-sidebar-bdr":"#1e293b",
+  }
 };
 const R={sm:8,md:12,lg:16};
 const SH={sm:"0 1px 3px rgba(0,0,0,.07)",lg:"0 16px 48px rgba(0,0,0,.18)"};
@@ -1910,9 +1930,11 @@ function GlobalSearch({items,txs,users,depts,lang,t,isAR,onNavigate}){
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App(){
-  const [lang,setLang]=useState("ar");
+  const [lang,setLang]=useState(()=>localStorage.getItem("nexerp_lang")||"en");
+  const [theme,setTheme]=useState(()=>localStorage.getItem("nexerp_theme")||"light");
   const t=T[lang];
   const isAR=lang==="ar";
+  const themeVars=THEME_VARS[theme]||THEME_VARS.light;
 
   // Auth
   const [authed,setAuthed]=useState(false);
@@ -1943,6 +1965,17 @@ export default function App(){
   const [toast,setToast]=useState(null);
   const [sidebarOpen,setSidebarOpen]=useState(window.innerWidth>=768);
   const isMobile=()=>window.innerWidth<768;
+
+  useEffect(()=>{
+    localStorage.setItem("nexerp_lang",lang);
+    document.documentElement.lang=lang;
+    document.documentElement.dir=isAR?"rtl":"ltr";
+  },[lang,isAR]);
+
+  useEffect(()=>{
+    localStorage.setItem("nexerp_theme",theme);
+    document.documentElement.dataset.theme=theme;
+  },[theme]);
 
   useEffect(()=>{
     const onResize=()=>{ if(window.innerWidth>=768) setSidebarOpen(true); };
@@ -2077,7 +2110,7 @@ export default function App(){
     return(
       <>
         <style>{`@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
-        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
+        <div style={{...themeVars,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
           background:"linear-gradient(135deg,#1e3a5f,#0f172a)",
           fontFamily:"'Segoe UI',system-ui,sans-serif",direction:isAR?"rtl":"ltr"}}>
           <div style={{background:C.surf,borderRadius:R.lg+4,padding:42,width:380,boxShadow:SH.lg}}>
@@ -2120,6 +2153,12 @@ export default function App(){
                 ))}
               </div>
             </div>
+            <div style={{marginTop:10,display:"flex",justifyContent:"center"}}>
+              <button onClick={()=>setTheme(v=>v==="dark"?"light":"dark")}
+                style={{border:`1px solid ${C.bdr}`,background:C.surf2,color:C.tx2,borderRadius:R.sm,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                {theme==="dark"?"☀️ Light":"🌙 Dark"}
+              </button>
+            </div>
           </div>
         </div>
       </>
@@ -2149,7 +2188,7 @@ export default function App(){
       `}</style>
       {toast&&<Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)}/>}
 
-      <div style={{display:"flex",height:"100vh",overflow:"hidden",
+      <div style={{...themeVars,display:"flex",height:"100vh",overflow:"hidden",
         fontFamily:"'Segoe UI',system-ui,'Noto Sans Arabic',sans-serif",
         background:C.bg,color:C.tx,direction:isAR?"rtl":"ltr"}}>
 
@@ -2235,6 +2274,11 @@ export default function App(){
             {page==="item"&&perm.canEdit&&selectedItem&&<Btn color="ghost" size="sm" onClick={()=>{setEditItem(selectedItem);setModal("item");}}>✏️</Btn>}
             {page==="item"&&perm.canTx&&selectedItem&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(selectedItem._id||selectedItem.id);setModal("tx");}}>↕</Btn>}
             {page==="tx"&&perm.canTx&&<Btn color="primary" size="sm" onClick={()=>{setTxItemId(null);setModal("tx");}}>＋</Btn>}
+            <button onClick={()=>setTheme(v=>v==="dark"?"light":"dark")}
+              title={theme==="dark"?"Light mode":"Dark mode"}
+              style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:34,border:`1px solid ${C.bdr}`,background:C.surf2,color:C.tx,borderRadius:R.sm,cursor:"pointer",fontSize:15,flexShrink:0}}>
+              {theme==="dark"?"☀️":"🌙"}
+            </button>
             <div style={{fontSize:11,color:C.tx3,background:C.surf2,padding:"3px 8px",borderRadius:99,border:`1px solid ${C.bdr}`,whiteSpace:"nowrap",flexShrink:0}}>
               {t.users.roles[currentUser.role]}
             </div>
