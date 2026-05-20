@@ -156,12 +156,14 @@ export const AppProvider = ({ children }) => {
     setAuthed(true);
     if (data.user.preferredLanguage) setLang(data.user.preferredLanguage);
     if (data.company?.theme) setTheme(data.company.theme);
+    window.location.hash = '#dash';
   };
 
   // Called after registration — token already issued, just load the session
   const loginWithToken = async (token) => {
     localStorage.setItem('nexerp_token', token);
     await checkAuth();
+    window.location.hash = '#dash';
   };
 
   const logout = () => {
@@ -170,6 +172,7 @@ export const AppProvider = ({ children }) => {
     setUser(null);
     setCompany(null);
     setItems([]); setDepts([]); setCats([]); setUsers([]); setTxs([]); setStats(null);
+    window.location.hash = '#landing';
   };
 
   // ── Load all data ─────────────────────────────────────────────────────────
@@ -278,6 +281,28 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const uploadCompanyLogo = async (file) => {
+    try {
+      const res = await api.uploadCompanyLogo(file);
+      setCompany(prev => ({ ...prev, logo: res.logo }));
+      showToast(lang === 'ar' ? 'تم رفع الشعار بنجاح' : 'Logo uploaded successfully');
+    } catch (e) {
+      showToast(e.message || 'Error uploading logo', 'error');
+      throw e;
+    }
+  };
+
+  const doUpdateProfile = async (data) => {
+    try {
+      const updatedUser = await api.updateProfile(data);
+      setUser({ ...updatedUser, perms: user.perms });
+      showToast(lang === 'ar' ? 'تم تحديث الملف الشخصي' : 'Profile updated successfully');
+    } catch (e) {
+      showToast(e.message || 'Error updating profile', 'error');
+      throw e;
+    }
+  };
+
   // ── Expose ────────────────────────────────────────────────────────────────
   const value = {
     user, company, authed, loading,
@@ -288,7 +313,7 @@ export const AppProvider = ({ children }) => {
     saveItem, removeItem,
     saveTx, removeTx,
     saveUser, removeUser,
-    doUpdateCompany,
+    doUpdateCompany, uploadCompanyLogo, doUpdateProfile,
     t: T[lang] || T.en,
     isAR: lang === 'ar',
   };

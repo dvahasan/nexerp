@@ -21,9 +21,10 @@ async function req(method, path, body, isForm = false) {
 
 export const api = {
   // Auth
-  login:  (companyCode, username, password) => req("POST", "/auth/login", { companyCode, username, password }),
+  login:  (code, username, password) => req("POST", "/auth/login", { code, username, password }),
   register: (data) => req("POST", "/auth/register", data),
   me:     ()                    => req("GET",  "/auth/me"),
+  updateProfile: (data)         => req("PUT", "/auth/profile", data),
 
   // Departments
   getDepts:   ()      => req("GET",    "/departments"),
@@ -67,6 +68,11 @@ export const api = {
   getSettings:    ()  => req("GET", "/settings"),
   updateSettings: (d) => req("PUT", "/settings", d),
   updateCompany:  (d) => req("PUT", "/company", d),
+  uploadCompanyLogo:(file)=> { const fd = new FormData(); fd.append("logo", file); return req("POST", `/company/logo`, fd, true); },
+
+  // Enterprise
+  getEnterpriseCompanies: () => req("GET", "/enterprise/companies"),
+  assumeEnterpriseCompany: (id) => req("POST", `/enterprise/assume/${id}`),
 
   // Admin
   getCloudinaryUsage: () => req("GET", "/admin/cloudinary"),

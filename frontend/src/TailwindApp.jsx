@@ -8,8 +8,9 @@ import Inventory from './pages/Inventory';
 import Transactions from './pages/Transactions';
 import Users from './pages/Users';
 import Permissions from './pages/Permissions';
-import Settings from './pages/Settings';
 import CompanyProfile from './pages/CompanyProfile';
+import UserProfile from './pages/UserProfile';
+import EnterpriseDashboard from './pages/EnterpriseDashboard';
 import { useState, useEffect } from 'react';
 
 function AppContent() {
@@ -40,6 +41,11 @@ function AppContent() {
     return <Landing />;
   }
 
+  // If enterprise user logged in but hasn't selected a company yet
+  if (user?.isEnterprise && !company) {
+    return <EnterpriseDashboard />;
+  }
+
   return (
     <Layout>
       {page === 'dash'        && <Dashboard />}
@@ -49,7 +55,8 @@ function AppContent() {
       {page === 'permissions' && <Permissions />}
       {page === 'settings'    && <Settings />}
       {page === 'profile'     && <CompanyProfile />}
-      {!['dash','inv','tx','users','permissions','settings','profile'].includes(page) && (
+      {page === 'myprofile'   && <UserProfile />}
+      {!['dash','inv','tx','users','permissions','settings','profile','myprofile'].includes(page) && (
         <div className="text-center py-20 text-slate-500 dark:text-slate-400">
           <h2 className="text-2xl font-bold mb-4">Page not found</h2>
         </div>

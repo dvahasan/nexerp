@@ -54,6 +54,7 @@ const CompanySchema = new mongoose.Schema({
   theme:          { type: String, default: "light" },
   activeIconPack: { type: String, default: "material" },
   primaryColor:   { type: String, default: "#3b82f6" },
+  logo:           { type: String, default: "" },
   active:         { type: Boolean, default: true },
 }, { timestamps: true });
 
@@ -74,7 +75,7 @@ const CatSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const UserSchema = new mongoose.Schema({
-  companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
+  companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
   name: { type: String, required: true },
   nameEn: String,
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -83,6 +84,8 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ["admin","manager","warehouse","viewer"], default: "viewer" },
   permissions: { type: mongoose.Schema.Types.Mixed, default: null },
   preferredLanguage: { type: String, default: "en" },
+  isEnterprise: { type: Boolean, default: false },
+  ownedCompanies: [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
   active: { type: Boolean, default: true },
 }, { timestamps: true });
 UserSchema.methods.checkPass = function(p) { return bcrypt.compare(p, this.passwordHash); };
@@ -147,13 +150,29 @@ const protect = async (req, res, next) => {
   const h = req.headers.authorization;
   if (!h?.startsWith("Bearer ")) return res.status(401).json({ message: "No token" });
   try {
-    const { id } = jwt.verify(h.split(" ")[1], SECRET);
+    const { id, companyId } = jwt.verify(h.split(" ")[1], SECRET);
     req.user = await User.findById(id).select("-passwordHash");
     if (!req.user?.active) return res.status(401).json({ message: "Unauthorized" });
+    if (req.user.isEnterprise && !req.user.companyId && companyId) {
+       // Temporary assumption of company for this request
+       req.user.companyId = companyId;
+    }
     req.perms = resolvePerms(req.user);
     next();
   } catch { res.status(401).json({ message: "Invalid token" }); }
 };
+
+const protectEnterprise = async (req, res, next) => {
+  const h = req.headers.authorization;
+  if (!h?.startsWith("Bearer ")) return res.status(401).json({ message: "No token" });
+  try {
+    const { id } = jwt.verify(h.split(" ")[1], SECRET);
+    req.user = await User.findById(id).select("-passwordHash");
+    if (!req.user?.active || !req.user?.isEnterprise) return res.status(403).json({ message: "Enterprise access required" });
+    next();
+  } catch { res.status(401).json({ message: "Invalid token" }); }
+};
+
 const need = p => (req, res, next) => req.perms?.[p] ? next() : res.status(403).json({ message: `No ${p} permission` });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -223,17 +242,24 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { companyCode, username, password } = req.body;
-    if (!companyCode || !username || !password) return res.status(400).json({ message: "Missing fields" });
-    const company = await Company.findOne({ code: companyCode.toUpperCase().trim(), active: true });
-    if (!company) return res.status(401).json({ message: "Invalid company code" });
-    const user = await User.findOne({ companyId: company._id, username: username.toLowerCase().trim() });
-    if (!user || !user.active || !(await user.checkPass(password)))
+    const { code, username, password } = req.body;
+    // Check if enterprise user login directly via username (no code needed for Enterprise dashboard)
+    if (!code) {
+      const entUser = await User.findOne({ username: username.toLowerCase(), isEnterprise: true });
+      if (!entUser || !await entUser.checkPass(password)) {
+        return res.status(401).json({ message: "Invalid enterprise credentials" });
+      }
+      const token = jwt.sign({ id: entUser._id }, SECRET, { expiresIn: "7d" });
+      return res.json({ token, user: entUser, company: null, perms: resolvePerms(entUser) });
+    }
+
+    const company = await Company.findOne({ code: code.toUpperCase() });
+    if (!company) return res.status(404).json({ message: "Company not found" });
+    const user = await User.findOne({ companyId: company._id, username: username.toLowerCase() });
+    if (!user || !await user.checkPass(password))
       return res.status(401).json({ message: "Invalid credentials" });
-    const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: "7d" });
-    const perms = resolvePerms(user);
-    res.json({ token, company, user: { id: user._id, name: user.name, nameEn: user.nameEn,
-      username: user.username, email: user.email||"", role: user.role, permissions: user.permissions||null, preferredLanguage: user.preferredLanguage, perms } });
+    const token = jwt.sign({ id: user._id, companyId: company._id }, SECRET, { expiresIn: "7d" });
+    res.json({ token, user, company, perms: resolvePerms(user) });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
@@ -487,7 +513,59 @@ app.delete("/api/transactions/:id", protect, need("canManageUsers"), async (req,
   } finally { session.endSession(); }
 });
 
-// ── Users ─────────────────────────────────────────────────────────────────────
+// ── Enterprise ────────────────────────────────────────────────────────────────
+app.get("/api/enterprise/companies", protectEnterprise, async (req, res) => {
+  try {
+    const companies = await Company.find({ _id: { $in: req.user.ownedCompanies } });
+    res.json(companies);
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
+app.post("/api/enterprise/assume/:companyId", protectEnterprise, async (req, res) => {
+  try {
+    const companyId = req.params.companyId;
+    if (!req.user.ownedCompanies.includes(companyId)) {
+      return res.status(403).json({ message: "You do not own this company" });
+    }
+    const company = await Company.findById(companyId);
+    if (!company) return res.status(404).json({ message: "Company not found" });
+    
+    // Issue a token specifically for this company context
+    const token = jwt.sign({ id: req.user._id, companyId: company._id }, SECRET, { expiresIn: "7d" });
+    res.json({ token, user: req.user, company, perms: resolvePerms(req.user) });
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
+app.post("/api/enterprise/create", async (req, res) => {
+  try {
+    const { name, username, password, email } = req.body;
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name, username, email, passwordHash, role: "admin", isEnterprise: true, ownedCompanies: []
+    });
+    const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: "7d" });
+    res.status(201).json({ token, user });
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
+// ── User Management ───────────────────────────────────────────────────────────
+app.put("/api/auth/profile", protect, async (req, res) => {
+  try {
+    const { name, username, email, password } = req.body;
+    const update = { name, username: username.toLowerCase().trim(), email };
+    if (password) update.passwordHash = await bcrypt.hash(password, 10);
+    
+    // Check if username is taken by someone else
+    const existing = await User.findOne({ username: update.username });
+    if (existing && existing._id.toString() !== req.user._id.toString()) {
+      return res.status(400).json({ message: "Username already taken" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-passwordHash");
+    res.json(updatedUser);
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
 app.get("/api/users", protect, need("canManageUsers"), async (req, res) => {
   try { res.json(await User.find({ companyId: req.user.companyId }).select("-passwordHash").sort({ createdAt: 1 })); }
   catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
@@ -548,31 +626,23 @@ app.put("/api/settings", protect, need("canManageUsers"), async (req, res) => {
 // ── Company ───────────────────────────────────────────────────────────────────
 app.put("/api/company", protect, need("canManageUsers"), async (req, res) => {
   try {
-    const { name, code, baseCurrency, primaryColor, activeIconPack, description, industry } = req.body;
+    const c = await Company.findByIdAndUpdate(req.user.companyId, req.body, { new: true });
+    res.json(c);
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
 
-    // Check if code is already taken by another company
-    if (code) {
-      const existing = await Company.findOne({ code: code.toUpperCase() });
-      if (existing && existing._id.toString() !== req.user.companyId.toString()) {
-        return res.status(400).json({ message: "Company code is already taken" });
-      }
+app.post("/api/company/logo", protect, need("canManageUsers"), upload.single("logo"), async (req, res) => {
+  try {
+    if (!req.file) throw new Error("No file uploaded");
+    
+    let folder = `nexerp/${req.user.companyId}`;
+    if (req.user.isEnterprise) {
+      folder = `nexerp/${req.user.username}/${req.user.companyId}`;
     }
 
-    const patch = {};
-    if (name)           patch.name           = name;
-    if (code)           patch.code           = code.toUpperCase();
-    if (baseCurrency)   patch.baseCurrency   = baseCurrency;
-    if (primaryColor)   patch.primaryColor   = primaryColor;
-    if (activeIconPack) patch.activeIconPack = activeIconPack;
-    if (description !== undefined) patch.description = description;
-    if (industry    !== undefined) patch.industry    = industry;
-
-    const updated = await Company.findByIdAndUpdate(
-      req.user.companyId,
-      { $set: patch },
-      { new: true }
-    );
-    res.json(updated);
+    const result = await uploadToCloudinary(req.file.buffer, folder);
+    const c = await Company.findByIdAndUpdate(req.user.companyId, { logo: result.secure_url }, { new: true });
+    res.json({ success: true, logo: c.logo });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
