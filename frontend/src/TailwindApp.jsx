@@ -7,7 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Transactions from './pages/Transactions';
 import Users from './pages/Users';
+import Permissions from './pages/Permissions';
 import Settings from './pages/Settings';
+import CompanyProfile from './pages/CompanyProfile';
 import { useState, useEffect } from 'react';
 
 function AppContent() {
@@ -40,15 +42,16 @@ function AppContent() {
 
   return (
     <Layout>
-      {page === 'dash' && <Dashboard />}
-      {page === 'inv' && <Inventory />}
-      {page === 'tx' && <Transactions />}
-      {page === 'users' && <Users />}
-      {page === 'settings' && <Settings />}
-      {page !== 'dash' && page !== 'inv' && page !== 'tx' && page !== 'users' && page !== 'settings' && (
+      {page === 'dash'        && <Dashboard />}
+      {page === 'inv'         && <Inventory />}
+      {page === 'tx'          && <Transactions />}
+      {page === 'users'       && <Users />}
+      {page === 'permissions' && <Permissions />}
+      {page === 'settings'    && <Settings />}
+      {page === 'profile'     && <CompanyProfile />}
+      {!['dash','inv','tx','users','permissions','settings','profile'].includes(page) && (
         <div className="text-center py-20 text-slate-500 dark:text-slate-400">
-          <h2 className="text-2xl font-bold mb-4">SaaS Component Under Construction</h2>
-          <p>The layout and Dashboard are complete. We are migrating {page} now.</p>
+          <h2 className="text-2xl font-bold mb-4">Page not found</h2>
         </div>
       )}
     </Layout>

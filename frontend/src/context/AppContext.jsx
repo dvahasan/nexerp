@@ -158,6 +158,12 @@ export const AppProvider = ({ children }) => {
     if (data.company?.theme) setTheme(data.company.theme);
   };
 
+  // Called after registration — token already issued, just load the session
+  const loginWithToken = async (token) => {
+    localStorage.setItem('nexerp_token', token);
+    await checkAuth();
+  };
+
   const logout = () => {
     localStorage.removeItem('nexerp_token');
     setAuthed(false);
@@ -277,7 +283,7 @@ export const AppProvider = ({ children }) => {
     user, company, authed, loading,
     lang, setLang, theme, setTheme,
     items, depts, cats, users, txs, stats,
-    login, logout, loadData,
+    login, loginWithToken, logout, loadData,
     toasts, showToast, removeToast,
     saveItem, removeItem,
     saveTx, removeTx,
