@@ -62,9 +62,10 @@ export const api = {
   // Stats
   getStats: () => req("GET", "/stats"),
 
-  // Settings
+  // Settings & Company
   getSettings:    ()  => req("GET", "/settings"),
   updateSettings: (d) => req("PUT", "/settings", d),
+  updateCompany:  (d) => req("PUT", "/company", d),
 
   // Admin
   getCloudinaryUsage: () => req("GET", "/admin/cloudinary"),

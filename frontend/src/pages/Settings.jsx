@@ -6,8 +6,13 @@ import { MdSave, MdCloudUpload } from 'react-icons/md';
 export default function Settings() {
   const { lang, setLang, t, isAR, company, user } = useAppContext();
   const [localLang, setLocalLang] = useState(lang);
+  
+  // Company Profile states
+  const [companyName, setCompanyName] = useState(company?.name || "");
+  const [companyCode, setCompanyCode] = useState(company?.code || "");
   const [currency, setCurrency] = useState(company?.baseCurrency || "USD");
   const [primaryColor, setPrimaryColor] = useState(company?.primaryColor || "#3b82f6");
+  
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   
@@ -31,7 +36,7 @@ export default function Settings() {
       
       // If admin, save company-wide settings
       if (user?.perms?.canManageUsers) {
-        await api.updateSettings({ currency, primaryColor });
+        await api.updateCompany({ name: companyName, code: companyCode, baseCurrency: currency, primaryColor });
         // Normally we'd update company context here, but reloading the page or refetching 'me' works too
         window.location.reload();
       } else {
@@ -81,37 +86,61 @@ export default function Settings() {
         {user?.perms?.canManageUsers && (
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6">
             <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-              🏢 {isAR ? 'إعدادات الشركة (تتطلب صلاحيات مدير)' : 'Company Settings (Admin)'}
+              🏢 {isAR ? 'ملف الشركة (للمدراء فقط)' : 'Company Profile (Admin)'}
             </h2>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-                  {isAR ? 'العملة الافتراضية' : 'Base Currency'}
+                  {isAR ? 'اسم الشركة' : 'Company Name'}
                 </label>
-                <select 
-                  value={currency} onChange={e => setCurrency(e.target.value)}
+                <input 
+                  type="text" 
+                  value={companyName} onChange={e => setCompanyName(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="EGP">EGP (E£)</option>
-                  <option value="SAR">SAR (﷼)</option>
-                  <option value="AED">AED (د.إ)</option>
-                </select>
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
-                  {isAR ? 'اللون الأساسي (Primary Color)' : 'Primary Theme Color'}
+                  {isAR ? 'رمز الشركة' : 'Company Code'}
                 </label>
-                <div className="flex items-center gap-4">
-                  <input 
-                    type="color" 
-                    value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-                    className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-0 p-0"
-                  />
-                  <span className="text-sm font-mono text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">{primaryColor}</span>
+                <input 
+                  type="text" 
+                  value={companyCode} onChange={e => setCompanyCode(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                    {isAR ? 'العملة الافتراضية' : 'Base Currency'}
+                  </label>
+                  <select 
+                    value={currency} onChange={e => setCurrency(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="EGP">EGP (E£)</option>
+                    <option value="SAR">SAR (﷼)</option>
+                    <option value="AED">AED (د.إ)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">
+                    {isAR ? 'اللون الأساسي' : 'Primary Color'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
+                      className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                    />
+                    <span className="text-sm font-mono text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 w-full text-center">{primaryColor}</span>
+                  </div>
                 </div>
               </div>
             </div>

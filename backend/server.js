@@ -481,6 +481,28 @@ app.put("/api/settings", protect, need("canManageUsers"), async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// ── Company ───────────────────────────────────────────────────────────────────
+app.put("/api/company", protect, need("canManageUsers"), async (req, res) => {
+  try {
+    const { name, code, baseCurrency, primaryColor } = req.body;
+    
+    // Check if code is already taken by another company
+    if (code) {
+      const existing = await Company.findOne({ code: code.toUpperCase() });
+      if (existing && existing._id.toString() !== req.user.companyId.toString()) {
+        return res.status(400).json({ message: "Company code is already taken" });
+      }
+    }
+
+    const updated = await Company.findByIdAndUpdate(
+      req.user.companyId,
+      { $set: { ...(name && {name}), ...(code && {code: code.toUpperCase()}), ...(baseCurrency && {baseCurrency}), ...(primaryColor && {primaryColor}) } },
+      { new: true }
+    );
+    res.json(updated);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 app.get("/api/stats", protect, async (req, res) => {
   try {
