@@ -157,6 +157,58 @@ const need = p => (req, res, next) => req.perms?.[p] ? next() : res.status(403).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+const generateCompanyCode = () => 'NEX-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { companyName, adminUsername, adminEmail, password } = req.body;
+    if (!companyName || !adminUsername || !password) {
+      return res.status(400).json({ message: "Company Name, Username, and Password are required" });
+    }
+
+    // Ensure username is globally unique (across all tenants) for simplicity of login if we ever want cross-tenant login,
+    // though currently username + companyCode is required. Let's just ensure username is unique within the company.
+    // Wait, Company doesn't exist yet. We just need to check if companyName is somewhat unique, or we don't care because code is unique.
+    
+    // Generate unique code
+    let code = generateCompanyCode();
+    while (await Company.findOne({ code })) {
+      code = generateCompanyCode();
+    }
+
+    // Create Company
+    const company = await Company.create({
+      name: companyName,
+      code,
+      baseCurrency: "USD",
+      theme: "light",
+      primaryColor: "#3b82f6"
+    });
+
+    // Create Admin User
+    const user = await User.create({
+      companyId: company._id,
+      name: adminUsername,
+      username: adminUsername,
+      email: adminEmail || "",
+      password: await bcrypt.hash(password, 10),
+      role: "admin",
+      permissions: { canAdd:true, canEdit:true, canDelete:true, canTx:true, canManageUsers:true, canManageDepts:true }
+    });
+
+    // Create Default Department and Category
+    const dept = await Dept.create({ companyId: company._id, name: "General", nameEn: "General", color: "#3b82f6" });
+    await Cat.create({ companyId: company._id, deptId: dept._id, name: "Misc", nameEn: "Misc" });
+
+    // Generate Token
+    const token = jwt.sign({ id: user._id, role: user.role, companyId: company._id }, JWT_SECRET, { expiresIn: "30d" });
+
+    res.json({ token, user: { id: user._id, username: user.username, role: user.role }, companyCode: code });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { companyCode, username, password } = req.body;

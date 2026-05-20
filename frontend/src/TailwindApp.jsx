@@ -1,4 +1,6 @@
 import { AppProvider, useAppContext } from './context/AppContext';
+import Landing from './pages/Landing';
+import Register from './pages/Register';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -32,7 +34,9 @@ function AppContent() {
   }, []);
 
   if (!authed) {
-    return <Login />;
+    if (page === 'login') return <Login />;
+    if (page === 'register') return <Register />;
+    return <Landing />;
   }
 
   return (
