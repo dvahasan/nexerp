@@ -53,7 +53,7 @@ function StatCard({ icon, label, value, sub, accent = 'blue' }) {
 }
 
 export default function CompanyProfile() {
-  const { company, users, items, txs, stats, doUpdateCompany, showToast, isAR, user: me } = useAppContext();
+  const { company, users, items, txs, stats, doUpdateCompany, uploadCompanyLogo, showToast, isAR, user: me } = useAppContext();
 
   const isAdmin = me?.role === 'admin' || me?.perms?.canManageUsers;
 
@@ -104,9 +104,13 @@ export default function CompanyProfile() {
           style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
         <div className="relative px-8 py-10 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          {/* Company avatar */}
-          <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white font-black text-3xl flex-shrink-0 shadow-lg">
-            {company?.name?.charAt(0)?.toUpperCase() || 'N'}
+          {/* Company avatar / logo */}
+          <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white font-black text-3xl flex-shrink-0 shadow-lg overflow-hidden">
+            {company?.logo ? (
+              <img src={company.logo} alt="Logo" className="w-full h-full object-contain bg-white" />
+            ) : (
+              company?.name?.charAt(0)?.toUpperCase() || 'N'
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
@@ -236,6 +240,30 @@ export default function CompanyProfile() {
                   <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Logo Upload */}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                {isAR ? 'شعار الشركة' : 'Company Logo'}
+              </label>
+              <label className="cursor-pointer flex items-center justify-center w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 border-dashed hover:border-blue-500 rounded-xl px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400 transition-colors h-[42px]">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async e => {
+                    if (e.target.files?.[0]) {
+                      setSaving(true);
+                      try {
+                        await uploadCompanyLogo(e.target.files[0]);
+                      } finally { setSaving(false); }
+                    }
+                  }}
+                />
+                <Icon name="upload" size={16} className="mr-2" />
+                {isAR ? 'اختر صورة...' : 'Upload new logo...'}
+              </label>
             </div>
           </div>
 

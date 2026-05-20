@@ -44,12 +44,14 @@ export default function Layout({ children }) {
         { id: 'users',       icon: 'users',    label: t.users },
         { id: 'permissions', icon: 'lock',     label: isAR ? 'الصلاحيات' : 'Permissions' },
         { id: 'settings',    icon: 'settings', label: t.settings },
+        { id: 'myprofile',   icon: 'user',     label: isAR ? 'حسابي' : 'My Profile' },
       ]
     });
   } else {
     navSections.push({
       title: isAR ? 'حسابي' : 'Account',
       items: [
+        { id: 'myprofile',   icon: 'user',     label: isAR ? 'حسابي' : 'My Profile' },
         { id: 'settings',    icon: 'settings', label: t.settings },
       ]
     });
@@ -66,29 +68,32 @@ export default function Layout({ children }) {
   const SidebarContent = ({ mobile = false }) => (
     <div className="flex flex-col h-full">
       {/* Brand */}
-      <div className={`h-16 flex items-center shrink-0 border-b border-slate-100 dark:border-slate-700
-        ${collapsed && !mobile ? 'justify-center px-0' : 'justify-between px-4'}`}>
-        <div className={`flex items-center gap-3 min-w-0 ${collapsed && !mobile ? '' : ''}`}>
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            <Icon name="inventory" size={18} />
-          </div>
-          {(!collapsed || mobile) && (
-            <span className="font-bold text-base text-slate-800 dark:text-white truncate">
+      <div className="h-16 flex items-center justify-center border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+        {(!collapsed || mobile) ? (
+          <div className="flex items-center gap-3">
+            {company?.logo ? (
+              <img src={company.logo} alt="Company Logo" className="w-8 h-8 rounded-lg object-contain" />
+            ) : (
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Icon name="inventory" className="text-white" size={18} />
+              </div>
+            )}
+            <span className="font-bold text-lg tracking-tight text-slate-800 dark:text-white truncate max-w-[140px]">
               {company?.name || 'NexERP'}
             </span>
-          )}
-        </div>
-        {mobile && (
-          <button onClick={() => setDrawerOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white">
-            <Icon name="close" size={22} />
-          </button>
+          </div>
+        ) : (
+          company?.logo ? (
+            <img src={company.logo} alt="Company Logo" className="w-8 h-8 rounded-lg object-contain" />
+          ) : (
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Icon name="inventory" className="text-white" size={18} />
+            </div>
+          )
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-3">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3">
         <div className={`space-y-6 ${collapsed && !mobile ? 'px-2' : 'px-3'}`}>
           {navSections.map((section, idx) => (
             <div key={idx}>
