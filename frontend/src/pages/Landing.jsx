@@ -1,4 +1,4 @@
-import { MdInventory, MdTrendingUp, MdLanguage, MdComputer, MdCheckCircle, MdBusiness, MdDomainAdd } from 'react-icons/md';
+import { MdInventory, MdTrendingUp, MdLanguage, MdComputer, MdCheckCircle, MdBusiness, MdDomainAdd, MdPerson } from 'react-icons/md';
 
 export default function Landing() {
   return (
