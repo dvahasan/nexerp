@@ -21,7 +21,7 @@ async function req(method, path, body, isForm = false) {
 
 export const api = {
   // Auth
-  login:  (username, password) => req("POST", "/auth/login", { username, password }),
+  login:  (companyCode, username, password) => req("POST", "/auth/login", { companyCode, username, password }),
   me:     ()                    => req("GET",  "/auth/me"),
 
   // Departments
