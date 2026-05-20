@@ -72,7 +72,7 @@ export default function TxModal({ open, onClose, editTx = null }) {
     }
   };
 
-  const inputCls = "w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm transition-all";
+  const inputCls = "w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm transition-colors";
   const labelCls = "block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide";
 
   return (
@@ -141,7 +141,7 @@ export default function TxModal({ open, onClose, editTx = null }) {
                   key={tp}
                   type="button"
                   onClick={() => set('type', tp)}
-                  className={`flex-1 py-2.5 text-sm font-bold transition-all ${
+                  className={`flex-1 py-2.5 text-sm font-bold transition-colors ${
                     form.type === tp
                       ? tp === 'IN'
                         ? 'bg-green-500 text-white shadow-inner'
@@ -224,7 +224,7 @@ export default function TxModal({ open, onClose, editTx = null }) {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/30 flex items-center gap-2 disabled:opacity-70"
+            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-colors border border-purple-500 flex items-center gap-2 disabled:opacity-70"
           >
             {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {t.save}

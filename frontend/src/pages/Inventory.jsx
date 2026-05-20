@@ -82,7 +82,7 @@ export default function Inventory() {
           {user?.perms?.canAdd && (
             <button
               onClick={openAdd}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/30"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-blue-500"
             >
               <Icon name="add" size={20} /> {t.addItem}
             </button>
@@ -99,7 +99,7 @@ export default function Inventory() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
           />
         </div>
         <div className="flex gap-2 md:w-auto w-full">
@@ -137,7 +137,7 @@ export default function Inventory() {
           return (
             <div
               key={item._id}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer"
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[transform,box-shadow] duration-300 group cursor-pointer"
               onClick={() => openEdit(item)}
             >
               {/* Photo */}

@@ -89,27 +89,25 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden">
-          <div className="absolute top-[-20%] right-[-20%] w-[60%] h-[60%] bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
-          
-          <h2 className="text-lg font-bold mb-2 flex items-center gap-2 relative z-10">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-sm p-6 text-white">
+          <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
             <span className="bg-blue-500 p-1.5 rounded-lg text-white">✨</span> 
             {isAR ? 'رؤى الذكاء الاصطناعي' : 'AI Insights'}
           </h2>
-          <p className="text-slate-300 text-sm mb-6 relative z-10 leading-relaxed">
+          <p className="text-slate-300 text-sm mb-6 leading-relaxed">
             {isAR ? 'الذكاء الاصطناعي الخاص بنا يقوم بتحليل بيانات المخزون الخاص بك.' : 'Our AI is currently analyzing your inventory data to find actionable insights.'}
           </p>
 
           {/* AI Chat Placeholder */}
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 relative z-10">
+          <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600/50">
              <div className="flex gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold flex-shrink-0">AI</div>
-                <div className="bg-white/10 rounded-2xl rounded-tl-sm p-3 text-sm">
+                <div className="bg-slate-600/60 rounded-2xl rounded-tl-sm p-3 text-sm">
                   {isAR ? "بناءً على نشاطك الأخير، أوصي بإعادة طلب العناصر من قسم 'الكهربائيات' قريباً." : "Based on your recent activity, I recommend reordering items from the 'Electrical' department soon."}
                 </div>
              </div>
              
-             <button className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors border border-white/5">
+             <button className="w-full py-2 bg-slate-600/50 hover:bg-slate-600 rounded-lg text-sm transition-colors border border-slate-500/50">
                 {isAR ? 'تحدث مع الذكاء الاصطناعي' : 'Chat with AI Assistant'}
              </button>
           </div>

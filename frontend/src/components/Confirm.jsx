@@ -40,10 +40,10 @@ export default function Confirm({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2 disabled:opacity-70 shadow-lg ${
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors flex items-center gap-2 disabled:opacity-70 ${
               danger
-                ? 'bg-red-600 hover:bg-red-700 shadow-red-500/30'
-                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30'
+                ? 'bg-red-600 hover:bg-red-700 border border-red-500'
+                : 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
             }`}
           >
             {loading ? (

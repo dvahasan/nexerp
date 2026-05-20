@@ -56,7 +56,7 @@ export default function Register() {
 
           <button 
             onClick={handleEnterWorkspace}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500"
           >
             Enter Workspace
           </button>
@@ -70,12 +70,9 @@ export default function Register() {
       
       {/* Left Banner */}
       <div className="hidden md:flex flex-1 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 text-white flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-white/10 blur-[100px] rounded-full mix-blend-overlay"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-400/20 blur-[80px] rounded-full mix-blend-overlay"></div>
-        
         <div className="relative z-10">
           <a href="#landing" className="flex items-center gap-3 w-max">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 shadow-xl">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30 shadow-xl">
               <span className="text-white font-black text-2xl">N</span>
             </div>
             <span className="text-2xl font-black tracking-tight">NexERP</span>
@@ -169,7 +166,7 @@ export default function Register() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5 mt-4 flex items-center justify-center gap-2 disabled:opacity-70 disabled:hover:translate-y-0"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500 mt-4 flex items-center justify-center gap-2 disabled:opacity-70"
             >
               {loading ? (
                 <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

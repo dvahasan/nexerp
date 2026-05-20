@@ -91,7 +91,7 @@ export default function Settings() {
                   key={th}
                   type="button"
                   onClick={() => setTheme(th)}
-                  className={`py-2.5 rounded-xl text-sm font-semibold capitalize transition-all border-2 flex items-center justify-center gap-2 ${
+                  className={`py-2.5 rounded-xl text-sm font-semibold capitalize transition-colors border-2 flex items-center justify-center gap-2 ${
                     theme === th
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
                       : 'border-transparent bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -171,7 +171,7 @@ export default function Settings() {
                   key={pack.key}
                   type="button"
                   onClick={() => setIconPack(pack.key)}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                  className={`p-4 rounded-2xl border-2 text-left transition-colors ${
                     active
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50 dark:bg-slate-900'
@@ -209,7 +209,7 @@ export default function Settings() {
         <button
           onClick={saveAll}
           disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors border border-blue-500 flex items-center gap-2 disabled:opacity-70"
         >
           {saving
             ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -221,13 +221,12 @@ export default function Settings() {
 
       {/* ── Cloudinary Storage ───────────────────────────────────────────── */}
       {user?.perms?.canManageUsers && cloudUsage && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-sm border border-slate-700 p-6 text-white relative overflow-hidden">
-          <div className="absolute top-[-50%] right-[-10%] w-[40%] h-[150%] bg-blue-500/10 blur-[60px] rotate-12" />
-          <h2 className="text-lg font-bold mb-5 flex items-center gap-2 relative z-10">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-sm p-6 text-white">
+          <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
             <Icon name="upload" size={22} className="text-blue-400" />
             {t.cloudStorage}
           </h2>
-          <div className="space-y-4 relative z-10">
+          <div className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2 text-slate-300">
                 <span>{isAR ? 'مساحة التخزين' : 'Storage'}</span>
@@ -235,7 +234,7 @@ export default function Settings() {
               </div>
               <div className="w-full h-2.5 bg-slate-700/50 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-1000 ${
+                  className={`h-full rounded-full transition-[width] duration-1000 ${
                     storPct > 80 ? 'bg-red-500' : storPct > 60 ? 'bg-yellow-500' : 'bg-blue-500'
                   }`}
                   style={{ width: `${storPct}%` }}

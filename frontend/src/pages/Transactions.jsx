@@ -63,7 +63,7 @@ export default function Transactions() {
         {user?.perms?.canTx && (
           <button
             onClick={openRecord}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-purple-500/30"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-purple-500"
           >
             <Icon name="add" size={20} /> {t.addTransaction}
           </button>
@@ -79,7 +79,7 @@ export default function Transactions() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث عن الصنف، المصدر، الوجهة...' : 'Search item, source, destination...'}
-            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-sm"
+            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm"
           />
         </div>
         <select

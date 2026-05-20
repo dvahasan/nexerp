@@ -52,7 +52,7 @@ export default function Users() {
         {user?.perms?.canManageUsers && (
           <button
             onClick={openAdd}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/30"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-blue-500"
           >
             <Icon name="add" size={20} /> {t.addUser}
           </button>
@@ -69,7 +69,7 @@ export default function Users() {
           return (
             <div
               key={u._id}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-5 hover:shadow-md hover:-translate-y-0.5 transition-[transform,box-shadow] duration-300 group"
             >
               {/* Top */}
               <div className="flex items-start justify-between mb-4">

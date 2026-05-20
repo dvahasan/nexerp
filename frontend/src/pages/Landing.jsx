@@ -14,7 +14,7 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-4">
             <a href="#login" className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Log In</a>
-            <a href="#register" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5">
+            <a href="#register" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors border border-blue-500">
               Start for Free
             </a>
           </div>
@@ -44,10 +44,10 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <a href="#register" className="w-full sm:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 px-8 py-4 rounded-2xl text-lg font-bold transition-all shadow-xl hover:-translate-y-1">
+            <a href="#register" className="w-full sm:w-auto bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 px-8 py-4 rounded-2xl text-lg font-bold transition-colors border border-slate-700 dark:border-slate-200">
               Create Company Profile
             </a>
-            <a href="#login" className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 px-8 py-4 rounded-2xl text-lg font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-700">
+            <a href="#login" className="w-full sm:w-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 px-8 py-4 rounded-2xl text-lg font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700">
               Sign In to Workspace
             </a>
           </div>
@@ -55,11 +55,8 @@ export default function Landing() {
 
         {/* Mockup / Image Area */}
         <div className="max-w-6xl mx-auto mt-20 relative">
-          {/* Glow */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/30 to-purple-500/20 blur-3xl -z-10 rounded-full scale-75"></div>
-
           {/* Browser chrome */}
-          <div className="bg-slate-800/80 backdrop-blur-xl border border-slate-600/60 rounded-3xl p-3 shadow-2xl shadow-black/40">
+          <div className="bg-slate-800 border border-slate-700 rounded-3xl p-3 shadow-2xl shadow-black/40">
             {/* Traffic lights */}
             <div className="h-8 flex items-center px-3 gap-2 mb-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -154,7 +151,7 @@ export default function Landing() {
             { icon: <MdLanguage size={32}/>, title: "Global Ready", desc: "Full English & Arabic (RTL) support out of the box, with per-user persistent language settings." },
             { icon: <MdComputer size={32}/>, title: "Modern Stack", desc: "Lightning fast React architecture styled with beautiful, responsive Tailwind CSS." }
           ].map((f, i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 hover:shadow-md hover:-translate-y-1 transition-[transform,box-shadow] duration-300">
               <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-6">
                 {f.icon}
               </div>

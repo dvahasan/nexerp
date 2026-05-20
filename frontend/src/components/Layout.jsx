@@ -64,7 +64,7 @@ export default function Layout({ children }) {
                   <a
                     href={`#${item.id}`}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${
                       active
                         ? 'text-white shadow-md'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white'
