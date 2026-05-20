@@ -60,7 +60,7 @@ export default function Settings() {
     ? Math.min(100, Math.round((cloudUsage.storage?.used || 0) / (cloudUsage.storage?.limit || 1) * 100))
     : 0;
 
-  const inputCls = "w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
+  const inputCls = "w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm";
   const labelCls = "block text-sm font-medium text-slate-500 dark:text-slate-400 mb-2";
 
   return (

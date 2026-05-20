@@ -99,20 +99,20 @@ export default function Inventory() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
           />
         </div>
         <div className="flex gap-2 md:w-auto w-full">
           <select
             value={deptF} onChange={e => setDeptF(e.target.value)}
-            className="flex-1 md:w-44 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="flex-1 md:w-44 bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
             <option value="all">{isAR ? 'جميع الأقسام' : 'All Depts'}</option>
             {depts.map(d => <option key={d._id} value={d._id}>{isAR ? d.name : (d.nameEn || d.name)}</option>)}
           </select>
           <select
             value={stF} onChange={e => setStF(e.target.value)}
-            className="flex-1 md:w-36 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="flex-1 md:w-36 bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           >
             <option value="all">{isAR ? 'الجميع' : 'All'}</option>
             <option value="ok">✅ {isAR ? 'متوفر' : 'OK'}</option>

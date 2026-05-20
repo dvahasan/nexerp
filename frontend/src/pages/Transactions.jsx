@@ -79,12 +79,12 @@ export default function Transactions() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث عن الصنف، المصدر، الوجهة...' : 'Search item, source, destination...'}
-            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-sm"
+            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-sm"
           />
         </div>
         <select
           value={typeF} onChange={e => setTypeF(e.target.value)}
-          className="w-full md:w-48 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+          className="w-full md:w-48 bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
         >
           <option value="all">{isAR ? 'جميع الحركات' : 'All Types'}</option>
           <option value="IN">↓ {isAR ? 'وارد' : 'Stock IN'}</option>
