@@ -2,7 +2,7 @@ import { useAppContext } from '../context/AppContext';
 import { MdInventory, MdWarning, MdError, MdAttachMoney, MdTrendingUp } from 'react-icons/md';
 
 export default function Dashboard() {
-  const { stats, loading, t, isAR, company } = useAppContext();
+  const { stats, loading, t, isAR, lang, company } = useAppContext();
 
   if (loading || !stats) {
     return (

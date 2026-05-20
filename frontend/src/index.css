@@ -1,9 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* ─── Class-based dark mode (Tailwind v4 requires explicit declaration) ─── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Base styles ────────────────────────────────────────────────────────── */
 @layer base {
   body {
     @apply bg-slate-50 text-slate-800 m-0 antialiased;
+  }
+
+  .dark body {
+    @apply bg-slate-900 text-slate-100;
   }
 }
