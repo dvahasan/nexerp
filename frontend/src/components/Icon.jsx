@@ -17,6 +17,7 @@ import {
   MdFilterList, MdRefresh, MdExpandMore, MdExpandLess, MdInfo,
   MdStar, MdChat, MdSend, MdAutoAwesome, MdPerson, MdNotifications,
   MdLock, MdEmail, MdPhone, MdHome, MdInsights, MdColorLens,
+  MdContentCopy, MdCalendarToday,
 } from 'react-icons/md';
 
 // ── Heroicons (outline) ───────────────────────────────────────────────────
@@ -30,7 +31,7 @@ import {
   TagIcon, QrCodeIcon, FunnelIcon, ArrowPathIcon, ChevronDownIcon,
   ChevronUpIcon, InformationCircleIcon, StarIcon, ChatBubbleLeftIcon,
   PaperAirplaneIcon, SparklesIcon, UserIcon, BellIcon, LockClosedIcon,
-  EnvelopeIcon, PhoneIcon,
+  EnvelopeIcon, PhoneIcon, DocumentDuplicateIcon, CalendarIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Lucide ────────────────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ import {
   ImageIcon, CloudUpload, AlertTriangle, AlertCircle, DollarSign,
   TrendingUp, Check, ArrowLeft, Eye, EyeOff, LogOut, Building2,
   Tag, QrCode, Filter, RefreshCw, ChevronDown, ChevronUp, Info,
-  Star, MessageSquare, Send, Sparkles, User, Bell, Lock, Mail, Phone,
+  Star, MessageSquare, Send, Sparkles, User, Bell, Lock, Mail, Phone, Copy, Calendar,
 } from 'lucide-react';
 
 // ── Phosphor ──────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ import {
   SignOut, Buildings, Tag as PhTag, QrCode as PhQr, Funnel, ArrowClockwise,
   CaretDown, CaretUp, Info as PhInfo, Star as PhStar, Chat, PaperPlaneRight,
   Sparkle, User as PhUser, Bell as PhBell, Lock as PhLock, EnvelopeSimple, Phone as PhPhone,
+  Copy as PhCopy, Calendar as PhCalendar,
 } from 'phosphor-react';
 
 // ── Icon name → component map per pack ────────────────────────────────────
@@ -72,6 +74,7 @@ const ICON_MAP = {
     send: MdSend, ai: MdAutoAwesome, user: MdPerson, bell: MdNotifications,
     lock: MdLock, email: MdEmail, phone: MdPhone, home: MdHome,
     insights: MdInsights, theme: MdColorLens,
+    copy: MdContentCopy, calendar: MdCalendarToday, trending_up: MdTrendingUp,
   },
   heroicons: {
     dashboard: HomeIcon, inventory: ArchiveBoxIcon, transactions: ListBulletIcon,
@@ -88,6 +91,7 @@ const ICON_MAP = {
     chat: ChatBubbleLeftIcon, send: PaperAirplaneIcon, ai: SparklesIcon,
     user: UserIcon, bell: BellIcon, lock: LockClosedIcon, email: EnvelopeIcon, phone: PhoneIcon,
     home: HomeIcon, insights: ArrowTrendingUpIcon, theme: Cog6ToothIcon,
+    copy: DocumentDuplicateIcon, calendar: CalendarIcon, trending_up: ArrowTrendingUpIcon,
   },
   lucide: {
     dashboard: LayoutDashboard, inventory: Package, transactions: ClipboardList,
@@ -104,6 +108,7 @@ const ICON_MAP = {
     chat: MessageSquare, send: Send, ai: Sparkles,
     user: User, bell: Bell, lock: Lock, email: Mail, phone: Phone,
     home: LayoutDashboard, insights: TrendingUp, theme: Settings,
+    copy: Copy, calendar: Calendar, trending_up: TrendingUp,
   },
   phosphor: {
     dashboard: House, inventory: PhPackage, transactions: ClipboardText,
@@ -120,6 +125,7 @@ const ICON_MAP = {
     chat: Chat, send: PaperPlaneRight, ai: Sparkle,
     user: PhUser, bell: PhBell, lock: PhLock, email: EnvelopeSimple, phone: PhPhone,
     home: House, insights: PhTrending, theme: GearSix,
+    copy: PhCopy, calendar: PhCalendar, trending_up: PhTrending,
   },
 };
 
@@ -130,24 +136,27 @@ export const ICON_PACKS = [
   { key: 'phosphor',  label: 'Phosphor Icons',   desc: 'Flexible, multi-weight family' },
 ];
 
-export default function Icon({ name, size = 20, className = '', style = {} }) {
-  // Safe: falls back to material if context isn't available yet
-  let pack = 'material';
+// pack prop overrides the context (used in Settings preview cards)
+export default function Icon({ name, size = 20, className = '', style = {}, pack: packProp }) {
+  let activePack = 'material';
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const ctx = useAppContext();
-    pack = ctx?.company?.activeIconPack || 'material';
+    activePack = ctx?.company?.activeIconPack || 'material';
   } catch {
     // context not yet available during render
   }
 
+  const pack = packProp || activePack;
   const map = ICON_MAP[pack] || ICON_MAP.material;
   const Component = map[name] || ICON_MAP.material[name];
   if (!Component) return null;
 
-  // Phosphor uses `weight` prop; others use `size`
-  if (pack === 'phosphor') {
-    return <Component size={size} className={className} style={style} />;
+  // Heroicons (@heroicons/react) uses width/height, not size
+  if (pack === 'heroicons') {
+    return <Component width={size} height={size} className={className} style={style} />;
   }
+
+  // Material (react-icons), Lucide, and Phosphor all accept size
   return <Component size={size} className={className} style={style} />;
 }

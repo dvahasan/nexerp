@@ -5,13 +5,9 @@
    so we must tell Tailwind v4 to use the .dark selector strategy.           */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── Base reset ──────────────────────────────────────────────────────────── */
+/* ── Base additions (Tailwind preflight already resets margin/padding/box-sizing) */
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
   body {
-    margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: #f8fafc; /* slate-50 */

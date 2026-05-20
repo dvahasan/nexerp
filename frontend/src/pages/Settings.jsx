@@ -177,13 +177,14 @@ export default function Settings() {
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50 dark:bg-slate-900'
                   }`}
                 >
-                  {/* Icon preview row */}
+                  {/* Icon preview row — each card shows its OWN pack's icons */}
                   <div className="flex items-center gap-2 mb-3">
                     {['dashboard', 'inventory', 'settings', 'add'].map(name => (
                       <Icon
                         key={name}
                         name={name}
                         size={20}
+                        pack={pack.key}
                         className={active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}
                       />
                     ))}

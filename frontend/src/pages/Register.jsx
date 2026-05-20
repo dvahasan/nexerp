@@ -4,12 +4,12 @@ import { useAppContext } from '../context/AppContext';
 import { MdBusiness, MdPerson, MdEmail, MdLock, MdArrowForward } from 'react-icons/md';
 
 export default function Register() {
-  const { setToken, setAuthed } = useAppContext();
-  
+  const { loginWithToken } = useAppContext();
+
   const [form, setForm] = useState({ companyName: '', adminUsername: '', adminEmail: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [entering, setEntering] = useState(false);
   const [error, setError] = useState('');
-  
   const [successData, setSuccessData] = useState(null);
 
   const handleSubmit = async (e) => {
@@ -18,7 +18,6 @@ export default function Register() {
     setLoading(true);
     try {
       const res = await api.register(form);
-      // Wait to show the success message which contains their company code
       setSuccessData({ token: res.token, code: res.companyCode });
     } catch (err) {
       setError(err.message || "Failed to register");
@@ -27,12 +26,15 @@ export default function Register() {
     }
   };
 
-  const handleEnterWorkspace = () => {
-    if (successData?.token) {
-      localStorage.setItem("token", successData.token);
-      setToken(successData.token);
-      setAuthed(true);
-      window.location.hash = "#dash";
+  const handleEnterWorkspace = async () => {
+    if (!successData?.token) return;
+    setEntering(true);
+    try {
+      await loginWithToken(successData.token);
+    } catch {
+      setError("Failed to enter workspace. Please log in manually.");
+    } finally {
+      setEntering(false);
     }
   };
 
@@ -54,11 +56,14 @@ export default function Register() {
             <p className="text-xs text-slate-500 mt-4">Save this code! Your employees will need it to log in.</p>
           </div>
 
-          <button 
+          <button
             onClick={handleEnterWorkspace}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500"
+            disabled={entering}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500 flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            Enter Workspace
+            {entering
+              ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Entering...</>
+              : 'Enter Workspace'}
           </button>
         </div>
       </div>

@@ -6,6 +6,8 @@ const bcrypt     = require("bcryptjs");
 const jwt        = require("jsonwebtoken");
 const multer     = require("multer");
 const { v2: cloudinary } = require("cloudinary");
+const { friendly, statusFor } = require("./errors");
+const { sendWelcome }          = require("./mailer");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -44,13 +46,15 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 const CompanySchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true, uppercase: true, trim: true },
-  name: { type: String, required: true },
-  baseCurrency: { type: String, default: "USD" },
-  theme: { type: String, default: "light" },
+  code:           { type: String, required: true, unique: true, uppercase: true, trim: true },
+  name:           { type: String, required: true },
+  description:    { type: String, default: "" },
+  industry:       { type: String, default: "" },
+  baseCurrency:   { type: String, default: "USD" },
+  theme:          { type: String, default: "light" },
   activeIconPack: { type: String, default: "material" },
-  primaryColor: { type: String, default: "#3b82f6" },
-  active: { type: Boolean, default: true },
+  primaryColor:   { type: String, default: "#3b82f6" },
+  active:         { type: Boolean, default: true },
 }, { timestamps: true });
 
 const DeptSchema = new mongoose.Schema({
@@ -189,9 +193,9 @@ app.post("/api/auth/register", async (req, res) => {
     const user = await User.create({
       companyId: company._id,
       name: adminUsername,
-      username: adminUsername,
+      username: adminUsername.toLowerCase().trim(),
       email: adminEmail || "",
-      password: await bcrypt.hash(password, 10),
+      passwordHash: await bcrypt.hash(password, 12),
       role: "admin",
       permissions: { canAdd:true, canEdit:true, canDelete:true, canTx:true, canManageUsers:true, canManageDepts:true }
     });
@@ -201,11 +205,19 @@ app.post("/api/auth/register", async (req, res) => {
     await Cat.create({ companyId: company._id, deptId: dept._id, name: "Misc", nameEn: "Misc" });
 
     // Generate Token
-    const token = jwt.sign({ id: user._id, role: user.role, companyId: company._id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id: user._id, role: user.role, companyId: company._id }, SECRET, { expiresIn: "30d" });
+
+    // Send welcome email (fire-and-forget — never block registration on mail failure)
+    sendWelcome({
+      to:          adminEmail || "",
+      adminName:   adminUsername,
+      companyName,
+      companyCode: code,
+    }).catch(err => console.error("📧 Welcome email failed:", err.message));
 
     res.json({ token, user: { id: user._id, username: user.username, role: user.role }, companyCode: code });
   } catch (e) {
-    res.status(500).json({ message: e.message });
+    res.status(statusFor(e)).json({ message: friendly(e) });
   }
 });
 
@@ -222,7 +234,7 @@ app.post("/api/auth/login", async (req, res) => {
     const perms = resolvePerms(user);
     res.json({ token, company, user: { id: user._id, name: user.name, nameEn: user.nameEn,
       username: user.username, email: user.email||"", role: user.role, permissions: user.permissions||null, preferredLanguage: user.preferredLanguage, perms } });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.get("/api/auth/me", protect, async (req, res) => {
@@ -234,15 +246,15 @@ app.get("/api/auth/me", protect, async (req, res) => {
 // ── Departments ───────────────────────────────────────────────────────────────
 app.get("/api/departments", protect, async (req, res) => {
   try { res.json(await Dept.find({ companyId: req.user.companyId, active: true }).sort({ name: 1 })); }
-  catch (e) { res.status(500).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.post("/api/departments", protect, need("canManageDepts"), async (req, res) => {
   try { res.status(201).json(await Dept.create({ ...req.body, companyId: req.user.companyId })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.put("/api/departments/:id", protect, need("canManageDepts"), async (req, res) => {
   try { res.json(await Dept.findOneAndUpdate({ _id: req.params.id, companyId: req.user.companyId }, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.delete("/api/departments/:id", protect, need("canManageDepts"), async (req, res) => {
   try {
@@ -250,17 +262,17 @@ app.delete("/api/departments/:id", protect, need("canManageDepts"), async (req, 
       return res.status(400).json({ message: "Department has items" });
     await Dept.findOneAndUpdate({ _id: req.params.id, companyId: req.user.companyId }, { active: false });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Categories ────────────────────────────────────────────────────────────────
 app.get("/api/categories", protect, async (req, res) => {
   try { res.json(await Cat.find({ companyId: req.user.companyId, active: true }).populate("deptId","name nameEn color")); }
-  catch (e) { res.status(500).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.post("/api/categories", protect, need("canManageDepts"), async (req, res) => {
   try { res.status(201).json(await Cat.create({ ...req.body, companyId: req.user.companyId })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.delete("/api/categories/:id", protect, need("canManageDepts"), async (req, res) => {
   try {
@@ -268,7 +280,7 @@ app.delete("/api/categories/:id", protect, need("canManageDepts"), async (req, r
       return res.status(400).json({ message: "Category has items" });
     await Cat.findOneAndUpdate({ _id: req.params.id, companyId: req.user.companyId }, { active: false });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Items ─────────────────────────────────────────────────────────────────────
@@ -293,12 +305,12 @@ app.get("/api/items", protect, async (req, res) => {
       .populate("catId","name nameEn")
       .sort({ createdAt: -1 });
     res.json(items);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.get("/api/items/barcode/:code", protect, async (req, res) => {
   try { res.json(await Item.findOne({ barcode: req.params.code, companyId: req.user.companyId }) || null); }
-  catch (e) { res.status(500).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.get("/api/items/:id", protect, async (req, res) => {
@@ -307,12 +319,12 @@ app.get("/api/items/:id", protect, async (req, res) => {
       .populate("deptId","name nameEn color").populate("catId","name nameEn");
     if (!item) return res.status(404).json({ message: "Not found" });
     res.json(item);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.post("/api/items", protect, need("canAdd"), async (req, res) => {
   try { res.status(201).json(await Item.create({ ...req.body, companyId: req.user.companyId })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.put("/api/items/:id", protect, need("canEdit"), async (req, res) => {
@@ -321,14 +333,14 @@ app.put("/api/items/:id", protect, need("canEdit"), async (req, res) => {
       .populate("deptId","name nameEn color").populate("catId","name nameEn");
     if (!item) return res.status(404).json({ message: "Not found" });
     res.json(item);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.delete("/api/items/:id", protect, need("canDelete"), async (req, res) => {
   try {
     await Item.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // Photo upload → Cloudinary
@@ -341,7 +353,7 @@ app.post("/api/items/:id/photo", protect, need("canEdit"), upload.single("photo"
       $push: { images: image }
     });
     res.json({ photo: result.secure_url, image });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // Add extra image
@@ -351,7 +363,7 @@ app.post("/api/items/:id/photos", protect, need("canEdit"), upload.single("photo
     const image = { url: result.secure_url, publicId: result.public_id };
     const item = await Item.findOneAndUpdate({ _id: req.params.id, companyId: req.user.companyId }, { $push: { images: image } }, { new: true });
     res.json({ image, images: item.images });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // Delete image
@@ -370,7 +382,7 @@ app.delete("/api/items/:id/photos/:publicId", protect, need("canEdit"), async (r
     }
     const updated = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId });
     res.json({ success: true, images: updated.images, photo: updated.photo });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Transactions ──────────────────────────────────────────────────────────────
@@ -390,7 +402,7 @@ app.get("/api/transactions", protect, async (req, res) => {
       .sort({ date: -1 })
       .limit(500);
     res.json(txs);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.post("/api/transactions", protect, need("canTx"), async (req, res) => {
@@ -415,7 +427,7 @@ app.post("/api/transactions", protect, need("canTx"), async (req, res) => {
     res.status(201).json({ transaction: tx, updatedQty: item.qty });
   } catch (e) {
     await session.abortTransaction();
-    res.status(400).json({ message: e.message });
+    res.status(statusFor(e)).json({ message: friendly(e) });
   } finally { session.endSession(); }
 });
 
@@ -450,7 +462,7 @@ app.put("/api/transactions/:id", protect, need("canManageUsers"), async (req, re
     res.json({ transaction: updated, updatedQty: item.qty });
   } catch (e) {
     await session.abortTransaction();
-    res.status(400).json({ message: e.message });
+    res.status(statusFor(e)).json({ message: friendly(e) });
   } finally { session.endSession(); }
 });
 
@@ -471,14 +483,14 @@ app.delete("/api/transactions/:id", protect, need("canManageUsers"), async (req,
     res.json({ success: true, updatedQty: item?.qty });
   } catch (e) {
     await session.abortTransaction();
-    res.status(500).json({ message: e.message });
+    res.status(statusFor(e)).json({ message: friendly(e) });
   } finally { session.endSession(); }
 });
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 app.get("/api/users", protect, need("canManageUsers"), async (req, res) => {
   try { res.json(await User.find({ companyId: req.user.companyId }).select("-passwordHash").sort({ createdAt: 1 })); }
-  catch (e) { res.status(500).json({ message: e.message }); }
+  catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.post("/api/users", protect, need("canManageUsers"), async (req, res) => {
   try {
@@ -488,7 +500,7 @@ app.post("/api/users", protect, need("canManageUsers"), async (req, res) => {
     const user = await User.create({ companyId: req.user.companyId, name, nameEn, username: username.toLowerCase().trim(), email: email||"", passwordHash, role, permissions: permissions||null, preferredLanguage });
     res.status(201).json({ id: user._id, _id: user._id, name: user.name, nameEn: user.nameEn, username: user.username, email: user.email, role: user.role, permissions: user.permissions, preferredLanguage: user.preferredLanguage, active: user.active });
   } catch (e) {
-    res.status(e.code === 11000 ? 409 : 400).json({ message: e.code === 11000 ? "Username taken" : e.message });
+    res.status(statusFor(e)).json({ message: friendly(e) });
   }
 });
 app.put("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
@@ -497,14 +509,14 @@ app.put("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
     if (password) rest.passwordHash = await bcrypt.hash(password, 12);
     const user = await User.findOneAndUpdate({ _id: req.params.id, companyId: req.user.companyId }, rest, { new: true }).select("-passwordHash");
     res.json(user);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.get("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
   try {
     const user = await User.findOne({ _id: req.params.id, companyId: req.user.companyId }).select("-passwordHash");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 app.delete("/api/users/:id", protect, need("canManageUsers"), async (req, res) => {
   try {
@@ -512,7 +524,7 @@ app.delete("/api/users/:id", protect, need("canManageUsers"), async (req, res) =
       return res.status(400).json({ message: "Cannot delete yourself" });
     await User.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.get("/api/settings", protect, async (req, res) => {
@@ -521,7 +533,7 @@ app.get("/api/settings", protect, async (req, res) => {
     const obj = {};
     all.forEach(s => { obj[s.key] = s.value; });
     res.json(obj);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.put("/api/settings", protect, need("canManageUsers"), async (req, res) => {
@@ -530,14 +542,14 @@ app.put("/api/settings", protect, need("canManageUsers"), async (req, res) => {
       await Setting.findOneAndUpdate({ companyId: req.user.companyId, key }, { value }, { upsert: true, new: true });
     }
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Company ───────────────────────────────────────────────────────────────────
 app.put("/api/company", protect, need("canManageUsers"), async (req, res) => {
   try {
-    const { name, code, baseCurrency, primaryColor } = req.body;
-    
+    const { name, code, baseCurrency, primaryColor, activeIconPack, description, industry } = req.body;
+
     // Check if code is already taken by another company
     if (code) {
       const existing = await Company.findOne({ code: code.toUpperCase() });
@@ -546,13 +558,22 @@ app.put("/api/company", protect, need("canManageUsers"), async (req, res) => {
       }
     }
 
+    const patch = {};
+    if (name)           patch.name           = name;
+    if (code)           patch.code           = code.toUpperCase();
+    if (baseCurrency)   patch.baseCurrency   = baseCurrency;
+    if (primaryColor)   patch.primaryColor   = primaryColor;
+    if (activeIconPack) patch.activeIconPack = activeIconPack;
+    if (description !== undefined) patch.description = description;
+    if (industry    !== undefined) patch.industry    = industry;
+
     const updated = await Company.findByIdAndUpdate(
       req.user.companyId,
-      { $set: { ...(name && {name}), ...(code && {code: code.toUpperCase()}), ...(baseCurrency && {baseCurrency}), ...(primaryColor && {primaryColor}) } },
+      { $set: patch },
       { new: true }
     );
     res.json(updated);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -570,7 +591,7 @@ app.get("/api/stats", protect, async (req, res) => {
     ]);
     res.json({ totalItems, lowStock, outOfStock,
       totalValue: valAgg[0]?.total || 0, todayTransactions: todayTx, recentTx });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── AI Insights ───────────────────────────────────────────────────────────────
@@ -604,7 +625,7 @@ app.post("/api/ai/chat", protect, async (req, res) => {
     });
     
     res.json({ response: response.text });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 // ── Seed ──────────────────────────────────────────────────────────────────────
@@ -664,7 +685,7 @@ app.get("/api/admin/cloudinary", protect, need("canManageUsers"), async (req, re
   try {
     const usage = await cloudinary.api.usage();
     res.json(usage);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
 app.listen(PORT, () => console.log(`🚀 NexERP API v1.1 → http://localhost:${PORT} | routes: settings, cloudinary, tx-crud`));
