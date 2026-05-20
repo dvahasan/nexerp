@@ -89,8 +89,8 @@ export const AppProvider = ({ children }) => {
   const [authed,  setAuthed]  = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [lang,  setLang]  = useState(() => localStorage.getItem('nexerp_lang')  || 'en');
-  const [theme, setTheme] = useState(() => localStorage.getItem('nexerp_theme') || 'dark');
+  const [lang,  setLang]  = useState(() => localStorage.getItem('nexinv_lang')  || 'en');
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexinv_theme') || 'dark');
 
   const [items, setItems] = useState([]);
   const [depts, setDepts] = useState([]);
@@ -116,13 +116,13 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
-    localStorage.setItem('nexerp_lang', lang);
+    localStorage.setItem('nexinv_lang', lang);
   }, [lang]);
 
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
-    localStorage.setItem('nexerp_theme', theme);
+    localStorage.setItem('nexinv_theme', theme);
   }, [theme]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────
@@ -144,13 +144,13 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (localStorage.getItem('nexerp_token')) checkAuth();
+    if (localStorage.getItem('nexinv_token')) checkAuth();
     else setLoading(false);
   }, []);
 
   const login = async (code, username, password) => {
     const data = await api.login(code, username, password);
-    localStorage.setItem('nexerp_token', data.token);
+    localStorage.setItem('nexinv_token', data.token);
     setUser({ ...data.user, perms: data.perms });
     setCompany(data.company);
     setAuthed(true);
@@ -161,13 +161,13 @@ export const AppProvider = ({ children }) => {
 
   // Called after registration — token already issued, just load the session
   const loginWithToken = async (token) => {
-    localStorage.setItem('nexerp_token', token);
+    localStorage.setItem('nexinv_token', token);
     await checkAuth();
     window.location.hash = '#dash';
   };
 
   const logout = () => {
-    localStorage.removeItem('nexerp_token');
+    localStorage.removeItem('nexinv_token');
     setAuthed(false);
     setUser(null);
     setCompany(null);

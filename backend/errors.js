@@ -1,5 +1,5 @@
 /**
- * errors.js — NexERP friendly error resolver
+ * errors.js — NexINV friendly error resolver
  *
  * Converts raw MongoDB / Mongoose / JWT errors into short, readable messages
  * that are safe to show directly to the end user.

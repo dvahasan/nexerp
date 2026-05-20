@@ -1,5 +1,5 @@
 /**
- * mailer.js — NexERP email service
+ * mailer.js — NexINV email service
  * Uses nodemailer with any SMTP provider (Gmail, Brevo, Mailgun, etc.)
  *
  * Required .env vars:
@@ -8,7 +8,7 @@
  *   SMTP_SECURE  true | false  (true for port 465)
  *   SMTP_USER    your@email.com
  *   SMTP_PASS    app password or SMTP password
- *   SMTP_FROM    "NexERP" <noreply@nexerp.app>   (optional, defaults to SMTP_USER)
+ *   SMTP_FROM    "NexINV" <noreply@nexinv.app>   (optional, defaults to SMTP_USER)
  */
 
 const nodemailer = require('nodemailer');
@@ -24,7 +24,7 @@ const transporter = isConfigured
     })
   : null;
 
-const FROM = process.env.SMTP_FROM || `"NexERP" <${process.env.SMTP_USER || 'noreply@nexerp.app'}>`;
+const FROM = process.env.SMTP_FROM || `"NexINV" <${process.env.SMTP_USER || 'noreply@nexinv.app'}>`;
 
 /* ── Welcome email on company registration ─────────────────────────────────── */
 async function sendWelcome({ to, adminName, companyName, companyCode }) {
@@ -43,7 +43,7 @@ async function sendWelcome({ to, adminName, companyName, companyCode }) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to NexERP</title>
+  <title>Welcome to NexINV</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
@@ -80,7 +80,7 @@ async function sendWelcome({ to, adminName, companyName, companyCode }) {
     <div class="header">
       <div class="logo-box">
         <div class="logo-icon">📦</div>
-        <div class="logo-text">NexERP</div>
+        <div class="logo-text">NexINV</div>
       </div>
       <h1>Welcome to the family, ${companyName}!</h1>
       <p>Your workspace is ready — let's get started.</p>
@@ -90,7 +90,7 @@ async function sendWelcome({ to, adminName, companyName, companyCode }) {
     <div class="body">
       <p class="greeting">Hi ${adminName} 👋</p>
       <p class="text">
-        We're thrilled to have <strong>${companyName}</strong> join the NexERP platform.
+        We're thrilled to have <strong>${companyName}</strong> join the NexINV platform.
         Your company workspace has been set up and is ready to use right now.
         Below is your unique company code — keep it safe and share it with your
         team members so they can log in to your workspace.
@@ -142,9 +142,9 @@ async function sendWelcome({ to, adminName, companyName, companyCode }) {
     <!-- Footer -->
     <div class="footer">
       <p>
-        This email was sent to <strong>${to}</strong> because you created a NexERP workspace.<br/>
+        This email was sent to <strong>${to}</strong> because you created a NexINV workspace.<br/>
         If this wasn't you, you can safely ignore this email.<br/>
-        © ${new Date().getFullYear()} NexERP SaaS. All rights reserved.
+        © ${new Date().getFullYear()} NexINV SaaS. All rights reserved.
       </p>
     </div>
   </div>
@@ -155,9 +155,9 @@ async function sendWelcome({ to, adminName, companyName, companyCode }) {
   await transporter.sendMail({
     from:    FROM,
     to,
-    subject: `🎉 Welcome to NexERP — your company code is ${companyCode}`,
+    subject: `🎉 Welcome to NexINV — your company code is ${companyCode}`,
     html,
-    text: `Welcome to NexERP, ${adminName}!\n\nYour company "${companyName}" is ready.\nYour company code: ${companyCode}\n\nLog in at: ${process.env.CLIENT_URL || 'http://localhost:5173'}/#login`,
+    text: `Welcome to NexINV, ${adminName}!\n\nYour company "${companyName}" is ready.\nYour company code: ${companyCode}\n\nLog in at: ${process.env.CLIENT_URL || 'http://localhost:5173'}/#login`,
   });
 
   console.log(`📧 Welcome email sent → ${to}`);

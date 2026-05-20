@@ -153,7 +153,7 @@ export default function CompanyProfile() {
           <span className="mx-2 text-white/20">·</span>
           <Icon name="dashboard" size={13} className="text-white/60" />
           <span className="text-xs text-white/60 font-medium">
-            NexERP SaaS
+            NexINV SaaS
           </span>
         </div>
       </div>

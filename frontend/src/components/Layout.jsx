@@ -8,13 +8,13 @@ export default function Layout({ children }) {
 
   // Desktop: collapsed = icon-only rail
   const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem('nexerp_sidebar') === 'collapsed';
+    return localStorage.getItem('nexinv_sidebar') === 'collapsed';
   });
   // Mobile: drawer open/closed
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('nexerp_sidebar', collapsed ? 'collapsed' : 'expanded');
+    localStorage.setItem('nexinv_sidebar', collapsed ? 'collapsed' : 'expanded');
   }, [collapsed]);
 
   const toggleLang  = () => setLang(lang === 'en' ? 'ar' : 'en');
@@ -79,7 +79,7 @@ export default function Layout({ children }) {
               </div>
             )}
             <span className="font-bold text-lg tracking-tight text-slate-800 dark:text-white truncate max-w-[140px]">
-              {company?.name || 'NexERP'}
+              {company?.name || 'NexINV'}
             </span>
           </div>
         ) : (
