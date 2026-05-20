@@ -11,10 +11,11 @@ import Permissions from './pages/Permissions';
 import CompanyProfile from './pages/CompanyProfile';
 import UserProfile from './pages/UserProfile';
 import EnterpriseDashboard from './pages/EnterpriseDashboard';
+import Settings from './pages/Settings';
 import { useState, useEffect } from 'react';
 
 function AppContent() {
-  const { authed, loading } = useAppContext();
+  const { authed, loading, user, company } = useAppContext();
   const [page, setPage] = useState('dash');
 
   useEffect(() => {
