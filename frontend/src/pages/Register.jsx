@@ -45,7 +45,7 @@ export default function Register() {
           <div className="w-20 h-20 bg-green-100 dark:bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
             🎉
           </div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Welcome to NexERP!</h2>
+          <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Welcome to NexINV!</h2>
           <p className="text-slate-600 dark:text-slate-400 mb-8">
             Your company workspace has been created.
           </p>
@@ -80,13 +80,13 @@ export default function Register() {
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30 shadow-xl">
               <span className="text-white font-black text-2xl">N</span>
             </div>
-            <span className="text-2xl font-black tracking-tight">NexERP</span>
+            <span className="text-2xl font-black tracking-tight">NexINV</span>
           </a>
         </div>
         
         <div className="relative z-10 max-w-md">
           <h1 className="text-5xl font-black mb-6 leading-tight">Scale your operations instantly.</h1>
-          <p className="text-blue-100 text-lg leading-relaxed">Join NexERP's multi-tenant platform to organize your inventory and boost your team's productivity with AI.</p>
+          <p className="text-blue-100 text-lg leading-relaxed">Join NexINV's multi-tenant platform to organize your inventory and boost your team's productivity with AI.</p>
         </div>
         
         <div className="relative z-10 flex items-center gap-4 text-sm font-medium text-blue-200">
@@ -101,7 +101,7 @@ export default function Register() {
 
       {/* Right Form */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative">
-        <a href="#landing" className="md:hidden absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">NexERP</a>
+        <a href="#landing" className="md:hidden absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">NexINV</a>
         
         <div className="w-full max-w-md animate-in slide-in-from-right-8 fade-in duration-700">
           <div className="mb-10">

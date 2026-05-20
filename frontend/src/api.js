@@ -1,7 +1,7 @@
 // src/api.js  — all API calls to the backend
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-function token() { return localStorage.getItem("nexerp_token"); }
+function token() { return localStorage.getItem("nexinv_token"); }
 
 async function req(method, path, body, isForm = false) {
   const headers = {};

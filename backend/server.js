@@ -17,7 +17,7 @@ cloudinary.config({
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const SECRET = process.env.JWT_SECRET || "nexerp_secret";
+const SECRET = process.env.JWT_SECRET || "nexinv_secret";
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({ origin: "*", credentials: true }));
@@ -30,7 +30,7 @@ const upload = multer({
   fileFilter: (_, f, cb) => f.mimetype.startsWith("image/") ? cb(null, true) : cb(new Error("Images only")),
 });
 
-function uploadToCloudinary(buffer, folder = "nexerp") {
+function uploadToCloudinary(buffer, folder = "nexinv") {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       { folder },
@@ -635,9 +635,9 @@ app.post("/api/company/logo", protect, need("canManageUsers"), upload.single("lo
   try {
     if (!req.file) throw new Error("No file uploaded");
     
-    let folder = `nexerp/${req.user.companyId}`;
+    let folder = `nexinv/${req.user.companyId}`;
     if (req.user.isEnterprise) {
-      folder = `nexerp/${req.user.username}/${req.user.companyId}`;
+      folder = `nexinv/${req.user.username}/${req.user.companyId}`;
     }
 
     const result = await uploadToCloudinary(req.file.buffer, folder);
@@ -706,7 +706,7 @@ async function seedData() {
   console.log("🌱 Seeding default company and admin...");
   const company = await Company.create({
     code: "NEX-01",
-    name: "NexERP Default Company",
+    name: "NexINV Default Company",
     baseCurrency: "USD",
     theme: "light",
     activeIconPack: "material",
@@ -758,4 +758,4 @@ app.get("/api/admin/cloudinary", protect, need("canManageUsers"), async (req, re
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
-app.listen(PORT, () => console.log(`🚀 NexERP API v1.1 → http://localhost:${PORT} | routes: settings, cloudinary, tx-crud`));
+app.listen(PORT, () => console.log(`🚀 NexINV API v1.1 → http://localhost:${PORT} | routes: settings, cloudinary, tx-crud`));

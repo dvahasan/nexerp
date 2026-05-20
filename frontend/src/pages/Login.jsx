@@ -24,18 +24,23 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Subtle top accent — no GPU cost */}
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative">
+      {/* Subtle top accent */}
       <div className="fixed top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent pointer-events-none" />
 
-      <div className="w-full max-w-md">
+      {/* Back to Home Link */}
+      <a href="#landing" className="absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-80 transition-opacity">
+        NexINV
+      </a>
+
+      <div className="w-full max-w-md z-10">
         {/* Solid card — no backdrop-blur */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
           <div className="text-center mb-8">
             <div className="bg-blue-600 w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <MdInventory className="text-white text-3xl" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">NexERP SaaS</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">NexINV SaaS</h1>
             <p className="text-slate-400 mt-1.5 text-sm">
               {isAR ? 'تسجيل الدخول للوصول إلى مساحة العمل الخاصة بك' : 'Sign in to access your workspace'}
             </p>
@@ -101,7 +106,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-6">© 2025 NexERP SaaS. All rights reserved.</p>
+        <p className="text-center text-slate-600 text-xs mt-6">© 2025 NexINV SaaS. All rights reserved.</p>
       </div>
     </div>
   );
