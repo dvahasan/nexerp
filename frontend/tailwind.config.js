@@ -4,7 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'selector',   // Tailwind v4: respond to .dark class on <html>
+  darkMode: 'class',
   theme: {
     extend: {},
   },

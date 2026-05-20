@@ -90,7 +90,7 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const [lang,  setLang]  = useState(() => localStorage.getItem('nexerp_lang')  || 'en');
-  const [theme, setTheme] = useState(() => localStorage.getItem('nexerp_theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexerp_theme') || 'dark');
 
   const [items, setItems] = useState([]);
   const [depts, setDepts] = useState([]);
