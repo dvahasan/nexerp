@@ -15,6 +15,7 @@ export default function EnterpriseDashboard() {
   const [creating, setCreating] = useState(false);
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('portfolio');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const LIMIT = 9;
 
   useEffect(() => {
@@ -99,35 +100,40 @@ export default function EnterpriseDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col relative">
       {/* Top Navbar */}
-      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-40">
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+            <Icon name="menu" size={24} />
+          </button>
+          <div className="hidden sm:flex w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg items-center justify-center">
             <Icon name="company" className="text-white" size={18} />
           </div>
-          <span className="font-black text-xl tracking-tight text-slate-800 dark:text-white">NexINV Enterprise</span>
+          <span className="font-black text-lg md:text-xl tracking-tight text-slate-800 dark:text-white">NexINV</span>
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setShowModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors"
-          >
-            <Icon name="add" size={18} />
-            {isAR ? 'إضافة شركة' : 'New Company'}
-          </button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-2" />
-          <button onClick={toggleLang} className="text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors font-bold text-sm">
-            {isAR ? 'EN' : 'عربي'}
-          </button>
-          <button onClick={logout} className="text-slate-500 hover:text-red-500 transition-colors" title={isAR ? 'تسجيل الخروج' : 'Logout'}>
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="hidden md:flex items-center gap-4">
+            <button 
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors"
+            >
+              <Icon name="add" size={18} />
+              {isAR ? 'إضافة شركة' : 'New Company'}
+            </button>
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-2" />
+            <button onClick={toggleLang} className="text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors font-bold text-sm">
+              {isAR ? 'EN' : 'عربي'}
+            </button>
+          </div>
+          <button onClick={logout} className="p-2 text-slate-500 hover:text-red-500 transition-colors" title={isAR ? 'تسجيل الخروج' : 'Logout'}>
             <Icon name="logout" size={20} />
           </button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden h-[calc(100vh-64px)]">
-        {/* Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-2 shrink-0 hidden md:flex">
           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{isAR ? 'القائمة الرئيسية' : 'Main Menu'}</div>
           <button 
@@ -146,7 +152,59 @@ export default function EnterpriseDashboard() {
           </button>
         </aside>
 
-        <main className="flex-1 overflow-y-auto p-6 lg:p-10 animate-in fade-in duration-500">
+        {/* Mobile Drawer */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+        <aside
+          className={`fixed inset-y-0 ${isAR ? 'right-0' : 'left-0'} z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-2 shrink-0 md:hidden shadow-2xl transform transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : isAR ? 'translate-x-full' : '-translate-x-full'}`}
+        >
+          <div className="flex justify-between items-center mb-6">
+            <span className="font-bold text-slate-800 dark:text-white">{isAR ? 'القائمة' : 'Menu'}</span>
+            <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white">
+              <Icon name="close" size={20} />
+            </button>
+          </div>
+
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{isAR ? 'القائمة الرئيسية' : 'Main Menu'}</div>
+          <button 
+            onClick={() => { setActiveTab('portfolio'); setMobileMenuOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'portfolio' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white'}`}
+          >
+            <Icon name="company" size={20} />
+            {isAR ? 'المحفظة' : 'Portfolio'}
+          </button>
+          <button 
+            onClick={() => { setActiveTab('analytics'); setMobileMenuOpen(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white'}`}
+          >
+            <Icon name="trending_up" size={20} />
+            {isAR ? 'التحليلات الشاملة' : 'Global Analytics'}
+          </button>
+
+          <div className="w-full h-px bg-slate-200 dark:bg-slate-800 my-4" />
+          
+          <button 
+            onClick={() => { setShowModal(true); setMobileMenuOpen(false); }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-colors mb-2"
+          >
+            <Icon name="add" size={18} />
+            {isAR ? 'إضافة شركة' : 'New Company'}
+          </button>
+          
+          <button 
+            onClick={() => { toggleLang(); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white transition-colors"
+          >
+            <Icon name="translate" size={20} />
+            {isAR ? 'EN' : 'عربي'}
+          </button>
+        </aside>
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 animate-in fade-in duration-500">
           {activeTab === 'portfolio' ? (
             <div className="max-w-6xl mx-auto w-full">
               <div className="mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
