@@ -1,6 +1,9 @@
 {
   "name": "nexerp",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "concurrently --names \"API,UI\" --prefix-colors \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --prefix backend",
