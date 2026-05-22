@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+// Polyfill for Web Crypto API (Required for Mongoose 9 on older Node versions like Railway's default Node 18)
+if (!globalThis.crypto) {
+  globalThis.crypto = require('crypto').webcrypto;
+}
+
 const express    = require("express");
 const http       = require("http");
 const cors       = require("cors");
