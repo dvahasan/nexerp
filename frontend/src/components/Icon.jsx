@@ -17,7 +17,7 @@ import {
   MdFilterList, MdRefresh, MdExpandMore, MdExpandLess, MdInfo,
   MdStar, MdChat, MdSend, MdAutoAwesome, MdPerson, MdNotifications,
   MdLock, MdEmail, MdPhone, MdHome, MdInsights, MdColorLens,
-  MdContentCopy, MdCalendarToday,
+  MdContentCopy, MdCalendarToday, MdArrowUpward, MdArrowDownward,
 } from 'react-icons/md';
 
 // ── Heroicons (outline) ───────────────────────────────────────────────────
@@ -31,7 +31,7 @@ import {
   TagIcon, QrCodeIcon, FunnelIcon, ArrowPathIcon, ChevronDownIcon,
   ChevronUpIcon, InformationCircleIcon, StarIcon, ChatBubbleLeftIcon,
   PaperAirplaneIcon, SparklesIcon, UserIcon, BellIcon, LockClosedIcon,
-  EnvelopeIcon, PhoneIcon, DocumentDuplicateIcon, CalendarIcon,
+  EnvelopeIcon, PhoneIcon, DocumentDuplicateIcon, CalendarIcon, ArrowUpIcon, ArrowDownIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Lucide ────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ import {
   ImageIcon, CloudUpload, AlertTriangle, AlertCircle, DollarSign,
   TrendingUp, Check, ArrowLeft, Eye, EyeOff, LogOut, Building2,
   Tag, QrCode, Filter, RefreshCw, ChevronDown, ChevronUp, Info,
-  Star, MessageSquare, Send, Sparkles, User, Bell, Lock, Mail, Phone, Copy, Calendar,
+  Star, MessageSquare, Send, Sparkles, User, Bell, Lock, Mail, Phone, Copy, Calendar, ArrowUp, ArrowDown,
 } from 'lucide-react';
 
 // ── Phosphor ──────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ import {
   SignOut, Buildings, Tag as PhTag, QrCode as PhQr, Funnel, ArrowClockwise,
   CaretDown, CaretUp, Info as PhInfo, Star as PhStar, Chat, PaperPlaneRight,
   Sparkle, User as PhUser, Bell as PhBell, Lock as PhLock, EnvelopeSimple, Phone as PhPhone,
-  Copy as PhCopy, Calendar as PhCalendar,
+  Copy as PhCopy, Calendar as PhCalendar, ArrowUp as PhArrowUp, ArrowDown as PhArrowDown,
 } from 'phosphor-react';
 
 // ── Icon name → component map per pack ────────────────────────────────────
@@ -75,6 +75,7 @@ const ICON_MAP = {
     lock: MdLock, email: MdEmail, phone: MdPhone, home: MdHome,
     insights: MdInsights, theme: MdColorLens,
     copy: MdContentCopy, calendar: MdCalendarToday, trending_up: MdTrendingUp,
+    arrow_up: MdArrowUpward, arrow_down: MdArrowDownward,
   },
   heroicons: {
     dashboard: HomeIcon, inventory: ArchiveBoxIcon, transactions: ListBulletIcon,
@@ -92,6 +93,7 @@ const ICON_MAP = {
     user: UserIcon, bell: BellIcon, lock: LockClosedIcon, email: EnvelopeIcon, phone: PhoneIcon,
     home: HomeIcon, insights: ArrowTrendingUpIcon, theme: Cog6ToothIcon,
     copy: DocumentDuplicateIcon, calendar: CalendarIcon, trending_up: ArrowTrendingUpIcon,
+    arrow_up: ArrowUpIcon, arrow_down: ArrowDownIcon,
   },
   lucide: {
     dashboard: LayoutDashboard, inventory: Package, transactions: ClipboardList,
@@ -109,6 +111,7 @@ const ICON_MAP = {
     user: User, bell: Bell, lock: Lock, email: Mail, phone: Phone,
     home: LayoutDashboard, insights: TrendingUp, theme: Settings,
     copy: Copy, calendar: Calendar, trending_up: TrendingUp,
+    arrow_up: ArrowUp, arrow_down: ArrowDown,
   },
   phosphor: {
     dashboard: House, inventory: PhPackage, transactions: ClipboardText,
@@ -126,6 +129,7 @@ const ICON_MAP = {
     user: PhUser, bell: PhBell, lock: PhLock, email: EnvelopeSimple, phone: PhPhone,
     home: House, insights: PhTrending, theme: GearSix,
     copy: PhCopy, calendar: PhCalendar, trending_up: PhTrending,
+    arrow_up: PhArrowUp, arrow_down: PhArrowDown,
   },
 };
 

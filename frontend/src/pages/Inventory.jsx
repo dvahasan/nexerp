@@ -1,52 +1,76 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { api } from '../api';
 import Icon from '../components/Icon';
+import Skeleton from '../components/Skeleton';
+import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
+import LazyScroll from '../components/LazyScroll';
 import ItemModal from './ItemModal';
 import TxModal from './TxModal';
 import Confirm from '../components/Confirm';
 
+const LIMIT = 12;
+
 export default function Inventory() {
-  const { items, depts, cats, loading, t, isAR, company, user, removeItem } = useAppContext();
+  const { depts, loading: ctxLoading, t, isAR, company, user, removeItem } = useAppContext();
 
   const [search, setSearch] = useState('');
   const [deptF,  setDeptF]  = useState('all');
   const [stF,    setStF]    = useState('all');
 
+  // Server-side paginated state
+  const [items,    setItems]    = useState([]);
+  const [total,    setTotal]    = useState(0);
+  const [hasMore,  setHasMore]  = useState(false);
+  const [page,     setPage]     = useState(1);
+  const [fetching, setFetching] = useState(true);
+  // Version bump forces a re-fetch even when page is already 1
+  const [version, setVersion] = useState(0);
+
   // Modal state
-  const [itemModal, setItemModal] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);   // item being edited
-
-  const [txModal, setTxModal] = useState(false);
-  const [txItem, setTxItem]   = useState(null);         // pre-selected item for quick TX
-
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [itemModal,    setItemModal]    = useState(false);
+  const [editTarget,   setEditTarget]   = useState(null);
+  const [txModal,      setTxModal]      = useState(false);
+  const [txItem,       setTxItem]       = useState(null);
+  const [confirmOpen,  setConfirmOpen]  = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return items.filter(i => {
-      const matchQ = !q || i.name.toLowerCase().includes(q)
-        || (i.nameEn || '').toLowerCase().includes(q)
-        || (i.sku    || '').toLowerCase().includes(q)
-        || (i.barcode|| '').includes(q);
-      const dId   = i.deptId?._id || i.deptId;
-      const matchD = deptF === 'all' || dId === deptF;
-      const matchS = stF === 'all'
-        || (stF === 'low' && i.qty > 0 && i.qty <= i.minThreshold)
-        || (stF === 'out' && i.qty === 0)
-        || (stF === 'ok'  && i.qty > i.minThreshold);
-      return matchQ && matchD && matchS;
-    });
-  }, [items, search, deptF, stF]);
+  // Pick up pre-applied filter from Dashboard card click
+  useEffect(() => {
+    const f = sessionStorage.getItem('nexinv_inv_filter');
+    if (f) { setStF(f); sessionStorage.removeItem('nexinv_inv_filter'); }
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Main fetch — accumulates on scroll, replaces on page-1 fetches
+  useEffect(() => {
+    let cancelled = false;
+    setFetching(true);
+    const params = { page, limit: LIMIT };
+    if (search) params.search = search;
+    if (deptF !== 'all') params.dept = deptF;
+    if (stF   !== 'all') params.stock = stF;
+
+    api.getItemsPaged(params)
+      .then(res => {
+        if (!cancelled) {
+          const newItems = res.items || [];
+          if (page === 1) setItems(newItems);
+          else            setItems(prev => [...prev, ...newItems]);
+          setTotal(res.total || 0);
+          setHasMore(page < (res.pages || 1));
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setFetching(false); });
+    return () => { cancelled = true; };
+  }, [page, search, deptF, stF, version]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1); }, [search, deptF, stF]);
+
+  // Explicit refresh (after save/delete): bump version so the effect re-runs even if page===1
+  const refresh = () => { setPage(1); setVersion(v => v + 1); };
 
   const getStatus = (i) => {
     if (i.qty === 0) return { label: isAR ? 'نفذت' : 'Out',  color: 'bg-red-500',    text: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-500/10' };
@@ -63,12 +87,52 @@ export default function Inventory() {
   const handleDelete  = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    try { await removeItem(deleteTarget._id); setConfirmOpen(false); }
+    try {
+      await removeItem(deleteTarget._id);
+      // Remove from local display state immediately
+      setItems(prev => prev.filter(i => i._id !== deleteTarget._id));
+      setTotal(prev => prev - 1);
+      setConfirmOpen(false);
+    }
     catch { /* toast shown by context */ }
     finally { setDeleting(false); }
   };
 
+  const handleSaved = () => refresh();
+
   const currencySymbol = company?.baseCurrency || '';
+
+  if (ctxLoading) {
+    return (
+      <div className="flex-1 animate-in fade-in duration-500">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" shape="text" />
+            <Skeleton className="h-4 w-64" shape="text" />
+          </div>
+          <Skeleton className="h-10 w-32" shape="rect" />
+        </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4">
+            <Skeleton className="h-10 w-full" shape="rect" />
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                  <Skeleton className="h-44 w-full" shape="rect" />
+                  <div className="p-4 space-y-3">
+                    <Skeleton className="h-5 w-3/4" shape="text" />
+                    <Skeleton className="h-4 w-1/2" shape="text" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -76,7 +140,7 @@ export default function Inventory() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
           {t.inventory}
-          <span className="ml-2 text-base font-normal text-slate-400">({filtered.length})</span>
+          <span className="ml-2 text-base font-normal text-slate-400">({total})</span>
         </h1>
         <div className="flex gap-2">
           {user?.perms?.canAdd && (
@@ -124,19 +188,38 @@ export default function Inventory() {
 
       {/* Item grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filtered.length === 0 && (
+        {/* Initial loading skeleton */}
+        {fetching && items.length === 0 && (
+          Array.from({ length: LIMIT }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+              <Skeleton className="h-44 w-full" shape="rect" />
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-5 w-3/4" shape="text" />
+                <Skeleton className="h-4 w-1/2" shape="text" />
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Skeleton className="h-10" shape="rect" />
+                  <Skeleton className="h-10" shape="rect" />
+                  <Skeleton className="h-10" shape="rect" />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Empty state */}
+        {!fetching && items.length === 0 && (
           <div className="col-span-full py-20 text-center text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
             {isAR ? 'لا توجد أصناف مطابقة للبحث' : 'No items match your search'}
           </div>
         )}
 
-        {filtered.map(item => {
+        {items.map(item => {
           const dept = depts.find(d => d._id === (item.deptId?._id || item.deptId));
           const st   = getStatus(item);
 
           return (
+            <LazyScroll key={item._id} alwaysRender rootMargin="200px">
             <div
-              key={item._id}
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[transform,box-shadow] duration-300 group cursor-pointer"
               onClick={() => openEdit(item)}
             >
@@ -146,6 +229,7 @@ export default function Inventory() {
                   <img
                     src={item.photo.startsWith('/') ? `http://localhost:5000${item.photo}` : item.photo}
                     alt={item.name}
+                    loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
@@ -235,21 +319,37 @@ export default function Inventory() {
                 </div>
               </div>
             </div>
+            </LazyScroll>
           );
         })}
       </div>
 
-      {/* Modals */}
+      {/* Infinite Scroll trigger */}
+      <InfiniteScrollTrigger
+        hasMore={hasMore && !fetching}
+        onVisible={() => setPage(p => p + 1)}
+      />
+
+      {/* Fetching-more spinner (subsequent pages) */}
+      {fetching && items.length > 0 && (
+        <div className="py-6 flex justify-center">
+          <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* ── Modals ── */}
       <ItemModal
         open={itemModal}
         onClose={() => { setItemModal(false); setEditTarget(null); }}
         editItem={editTarget}
+        onSaved={handleSaved}
       />
 
       <TxModal
         open={txModal}
         onClose={() => { setTxModal(false); setTxItem(null); }}
         editTx={txItem ? { itemId: txItem } : null}
+        onSaved={handleSaved}
       />
 
       <Confirm

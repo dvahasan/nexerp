@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import Icon from '../components/Icon';
+import LazyScroll from '../components/LazyScroll';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$',  name: 'US Dollar'       },
@@ -53,9 +54,10 @@ function StatCard({ icon, label, value, sub, accent = 'blue' }) {
 }
 
 export default function CompanyProfile() {
-  const { company, users, items, txs, stats, doUpdateCompany, uploadCompanyLogo, showToast, isAR, user: me } = useAppContext();
+  const { company, users, items, stats, doUpdateCompany, uploadCompanyLogo, showToast, isAR, user: me } = useAppContext();
 
-  const isAdmin = me?.role === 'admin' || me?.perms?.canManageUsers;
+  // Owner always can edit — role is the source of truth; others need canManageCompany perm
+  const isAdmin = me?.role === 'owner' || !!me?.perms?.canManageCompany;
 
   const [form, setForm] = useState({
     name:           company?.name          || '',
@@ -107,7 +109,7 @@ export default function CompanyProfile() {
           {/* Company avatar / logo */}
           <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white font-black text-3xl flex-shrink-0 shadow-lg overflow-hidden">
             {company?.logo ? (
-              <img src={company.logo} alt="Logo" className="w-full h-full object-contain bg-white" />
+              <img src={company.logo} alt="Logo" loading="lazy" className="w-full h-full object-contain bg-white" />
             ) : (
               company?.name?.charAt(0)?.toUpperCase() || 'N'
             )}
@@ -162,7 +164,7 @@ export default function CompanyProfile() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon="users"     label={isAR ? 'الأعضاء النشطون' : 'Active Members'} value={activeUsers}    accent="blue"    />
         <StatCard icon="inventory" label={isAR ? 'أصناف المخزون'   : 'Inventory Items'} value={items.length}  accent="emerald" />
-        <StatCard icon="swap"      label={isAR ? 'إجمالي الحركات'  : 'Total Transactions'} value={txs.length} accent="violet"  />
+        <StatCard icon="swap"      label={isAR ? 'إجمالي الحركات'  : 'Total Transactions'} value={stats?.totalTransactions ?? '—'} accent="violet"  />
         <StatCard
           icon="trending_up"
           label={isAR ? 'قيمة المخزون' : 'Stock Value'}
@@ -346,30 +348,44 @@ export default function CompanyProfile() {
 
       {/* ── Members summary ──────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl p-6">
-        <h2 className="text-base font-bold text-slate-800 dark:text-white mb-4">
-          {isAR ? 'فريق العمل' : 'Team Members'}
-        </h2>
-        <div className="space-y-3">
-          {users.slice(0, 8).map((u, i) => {
-            const GRADIENTS = ['from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600', 'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600', 'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600'];
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-slate-800 dark:text-white">
+            {isAR ? 'فريق العمل' : 'Team Members'}
+          </h2>
+          <span className="text-xs font-semibold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
+            {users.length}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {users.map((u, i) => {
+            const GRADIENTS = [
+              'from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600',
+              'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600',
+              'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600',
+            ];
             return (
-              <div key={u._id} className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                  {u.name.charAt(0).toUpperCase()}
+              <LazyScroll key={u._id} alwaysRender rootMargin="150px">
+                <div className="flex items-center gap-3 py-2 px-1 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-white truncate">{u.name}</div>
+                    <div className="text-xs text-slate-400 font-mono">@{u.username}</div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${u.active !== false ? 'bg-emerald-500' : 'bg-red-400'}`} />
+                    <span className="text-[10px] font-bold capitalize px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                      {u.role}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-800 dark:text-white truncate">{u.name}</div>
-                  <div className="text-xs text-slate-400 font-mono">@{u.username}</div>
-                </div>
-                <span className="text-[10px] font-bold capitalize px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 flex-shrink-0">
-                  {u.role}
-                </span>
-              </div>
+              </LazyScroll>
             );
           })}
-          {users.length > 8 && (
-            <p className="text-xs text-slate-400 text-center pt-1">
-              +{users.length - 8} {isAR ? 'مستخدم آخر' : 'more members'}
+          {users.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-6">
+              {isAR ? 'لا يوجد أعضاء' : 'No members yet'}
             </p>
           )}
         </div>

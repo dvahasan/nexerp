@@ -5,7 +5,7 @@ import Icon from '../components/Icon';
 import { api } from '../api';
 
 export default function Settings() {
-  const { lang, setLang, t, isAR, company, setCompany, user, doUpdateCompany, theme, setTheme } = useAppContext();
+  const { lang, setLang, t, isAR, company, setCompany, user, doUpdateCompany, theme, setTheme, doUpdateProfile } = useAppContext();
 
   const [localLang,   setLocalLang]   = useState(lang);
   const [companyName, setCompanyName] = useState(company?.name           || '');
@@ -32,11 +32,14 @@ export default function Settings() {
   const saveAll = async () => {
     setSaving(true);
     try {
-      // Personal: save preferred language
-      if (user?._id) {
-        await api.updateUser(user._id, { preferredLanguage: localLang });
-        setLang(localLang);
-      }
+      // Personal: persist preferred language via the self-service profile endpoint
+      // (no admin permission required — works for every user)
+      await doUpdateProfile({
+        name:              user?.name     || '',
+        username:          user?.username || '',
+        email:             user?.email    || '',
+        preferredLanguage: localLang,
+      });
 
       // Company-wide (admin only)
       if (user?.perms?.canManageUsers) {
@@ -77,7 +80,11 @@ export default function Settings() {
 
           <div>
             <label className={labelCls}>{t.language}</label>
-            <select value={localLang} onChange={e => setLocalLang(e.target.value)} className={inputCls}>
+            <select
+              value={localLang}
+              onChange={e => { setLocalLang(e.target.value); setLang(e.target.value); }}
+              className={inputCls}
+            >
               <option value="en">English</option>
               <option value="ar">العربية</option>
             </select>

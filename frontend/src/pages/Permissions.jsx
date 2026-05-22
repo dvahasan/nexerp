@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import Icon from '../components/Icon';
+import Skeleton from '../components/Skeleton';
+import LazyScroll from '../components/LazyScroll';
 
 const MODULES = [
-  { key: 'canAdd',         icon: 'add',         labelEN: 'Add Items',    labelAR: 'إضافة أصناف',     desc: 'Create new inventory items' },
-  { key: 'canEdit',        icon: 'edit',         labelEN: 'Edit Items',   labelAR: 'تعديل الأصناف',   desc: 'Modify existing items'       },
-  { key: 'canDelete',      icon: 'delete',       labelEN: 'Delete',       labelAR: 'الحذف',           desc: 'Delete items & records'      },
-  { key: 'canTx',          icon: 'swap',         labelEN: 'Transactions', labelAR: 'الحركات',          desc: 'Record stock movements'      },
-  { key: 'canManageUsers', icon: 'users',        labelEN: 'Manage Users', labelAR: 'إدارة المستخدمين', desc: 'Add, edit, delete users'     },
+  { key: 'canAdd',           icon: 'add',         labelEN: 'Add Items',      labelAR: 'إضافة أصناف',      desc: 'Create new inventory items'    },
+  { key: 'canEdit',          icon: 'edit',         labelEN: 'Edit Items',     labelAR: 'تعديل الأصناف',    desc: 'Modify existing items'          },
+  { key: 'canDelete',        icon: 'delete',       labelEN: 'Delete',         labelAR: 'الحذف',            desc: 'Delete items & records'         },
+  { key: 'canTx',            icon: 'swap',         labelEN: 'Transactions',   labelAR: 'الحركات',           desc: 'Record stock movements'         },
+  { key: 'canManageUsers',   icon: 'users',        labelEN: 'Manage Users',   labelAR: 'إدارة المستخدمين', desc: 'Add, edit, delete users'        },
+  { key: 'canManageCompany', icon: 'company',      labelEN: 'Company Profile',labelAR: 'ملف الشركة',       desc: 'View & edit company profile'    },
 ];
 
 const ROLE_BADGE = {
+  owner:     'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
   admin:     'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
   manager:   'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
   warehouse: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
@@ -30,8 +34,38 @@ export default function Permissions() {
   const [search, setSearch] = useState('');
 
   if (loading) return (
-    <div className="flex justify-center items-center h-64">
-      <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" shape="text" />
+          <Skeleton className="h-4 w-64" shape="text" />
+        </div>
+      </div>
+      <Skeleton className="h-10 w-64" shape="rect" />
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden overflow-x-auto">
+        <div className="min-w-[800px] p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4">
+          <Skeleton className="h-8 w-full" shape="rect" />
+        </div>
+        <div className="p-4 space-y-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-3 w-1/4">
+                <Skeleton className="w-10 h-10 shrink-0" shape="rect" />
+                <div>
+                  <Skeleton className="h-4 w-24 mb-1" shape="text" />
+                  <Skeleton className="h-3 w-16" shape="text" />
+                </div>
+              </div>
+              <div className="flex-1 flex gap-4 justify-between ml-8">
+                {[1, 2, 3, 4, 5, 6].map(j => (
+                  <Skeleton key={j} className="h-6 w-12" shape="rect" />
+                ))}
+              </div>
+              <Skeleton className="h-8 w-20 ml-8" shape="rect" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 
@@ -40,6 +74,16 @@ export default function Permissions() {
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.username.toLowerCase().includes(search.toLowerCase())
   );
+
+  const canManagePermissions = me?.role === 'owner' || me?.perms?.canManagePermissions;
+
+  if (!canManagePermissions) {
+    return (
+      <div className="p-8 text-center text-slate-500">
+        {isAR ? 'ليس لديك صلاحية للوصول إلى هذه الصفحة' : 'You do not have permission to view this page'}
+      </div>
+    );
+  }
 
   const toggle = (uid, key) => {
     setPerms(prev => ({
@@ -51,7 +95,7 @@ export default function Permissions() {
   const saveRow = async (u) => {
     setSaving(s => ({ ...s, [u._id]: true }));
     try {
-      await saveUser({ permissions: perms[u._id] }, u._id);
+      await saveUser({ permissions: perms[u._id] }, u._id, { silent: true });
       showToast(isAR ? `تم حفظ صلاحيات ${u.name}` : `Permissions saved for ${u.name}`);
     } catch { /* toast shown by context */ }
     finally { setSaving(s => ({ ...s, [u._id]: false })); }
@@ -134,15 +178,22 @@ export default function Permissions() {
         {/* Rows */}
         <div className="divide-y divide-slate-50 dark:divide-slate-700/50">
           {filtered.map((u) => {
-            const isMe   = me?._id === u._id;
-            const diff   = hasDiff(u);
+            const isOwner  = u.role === 'owner';
+            const isMe     = me?._id === u._id;
+            const diff     = hasDiff(u);
             const isSaving = saving[u._id];
-            const rowPerms = perms[u._id] || {};
+            const rowPerms = isOwner
+              ? Object.fromEntries(MODULES.map(m => [m.key, true])) // owner always has all
+              : (perms[u._id] || {});
 
             return (
+              <LazyScroll key={u._id} alwaysRender rootMargin="200px">
               <div
-                key={u._id}
-                className={`grid items-center transition-colors ${diff ? 'bg-blue-50/50 dark:bg-blue-500/5' : 'hover:bg-slate-50 dark:hover:bg-slate-700/20'}`}
+                className={`grid items-center transition-colors ${
+                  isOwner
+                    ? 'bg-amber-50/60 dark:bg-amber-500/5'
+                    : diff ? 'bg-blue-50/50 dark:bg-blue-500/5' : 'hover:bg-slate-50 dark:hover:bg-slate-700/20'
+                }`}
                 style={{ gridTemplateColumns: '1fr ' + MODULES.map(() => '80px').join(' ') + ' 100px' }}
               >
                 {/* User info */}
@@ -157,8 +208,8 @@ export default function Permissions() {
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-slate-400 font-mono">@{u.username}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold capitalize ${ROLE_BADGE[u.role] || ROLE_BADGE.viewer}`}>
-                        {u.role}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold capitalize flex items-center gap-1 ${ROLE_BADGE[u.role] || ROLE_BADGE.viewer}`}>
+                        {isOwner && '👑 '}{u.role}
                       </span>
                     </div>
                   </div>
@@ -167,19 +218,19 @@ export default function Permissions() {
                 {/* Permission toggles */}
                 {MODULES.map(m => {
                   const enabled = !!rowPerms[m.key];
-                  const canChange = !isMe && me?.perms?.canManageUsers;
+                  const canChange = !isMe && !isOwner && canManagePermissions;
                   return (
                     <div key={m.key} className="flex items-center justify-center py-4">
                       <button
                         disabled={!canChange}
                         onClick={() => toggle(u._id, m.key)}
                         title={isAR ? m.labelAR : m.labelEN}
-                        className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0
+                        className={`relative inline-flex w-11 h-6 rounded-full p-0 flex-shrink-0 transition-colors
                           ${enabled ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}
                           ${!canChange ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
                       >
-                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform
-                          ${enabled ? 'translate-x-5' : 'translate-x-1'}`}
+                        <span className={`absolute left-[2px] top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-transform
+                          ${enabled ? 'translate-x-5' : 'translate-x-0'}`}
                         />
                       </button>
                     </div>
@@ -188,7 +239,11 @@ export default function Permissions() {
 
                 {/* Save button */}
                 <div className="px-3 flex items-center justify-center py-4">
-                  {isMe ? (
+                  {isOwner ? (
+                    <span className="text-[11px] text-amber-500 dark:text-amber-400 font-bold flex items-center gap-1" title="Owner permissions are immutable">
+                      🔒 {isAR ? 'محمي' : 'Protected'}
+                    </span>
+                  ) : isMe ? (
                     <span className="text-xs text-slate-300 dark:text-slate-600 font-medium">—</span>
                   ) : (
                     <button
@@ -210,6 +265,7 @@ export default function Permissions() {
                   )}
                 </div>
               </div>
+              </LazyScroll>
             );
           })}
 

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import Modal from '../components/Modal';
 import { useAppContext } from '../context/AppContext';
 
+// Owner is never in this list — it cannot be assigned or changed via UI
 const ROLES = ['admin', 'manager', 'warehouse', 'viewer'];
 
 const roleDefaults = {
-  admin:     { canAdd: true,  canEdit: true,  canDelete: true,  canTx: true,  canManageUsers: true  },
-  manager:   { canAdd: true,  canEdit: true,  canDelete: false, canTx: true,  canManageUsers: false },
-  warehouse: { canAdd: false, canEdit: false, canDelete: false, canTx: true,  canManageUsers: false },
-  viewer:    { canAdd: false, canEdit: false, canDelete: false, canTx: false, canManageUsers: false },
+  admin:     { canAdd: true,  canEdit: true,  canDelete: true,  canTx: true,  canManageUsers: true,  canManageCompany: true  },
+  manager:   { canAdd: true,  canEdit: true,  canDelete: false, canTx: true,  canManageUsers: false, canManageCompany: false },
+  warehouse: { canAdd: false, canEdit: false, canDelete: false, canTx: true,  canManageUsers: false, canManageCompany: false },
+  viewer:    { canAdd: false, canEdit: false, canDelete: false, canTx: false, canManageUsers: false, canManageCompany: false },
 };
 
 const defaultForm = {
@@ -17,7 +18,7 @@ const defaultForm = {
   perms: { ...roleDefaults.warehouse },
 };
 
-export default function UserModal({ open, onClose, editUser = null }) {
+export default function UserModal({ open, onClose, editUser = null, onSaved }) {
   const { saveUser, t, isAR } = useAppContext();
   const [form,   setForm]   = useState(defaultForm);
   const [saving, setSaving] = useState(false);
@@ -31,7 +32,7 @@ export default function UserModal({ open, onClose, editUser = null }) {
         password: '',
         role:     editUser.role     || 'warehouse',
         active:   editUser.active   ?? true,
-        perms:    editUser.perms    || { ...roleDefaults[editUser.role] || roleDefaults.viewer },
+        perms:    editUser.permissions || editUser.perms || { ...roleDefaults[editUser.role] || roleDefaults.viewer },
       });
     } else {
       setForm(defaultForm);
@@ -49,10 +50,12 @@ export default function UserModal({ open, onClose, editUser = null }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
-      if (!payload.password) delete payload.password; // don't send empty password on edit
+      const { perms, ...rest } = form;
+      const payload = { ...rest, permissions: perms }; // backend stores as "permissions", not "perms"
+      if (!payload.password) delete payload.password;
       await saveUser(payload, editUser?._id);
       onClose();
+      onSaved?.();
     } catch {
       // error toast handled by context
     } finally {
@@ -71,12 +74,43 @@ export default function UserModal({ open, onClose, editUser = null }) {
   };
 
   const permLabels = {
-    canAdd:         t.canAdd,
-    canEdit:        t.canEdit,
-    canDelete:      t.canDelete,
-    canTx:          t.canTx,
-    canManageUsers: t.canManageUsers,
+    canAdd:           t.canAdd,
+    canEdit:          t.canEdit,
+    canDelete:        t.canDelete,
+    canTx:            t.canTx,
+    canManageUsers:   t.canManageUsers,
+    canManageCompany: isAR ? 'ملف الشركة' : 'Company Profile',
   };
+
+  // Owner accounts are fully protected — show a read-only info panel instead of edit form
+  if (editUser?.role === 'owner') {
+    return (
+      <Modal open={open} onClose={onClose} title={isAR ? 'حساب المالك' : 'Owner Account'}>
+        <div className="text-center py-6 px-4">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-5 text-4xl shadow-lg shadow-amber-500/30">
+            👑
+          </div>
+          <h3 className="text-xl font-black text-slate-800 dark:text-white mb-1">{editUser.name}</h3>
+          <p className="text-sm font-mono text-slate-400 mb-4">@{editUser.username}</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-bold mb-6">
+            👑 {isAR ? 'مالك الشركة' : 'Company Owner'}
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-xs mx-auto leading-relaxed">
+            {isAR
+              ? 'هذا الحساب هو مسجّل الشركة ويمتلك جميع الصلاحيات بشكل دائم. لا يمكن تعديله أو حذفه.'
+              : 'This account registered the company and permanently holds all permissions. It cannot be edited or deleted.'}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+          >
+            {isAR ? 'إغلاق' : 'Close'}
+          </button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
