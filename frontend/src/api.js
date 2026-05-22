@@ -38,7 +38,8 @@ export const api = {
   deleteCat: (id)    => req("DELETE", `/categories/${id}`),
 
   // Items
-  getItems:       (params = {}) => req("GET", "/items?" + new URLSearchParams(params)),
+  getItems:       (params = {}) => req("GET", "/items?" + new URLSearchParams({ all: "1", ...params })),
+  getItemsPaged:  (params = {}) => req("GET", "/items?" + new URLSearchParams(params)),
   getItem:        (id)          => req("GET",  `/items/${id}`),
   getByBarcode:   (code)        => req("GET",  `/items/barcode/${code}`),
   addItem:        (d)           => req("POST",   "/items", d),
@@ -49,17 +50,28 @@ export const api = {
   deleteItemPhoto:(id, publicId)=> req("DELETE", `/items/${id}/photos/${encodeURIComponent(publicId)}`),
 
   // Transactions
-  getTxs:   (params = {}) => req("GET",    "/transactions?" + new URLSearchParams(params)),
+  getTxs:      (params = {}) => req("GET", "/transactions?" + new URLSearchParams(params)),
   addTx:    (d)           => req("POST",   "/transactions", d),
   updateTx: (id, d)       => req("PUT",    `/transactions/${id}`, d),
   deleteTx: (id)          => req("DELETE", `/transactions/${id}`),
 
   // Users
-  getUsers:   ()      => req("GET",    "/users"),
+  getUsers:      ()           => req("GET", "/users"),
+  getUsersPaged: (params = {}) => req("GET", "/users?" + new URLSearchParams(params)),
   getUser:    (id)    => req("GET",    `/users/${id}`),
   addUser:    (d)     => req("POST",   "/users", d),
   updateUser: (id, d) => req("PUT",    `/users/${id}`, d),
   deleteUser: (id)    => req("DELETE", `/users/${id}`),
+
+  // Files
+  getFiles:   ()      => req("GET", "/files"),
+  deleteFile: (id)    => req("DELETE", `/files/${id}`),
+  uploadFile: (file, itemId) => { 
+    const fd = new FormData(); 
+    fd.append("file", file); 
+    if (itemId) fd.append("itemId", itemId);
+    return req("POST", "/files", fd, true); 
+  },
 
   // Stats
   getStats: () => req("GET", "/stats"),
@@ -72,8 +84,13 @@ export const api = {
 
   // Enterprise
   getEnterpriseCompanies: () => req("GET", "/enterprise/companies"),
+  createEnterpriseCompany: (data) => req("POST", "/enterprise/companies", data),
   assumeEnterpriseCompany: (id) => req("POST", `/enterprise/assume/${id}`),
+  exitEnterpriseCompany: () => req("POST", "/enterprise/exit"),
 
   // Admin
   getCloudinaryUsage: () => req("GET", "/admin/cloudinary"),
+
+  // AI
+  aiChat: (prompt, history = []) => req("POST", "/ai/chat", { prompt, history }),
 };

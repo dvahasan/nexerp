@@ -11,7 +11,7 @@ const defaultForm = {
   deptId: '', catId: '', status: 'active',
 };
 
-export default function ItemModal({ open, onClose, editItem = null }) {
+export default function ItemModal({ open, onClose, editItem = null, onSaved }) {
   const { depts, cats, saveItem, t, isAR } = useAppContext();
   const [form, setForm]       = useState(defaultForm);
   const [saving, setSaving]   = useState(false);
@@ -74,6 +74,7 @@ export default function ItemModal({ open, onClose, editItem = null }) {
         finally { setUploading(false); }
       }
       onClose();
+      onSaved?.();
     } catch {
       // error shown by context toast
     } finally {
@@ -279,7 +280,7 @@ export default function ItemModal({ open, onClose, editItem = null }) {
                 const publicId = url.includes('cloudinary') ? url.split('/').slice(-2).join('/').replace(/\.[^.]+$/, '') : url;
                 return (
                   <div key={url} className="relative group rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 aspect-square">
-                    <img src={url} alt={`photo-${idx}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={`photo-${idx}`} loading="lazy" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button
                         onClick={() => handleDeletePhoto(publicId)}

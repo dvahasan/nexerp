@@ -1,13 +1,38 @@
+import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import Icon from '../components/Icon';
+import Skeleton from '../components/Skeleton';
+import LazyScroll from '../components/LazyScroll';
 
 export default function Dashboard() {
   const { stats, loading, t, isAR, lang, company, user } = useAppContext();
 
   if (loading || !stats) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-8 h-8 border-4 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+      <div className="flex-1 animate-in fade-in duration-500">
+        <div className="mb-8">
+          <Skeleton className="h-8 w-48 mb-2" shape="text" />
+          <Skeleton className="h-4 w-64" shape="text" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6">
+              <div className="flex justify-between items-start mb-6">
+                <Skeleton className="h-4 w-24" shape="text" />
+                <Skeleton className="w-12 h-12" shape="rect" />
+              </div>
+              <Skeleton className="h-8 w-32 mb-2" shape="text" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 h-96">
+            <Skeleton className="h-full w-full" shape="rect" />
+          </div>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 h-96">
+            <Skeleton className="h-full w-full" shape="rect" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -41,14 +66,6 @@ export default function Dashboard() {
       iconCls: 'text-emerald-500',
     },
     {
-      label:   isAR ? 'حركات اليوم' : "Today's Moves",
-      value:   (stats.todayTx || 0).toLocaleString(),
-      icon:    'swap',
-      accent:  'border-violet-500',
-      iconBg:  'bg-violet-50 dark:bg-violet-500/10',
-      iconCls: 'text-violet-500',
-    },
-    {
       label:   isAR ? 'مخزون منخفض' : 'Low Stock',
       value:   (stats.lowStock || 0).toLocaleString(),
       icon:    'warning',
@@ -56,6 +73,7 @@ export default function Dashboard() {
       iconBg:  'bg-amber-50 dark:bg-amber-500/10',
       iconCls: 'text-amber-500',
       alert:   (stats.lowStock || 0) > 0,
+      filter:  'low',
     },
     {
       label:   isAR ? 'نفذت الكمية' : 'Out of Stock',
@@ -65,8 +83,20 @@ export default function Dashboard() {
       iconBg:  'bg-red-50 dark:bg-red-500/10',
       iconCls: 'text-red-500',
       alert:   (stats.outOfStock || 0) > 0,
+      filter:  'out',
     },
   ];
+
+  if (user?.perms?.canTx) {
+    cards.splice(2, 0, {
+      label:   isAR ? 'حركات اليوم' : "Today's Moves",
+      value:   (stats.todayTx || 0).toLocaleString(),
+      icon:    'swap',
+      accent:  'border-violet-500',
+      iconBg:  'bg-violet-50 dark:bg-violet-500/10',
+      iconCls: 'text-violet-500',
+    });
+  }
 
   /* ── Stock health bar ─────────────────────────────────────────────────── */
   const total = stats.totalItems || 1;
@@ -94,29 +124,43 @@ export default function Dashboard() {
 
       {/* ── Stat cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {cards.map((c, i) => (
-          <div
-            key={i}
-            className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 flex flex-col gap-3 border-l-4 ${c.accent} hover:shadow-md transition-shadow`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-tight">
-                {c.label}
-              </span>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>
-                <Icon name={c.icon} size={16} className={c.iconCls} />
+        {cards.map((c, i) => {
+          const Tag = c.filter ? Link : 'div';
+          const linkProps = c.filter ? {
+            to: '/inventory',
+            onClick: () => sessionStorage.setItem('nexinv_inv_filter', c.filter),
+          } : {};
+          return (
+            <Tag
+              key={i}
+              {...linkProps}
+              className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 flex flex-col gap-3 border-l-4 ${c.accent} transition-all
+                ${c.filter ? 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer group' : 'hover:shadow-md'}`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-tight">
+                  {c.label}
+                </span>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg} ${c.filter ? 'group-hover:scale-110 transition-transform' : ''}`}>
+                  <Icon name={c.icon} size={16} className={c.iconCls} />
+                </div>
               </div>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-2xl font-black tracking-tight ${c.alert ? c.iconCls : 'text-slate-800 dark:text-white'}`}>
-                {c.value}
-              </span>
-              {c.sub && (
-                <span className="text-xs font-semibold text-slate-400">{c.sub}</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-2xl font-black tracking-tight ${c.alert ? c.iconCls : 'text-slate-800 dark:text-white'}`}>
+                  {c.value}
+                </span>
+                {c.sub && (
+                  <span className="text-xs font-semibold text-slate-400">{c.sub}</span>
+                )}
+              </div>
+              {c.filter && (
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 group-hover:text-blue-500 transition-colors flex items-center gap-1">
+                  {isAR ? 'عرض الأصناف ←' : 'View items →'}
+                </span>
               )}
-            </div>
-          </div>
-        ))}
+            </Tag>
+          );
+        })}
       </div>
 
       {/* ── Stock health strip ───────────────────────────────────────────── */}
@@ -139,17 +183,18 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom grid: Recent Transactions + AI panel ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <LazyScroll className={`grid grid-cols-1 ${user?.perms?.canTx ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6`} minHeight="400px">
 
         {/* Recent Transactions */}
+        {user?.perms?.canTx && (
         <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
               {isAR ? 'آخر الحركات' : 'Recent Transactions'}
             </h2>
-            <a href="#tx" className="text-xs font-semibold text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            <Link to="/transactions" className="text-xs font-semibold text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               {isAR ? 'عرض الكل' : 'View all'} →
-            </a>
+            </Link>
           </div>
 
           {stats.recentTx?.length > 0 ? (
@@ -186,6 +231,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
 
         {/* Side panel */}
         <div className="flex flex-col gap-4">
@@ -197,51 +243,70 @@ export default function Dashboard() {
             </h2>
             <div className="space-y-1">
               {[
-                { icon: 'inventory',     label: isAR ? 'المخزون'    : 'Inventory',    href: '#inv'      },
-                { icon: 'transactions',  label: isAR ? 'الحركات'    : 'Transactions', href: '#tx'       },
-                { icon: 'users',         label: isAR ? 'المستخدمون' : 'Users',        href: '#users'    },
-                { icon: 'settings',      label: isAR ? 'الإعدادات'  : 'Settings',     href: '#settings' },
-              ].map(item => (
-                <a
-                  key={item.href}
-                  href={item.href}
+                { icon: 'inventory',     label: isAR ? 'المخزون'    : 'Inventory',    to: '/inventory', show: true },
+                { icon: 'transactions',  label: isAR ? 'الحركات'    : 'Transactions', to: '/transactions', show: user?.perms?.canTx },
+                { icon: 'users',         label: isAR ? 'المستخدمون' : 'Users',        to: '/users', show: user?.role === 'owner' || user?.perms?.canManageUsers },
+                { icon: 'settings',      label: isAR ? 'الإعدادات'  : 'Settings',     to: '/settings', show: true },
+              ].filter(i => i.show).map(item => (
+                <Link
+                  key={item.to}
+                  to={item.to}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white transition-colors group"
                 >
                   <Icon name={item.icon} size={17} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                   {item.label}
-                </a>
+                </Link>
               ))}
             </div>
           </div>
 
-          {/* AI placeholder */}
+          {/* AI panel */}
           <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl border border-slate-700 p-5 text-white flex-1">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/30">
                 <Icon name="ai" size={14} className="text-white" />
               </div>
-              <h2 className="text-sm font-bold">
+              <h2 className="text-sm font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
                 {isAR ? 'مساعد الذكاء الاصطناعي' : 'AI Assistant'}
               </h2>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              {isAR
-                ? 'اسأل عن مخزونك، الحركات، أو احصل على توصيات.'
-                : 'Ask about your inventory, transactions, or get smart recommendations.'}
-            </p>
-            <div className="bg-slate-800 rounded-xl p-3 text-xs text-slate-300 mb-3 border border-slate-700 leading-relaxed">
-              {isAR
-                ? "لديك ٣ أصناف نفذت كميتها. أوصي بإعادة الطلب قريباً."
-                : "You have 3 out-of-stock items. Consider reordering soon."}
+            {/* Live insight based on real stats */}
+            <div className="space-y-2 mb-4">
+              {(stats.outOfStock || 0) > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-300 flex items-start gap-2">
+                  <Icon name="error" size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  {isAR ? `${stats.outOfStock} صنف نفدت كميته` : `${stats.outOfStock} item${stats.outOfStock > 1 ? 's' : ''} out of stock`}
+                </div>
+              )}
+              {(stats.lowStock || 0) > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 text-xs text-amber-300 flex items-start gap-2">
+                  <Icon name="warning" size={13} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  {isAR ? `${stats.lowStock} صنف منخفض المخزون` : `${stats.lowStock} item${stats.lowStock > 1 ? 's' : ''} running low`}
+                </div>
+              )}
+              {(stats.outOfStock || 0) === 0 && (stats.lowStock || 0) === 0 && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-xs text-emerald-300 flex items-start gap-2">
+                  <Icon name="check" size={13} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                  {isAR ? 'المخزون في وضع ممتاز' : 'All stock levels are healthy'}
+                </div>
+              )}
+              <p className="text-[11px] text-slate-500 leading-relaxed px-1">
+                {isAR
+                  ? 'اسأل عن مخزونك، الحركات، أو احصل على توصيات ذكية.'
+                  : 'Ask about inventory, transactions, or get smart recommendations.'}
+              </p>
             </div>
-            <button className="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold transition-colors border border-blue-500 flex items-center justify-center gap-2">
+            <button
+              onClick={() => window.dispatchEvent(new Event('open-ai-chat'))}
+              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-xs font-bold transition-all border border-blue-500/50 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+            >
               <Icon name="chat" size={14} className="text-white" />
-              {isAR ? 'ابدأ محادثة' : 'Start Chat'}
+              {isAR ? 'ابدأ محادثة AI' : 'Chat with AI →'}
             </button>
           </div>
 
         </div>
-      </div>
+      </LazyScroll>
     </div>
   );
 }

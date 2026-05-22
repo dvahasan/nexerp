@@ -7,7 +7,7 @@ const defaultForm = {
   notes: '', date: new Date().toISOString().slice(0, 16),
 };
 
-export default function TxModal({ open, onClose, editTx = null }) {
+export default function TxModal({ open, onClose, editTx = null, onSaved }) {
   const { items, saveTx, t, isAR } = useAppContext();
   const [form,   setForm]   = useState(defaultForm);
   const [query,  setQuery]  = useState('');
@@ -65,6 +65,7 @@ export default function TxModal({ open, onClose, editTx = null }) {
         date: form.date ? new Date(form.date) : new Date(),
       }, editTx?._id);
       onClose();
+      onSaved?.();
     } catch {
       // error shown by context toast
     } finally {
@@ -105,7 +106,7 @@ export default function TxModal({ open, onClose, editTx = null }) {
                     className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors"
                   >
                     {item.photo ? (
-                      <img src={item.photo} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                      <img src={item.photo} alt="" loading="lazy" className="w-8 h-8 rounded-lg object-cover shrink-0" />
                     ) : (
                       <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 shrink-0" />
                     )}

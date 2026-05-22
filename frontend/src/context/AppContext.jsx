@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { api } from '../api';
 
 const AppContext = createContext();
@@ -96,7 +97,6 @@ export const AppProvider = ({ children }) => {
   const [depts, setDepts] = useState([]);
   const [cats,  setCats]  = useState([]);
   const [users, setUsers] = useState([]);
-  const [txs,   setTxs]   = useState([]);
   const [stats, setStats] = useState(null);
 
   // ── Toast system ──────────────────────────────────────────────────────────
@@ -119,11 +119,56 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('nexinv_lang', lang);
   }, [lang]);
 
+
+
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
     localStorage.setItem('nexinv_theme', theme);
   }, [theme]);
+
+  // ── Dynamic Theme Override ────────────────────────────────────────────────
+  useEffect(() => {
+    if (company?.primaryColor) {
+      let style = document.getElementById('dynamic-theme');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'dynamic-theme';
+        document.head.appendChild(style);
+      }
+      const c = company.primaryColor;
+      
+      // Calculate contrast text color based on primary brightness
+      const getBrightness = (hex) => {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(char => char + char).join('');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      };
+      const isLight = getBrightness(c) > 128;
+      const textC = isLight ? '#0f172a' : '#ffffff'; // slate-900 or white
+
+      // Overriding standard Tailwind blue utilities used across the app
+      style.innerHTML = `
+        :root { 
+          --primary: ${c}; 
+          --primary-text: ${textC};
+        }
+        .bg-blue-500, .bg-blue-600 { background-color: var(--primary) !important; color: var(--primary-text) !important; }
+        .bg-blue-500 .text-white, .bg-blue-600 .text-white, .from-blue-500 .text-white, .from-blue-600 .text-white { color: var(--primary-text) !important; }
+        .bg-blue-500 .text-blue-200, .bg-blue-600 .text-blue-200, .from-blue-500 .text-blue-200, .from-blue-600 .text-blue-200 { color: var(--primary-text) !important; opacity: 0.8; }
+        .text-blue-500, .text-blue-600 { color: var(--primary) !important; }
+        .border-blue-500, .border-blue-600 { border-color: var(--primary) !important; }
+        .ring-blue-500, .ring-blue-600 { --tw-ring-color: var(--primary) !important; }
+        .from-blue-500, .from-blue-600 { --tw-gradient-from: var(--primary) var(--tw-gradient-from-position) !important; }
+        .to-indigo-500, .to-indigo-600 { --tw-gradient-to: var(--primary) var(--tw-gradient-to-position) !important; }
+        .hover\\:bg-blue-500:hover, .hover\\:bg-blue-600:hover { background-color: var(--primary) !important; color: var(--primary-text) !important; filter: brightness(0.9); }
+        .hover\\:text-blue-500:hover, .hover\\:text-blue-600:hover { color: var(--primary) !important; filter: brightness(0.9); }
+      `;
+    }
+  }, [company?.primaryColor]);
 
   // ── Auth ─────────────────────────────────────────────────────────────────
   const checkAuth = async () => {
@@ -156,14 +201,14 @@ export const AppProvider = ({ children }) => {
     setAuthed(true);
     if (data.user.preferredLanguage) setLang(data.user.preferredLanguage);
     if (data.company?.theme) setTheme(data.company.theme);
-    window.location.hash = '#dash';
+    // Navigation handled by the calling component (Login.jsx)
   };
 
   // Called after registration — token already issued, just load the session
   const loginWithToken = async (token) => {
     localStorage.setItem('nexinv_token', token);
     await checkAuth();
-    window.location.hash = '#dash';
+    // Navigation handled by the calling component (Register.jsx)
   };
 
   const logout = () => {
@@ -171,36 +216,97 @@ export const AppProvider = ({ children }) => {
     setAuthed(false);
     setUser(null);
     setCompany(null);
-    setItems([]); setDepts([]); setCats([]); setUsers([]); setTxs([]); setStats(null);
-    window.location.hash = '#landing';
+    setItems([]); setDepts([]); setCats([]); setUsers([]); setStats(null);
+    // Navigation handled by Layout.jsx logout button
   };
 
+  const [lastSync, setLastSync] = useState(null);
+  const [syncing,  setSyncing]  = useState(false);
+
   // ── Load all data ─────────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     if (!authed) return;
+    if (!silent) return;
+    setSyncing(true);
     try {
-      const [i, d, c, u, tData, s] = await Promise.all([
+      const [iData, d, c, u, s] = await Promise.all([
         api.getItems(),
         api.getDepts(),
         api.getCats(),
-        user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve([]),
-        api.getTxs(),
+        user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
         api.getStats(),
       ]);
-      setItems(i); setDepts(d); setCats(c);
-      setUsers(u); setTxs(tData); setStats(s);
+      setItems(Array.isArray(iData) ? iData : (iData.items || []));
+      setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setLastSync(new Date());
     } catch (e) {
-      console.error('Failed to load data', e);
+      console.error('Live sync failed', e);
+    } finally {
+      setSyncing(false);
     }
   }, [authed, user?.perms?.canManageUsers]);
 
-  useEffect(() => { loadData(); }, [authed]);
+  // Full reload (used after CRUD operations — always fetches everything)
+  const reloadData = useCallback(async () => {
+    if (!authed) return;
+    try {
+      const [iData, d, c, u, s] = await Promise.all([
+        api.getItems(),
+        api.getDepts(),
+        api.getCats(),
+        user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
+        api.getStats(),
+      ]);
+      // getItems returns plain array (all=1 flag)
+      setItems(Array.isArray(iData) ? iData : (iData.items || []));
+      setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setLastSync(new Date());
+    } catch (e) {
+      console.error('Failed to reload data', e);
+    }
+  }, [authed, user?.perms?.canManageUsers]);
+
+  useEffect(() => { if (authed) reloadData();  }, [authed]);
+
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    if (authed) {
+      const token = localStorage.getItem('nexinv_token');
+      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      socketRef.current = io(url, { auth: { token } });
+      
+      const reload = () => loadData(true);
+      
+      const events = [
+        'dept_added', 'dept_updated', 'dept_deleted',
+        'cat_added', 'cat_deleted',
+        'item_added', 'item_updated', 'item_deleted',
+        'tx_added', 'tx_updated', 'tx_deleted',
+        'user_added', 'user_updated', 'user_deleted'
+      ];
+      
+      events.forEach(e => socketRef.current.on(e, reload));
+
+      return () => {
+        socketRef.current.disconnect();
+      };
+    }
+  }, [authed, loadData]);
+
+  // ── Live polling — refresh every 30 s silently ────────────────────────────
+  useEffect(() => {
+    if (!authed) return;
+    const id = setInterval(() => loadData(true), 30_000);
+    return () => clearInterval(id);
+  }, [authed, loadData]);
 
   // ── CRUD — Items ──────────────────────────────────────────────────────────
   const saveItem = async (data, id = null) => {
     try {
       const result = id ? await api.updateItem(id, data) : await api.addItem(data);
-      await loadData();
+      await reloadData();
       showToast(id ? (lang === 'ar' ? 'تم تعديل الصنف' : 'Item updated') : (lang === 'ar' ? 'تمت إضافة الصنف' : 'Item added'));
       return result;
     } catch (e) {
@@ -224,7 +330,10 @@ export const AppProvider = ({ children }) => {
   const saveTx = async (data, id = null) => {
     try {
       const result = id ? await api.updateTx(id, data) : await api.addTx(data);
-      await loadData();
+      // Reload items/stats so stock levels update; transactions are managed by the page itself
+      const [iData, s] = await Promise.all([api.getItems(), api.getStats()]);
+      setItems(Array.isArray(iData) ? iData : (iData.items || []));
+      setStats(s);
       showToast(id ? (lang === 'ar' ? 'تم تعديل الحركة' : 'Transaction updated') : (lang === 'ar' ? 'تم تسجيل الحركة' : 'Transaction recorded'));
       return result;
     } catch (e) {
@@ -236,7 +345,9 @@ export const AppProvider = ({ children }) => {
   const removeTx = async (id) => {
     try {
       await api.deleteTx(id);
-      await loadData();
+      const [iData, s] = await Promise.all([api.getItems(), api.getStats()]);
+      setItems(Array.isArray(iData) ? iData : (iData.items || []));
+      setStats(s);
       showToast(lang === 'ar' ? 'تم حذف الحركة' : 'Transaction deleted');
     } catch (e) {
       showToast(e.message || 'Error', 'error');
@@ -245,12 +356,14 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── CRUD — Users ──────────────────────────────────────────────────────────
-  const saveUser = async (data, id = null) => {
+  const saveUser = async (data, id = null, { silent = false } = {}) => {
     try {
       const result = id ? await api.updateUser(id, data) : await api.addUser(data);
       const fresh = await api.getUsers();
       setUsers(fresh);
-      showToast(id ? (lang === 'ar' ? 'تم تعديل المستخدم' : 'User updated') : (lang === 'ar' ? 'تمت إضافة المستخدم' : 'User added'));
+      if (!silent) {
+        showToast(id ? (lang === 'ar' ? 'تم تعديل المستخدم' : 'User updated') : (lang === 'ar' ? 'تمت إضافة المستخدم' : 'User added'));
+      }
       return result;
     } catch (e) {
       showToast(e.message || 'Error', 'error');
@@ -307,8 +420,9 @@ export const AppProvider = ({ children }) => {
   const value = {
     user, company, authed, loading,
     lang, setLang, theme, setTheme,
-    items, depts, cats, users, txs, stats,
-    login, loginWithToken, logout, loadData,
+    items, depts, cats, users, stats,
+    lastSync, syncing,
+    login, loginWithToken, logout, loadData: reloadData,
     toasts, showToast, removeToast,
     saveItem, removeItem,
     saveTx, removeTx,

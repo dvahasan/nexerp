@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { api } from '../api';
 import { useAppContext } from '../context/AppContext';
 import { MdBusiness, MdPerson, MdEmail, MdLock, MdArrowForward } from 'react-icons/md';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Register() {
   const { loginWithToken } = useAppContext();
+  const navigate = useNavigate();
 
-  const [form, setForm] = useState({ companyName: '', adminUsername: '', adminEmail: '', password: '' });
+  const [form, setForm] = useState({ companyName: '', adminUsername: '', adminEmail: '', password: '', isEnterprise: false });
   const [loading, setLoading] = useState(false);
   const [entering, setEntering] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +20,7 @@ export default function Register() {
     setLoading(true);
     try {
       const res = await api.register(form);
-      setSuccessData({ token: res.token, code: res.companyCode });
+      setSuccessData({ token: res.token, code: res.companyCode, isEnterprise: res.isEnterprise });
     } catch (err) {
       setError(err.message || "Failed to register");
     } finally {
@@ -31,6 +33,7 @@ export default function Register() {
     setEntering(true);
     try {
       await loginWithToken(successData.token);
+      navigate('/dashboard', { replace: true });
     } catch {
       setError("Failed to enter workspace. Please log in manually.");
     } finally {
@@ -46,15 +49,18 @@ export default function Register() {
             🎉
           </div>
           <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Welcome to NexINV!</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-8">
-            Your company workspace has been created.
-          </p>
-          
-          <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl mb-8 border border-slate-100 dark:border-slate-700">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 uppercase font-bold tracking-wider">Your Company Code</p>
-            <p className="text-3xl font-mono font-black text-blue-600 dark:text-blue-400 tracking-widest">{successData.code}</p>
-            <p className="text-xs text-slate-500 mt-4">Save this code! Your employees will need it to log in.</p>
-          </div>
+          {successData.isEnterprise ? (
+            <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">
+              Your Enterprise account is ready.
+            </p>
+          ) : (
+            <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">
+              Your company code is: <br />
+              <span className="text-2xl font-black text-slate-800 dark:text-white tracking-widest mt-2 inline-block bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                {successData.code}
+              </span>
+            </p>
+          )}
 
           <button
             onClick={handleEnterWorkspace}
@@ -76,7 +82,7 @@ export default function Register() {
       {/* Left Banner */}
       <div className="hidden md:flex flex-1 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 text-white flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
-          <a href="#landing" className="flex items-center gap-3 w-max">
+          <a href="/" className="flex items-center gap-3 w-max">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30 shadow-xl">
               <span className="text-white font-black text-2xl">N</span>
             </div>
@@ -101,7 +107,7 @@ export default function Register() {
 
       {/* Right Form */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative">
-        <a href="#landing" className="md:hidden absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">NexINV</a>
+        <a href="/" className="md:hidden absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">NexINV</a>
         
         <div className="w-full max-w-md animate-in slide-in-from-right-8 fade-in duration-700">
           <div className="mb-10">
@@ -116,6 +122,20 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-500/10 p-3 rounded-xl border border-blue-100 dark:border-blue-500/20">
+              <input 
+                type="checkbox" 
+                id="isEnterprise"
+                checked={form.isEnterprise}
+                onChange={e => setForm({...form, isEnterprise: e.target.checked, companyName: ''})}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="isEnterprise" className="text-sm font-bold text-blue-900 dark:text-blue-300 cursor-pointer">
+                Register as an Enterprise (Manage multiple companies)
+              </label>
+            </div>
+
+            {!form.isEnterprise && (
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Company Name</label>
               <div className="relative">
@@ -128,6 +148,7 @@ export default function Register() {
                 />
               </div>
             </div>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Admin Username</label>
@@ -183,7 +204,7 @@ export default function Register() {
 
           <div className="mt-8 text-center">
             <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
-              Already have a workspace? <a href="#login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Log in here</a>
+              Already have a workspace? <a href="/login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Log in here</a>
             </p>
           </div>
         </div>
