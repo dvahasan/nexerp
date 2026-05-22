@@ -1,7 +1,7 @@
 // src/api.js  — all API calls to the backend
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-function token() { return localStorage.getItem("nexerp_token"); }
+function token() { return localStorage.getItem("nexinv_token"); }
 
 async function req(method, path, body, isForm = false) {
   const headers = {};
@@ -21,8 +21,10 @@ async function req(method, path, body, isForm = false) {
 
 export const api = {
   // Auth
-  login:  (username, password) => req("POST", "/auth/login", { username, password }),
+  login:  (code, username, password) => req("POST", "/auth/login", { code, username, password }),
+  register: (data) => req("POST", "/auth/register", data),
   me:     ()                    => req("GET",  "/auth/me"),
+  updateProfile: (data)         => req("PUT", "/auth/profile", data),
 
   // Departments
   getDepts:   ()      => req("GET",    "/departments"),
@@ -43,17 +45,35 @@ export const api = {
   updateItem:     (id, d)       => req("PUT",    `/items/${id}`, d),
   deleteItem:     (id)          => req("DELETE", `/items/${id}`),
   uploadPhoto:    (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
+  addItemPhoto:   (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
+  deleteItemPhoto:(id, publicId)=> req("DELETE", `/items/${id}/photos/${encodeURIComponent(publicId)}`),
 
   // Transactions
-  getTxs:  (params = {}) => req("GET",  "/transactions?" + new URLSearchParams(params)),
-  addTx:   (d)           => req("POST", "/transactions", d),
+  getTxs:   (params = {}) => req("GET",    "/transactions?" + new URLSearchParams(params)),
+  addTx:    (d)           => req("POST",   "/transactions", d),
+  updateTx: (id, d)       => req("PUT",    `/transactions/${id}`, d),
+  deleteTx: (id)          => req("DELETE", `/transactions/${id}`),
 
   // Users
   getUsers:   ()      => req("GET",    "/users"),
+  getUser:    (id)    => req("GET",    `/users/${id}`),
   addUser:    (d)     => req("POST",   "/users", d),
   updateUser: (id, d) => req("PUT",    `/users/${id}`, d),
   deleteUser: (id)    => req("DELETE", `/users/${id}`),
 
   // Stats
   getStats: () => req("GET", "/stats"),
+
+  // Settings & Company
+  getSettings:    ()  => req("GET", "/settings"),
+  updateSettings: (d) => req("PUT", "/settings", d),
+  updateCompany:  (d) => req("PUT", "/company", d),
+  uploadCompanyLogo:(file)=> { const fd = new FormData(); fd.append("logo", file); return req("POST", `/company/logo`, fd, true); },
+
+  // Enterprise
+  getEnterpriseCompanies: () => req("GET", "/enterprise/companies"),
+  assumeEnterpriseCompany: (id) => req("POST", `/enterprise/assume/${id}`),
+
+  // Admin
+  getCloudinaryUsage: () => req("GET", "/admin/cloudinary"),
 };

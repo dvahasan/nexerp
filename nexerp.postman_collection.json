@@ -1,0 +1,547 @@
+{
+  "info": {
+    "name": "NexERP API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000/api" },
+    { "key": "token",    "value": "" },
+    { "key": "deptId",   "value": "" },
+    { "key": "catId",    "value": "" },
+    { "key": "itemId",   "value": "" },
+    { "key": "userId",   "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Login → saves token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "pm.test('Login OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Token received', () => pm.expect(res.token).to.be.a('string'));",
+                  "if (res.token) pm.collectionVariables.set('token', res.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin\"\n}" },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Me (current user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Me OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Username is admin', () => pm.expect(res.user.username).to.eql('admin'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Departments",
+      "item": [
+        {
+          "name": "Get All Departments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get departments OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Returns array', () => pm.expect(res).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/departments"
+          }
+        },
+        {
+          "name": "Create Department → saves deptId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create department OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Has _id', () => pm.expect(res._id).to.be.a('string'));",
+                  "if (res._id) pm.collectionVariables.set('deptId', res._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"قسم اختبار\",\n  \"nameEn\": \"Test Department\",\n  \"color\": \"#4f46e5\"\n}" },
+            "url": "{{base_url}}/departments"
+          }
+        },
+        {
+          "name": "Update Department",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update department OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Name updated', () => pm.expect(res.nameEn).to.eql('Test Department Updated'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"قسم اختبار محدث\",\n  \"nameEn\": \"Test Department Updated\",\n  \"color\": \"#10b981\"\n}" },
+            "url": "{{base_url}}/departments/{{deptId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get categories OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Returns array', () => pm.expect(res).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/categories"
+          }
+        },
+        {
+          "name": "Create Category → saves catId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create category OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Has _id', () => pm.expect(res._id).to.be.a('string'));",
+                  "if (res._id) pm.collectionVariables.set('catId', res._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"تصنيف اختبار\",\n  \"nameEn\": \"Test Category\",\n  \"deptId\": \"{{deptId}}\"\n}" },
+            "url": "{{base_url}}/categories"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Items",
+      "item": [
+        {
+          "name": "Get All Items",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get items OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Returns array', () => pm.expect(res).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/items"
+          }
+        },
+        {
+          "name": "Create Item → saves itemId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create item OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Has _id', () => pm.expect(res._id).to.be.a('string'));",
+                  "if (res._id) pm.collectionVariables.set('itemId', res._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"صنف اختبار\",\n  \"nameEn\": \"Test Item\",\n  \"sku\": \"TEST-001\",\n  \"barcode\": \"0000000000001\",\n  \"price\": 50,\n  \"qty\": 100,\n  \"minThreshold\": 10,\n  \"type\": \"unit\",\n  \"status\": \"active\",\n  \"deptId\": \"{{deptId}}\",\n  \"catId\": \"{{catId}}\",\n  \"description\": \"صنف للاختبار\"\n}" },
+            "url": "{{base_url}}/items"
+          }
+        },
+        {
+          "name": "Get Item by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get item OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Correct item', () => pm.expect(res._id).to.eql(pm.collectionVariables.get('itemId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/items/{{itemId}}"
+          }
+        },
+        {
+          "name": "Get Item by Barcode",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get by barcode OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/items/barcode/0000000000001"
+          }
+        },
+        {
+          "name": "Update Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update item OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Name updated', () => pm.expect(res.nameEn).to.eql('Test Item Updated'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"صنف اختبار محدث\",\n  \"nameEn\": \"Test Item Updated\",\n  \"price\": 75,\n  \"qty\": 120,\n  \"minThreshold\": 15,\n  \"type\": \"unit\",\n  \"status\": \"active\",\n  \"deptId\": \"{{deptId}}\",\n  \"catId\": \"{{catId}}\"\n}" },
+            "url": "{{base_url}}/items/{{itemId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Transactions",
+      "item": [
+        {
+          "name": "Get All Transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get transactions OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/transactions"
+          }
+        },
+        {
+          "name": "Stock IN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Stock IN OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Qty updated', () => pm.expect(res.updatedQty).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"IN\",\n  \"itemId\": \"{{itemId}}\",\n  \"qty\": 20,\n  \"source\": \"مورد اختبار\",\n  \"notes\": \"وارد اختبار\"\n}" },
+            "url": "{{base_url}}/transactions"
+          }
+        },
+        {
+          "name": "Stock OUT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Stock OUT OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Qty updated', () => pm.expect(res.updatedQty).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"OUT\",\n  \"itemId\": \"{{itemId}}\",\n  \"qty\": 5,\n  \"dest\": \"عميل اختبار\",\n  \"notes\": \"صادر اختبار\"\n}" },
+            "url": "{{base_url}}/transactions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get users OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/users"
+          }
+        },
+        {
+          "name": "Create User → saves userId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create user OK', () => pm.response.to.have.status(201));",
+                  "var res = pm.response.json();",
+                  "pm.test('Has id', () => pm.expect(res.id).to.be.a('string'));",
+                  "if (res.id) pm.collectionVariables.set('userId', res.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"مستخدم اختبار\",\n  \"nameEn\": \"Test User\",\n  \"username\": \"testuser_postman\",\n  \"password\": \"test123\",\n  \"role\": \"viewer\"\n}" },
+            "url": "{{base_url}}/users"
+          }
+        },
+        {
+          "name": "Update User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update user OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Role updated', () => pm.expect(res.role).to.eql('warehouse'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"مستخدم اختبار محدث\",\n  \"role\": \"warehouse\"\n}" },
+            "url": "{{base_url}}/users/{{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Stats",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Stats OK', () => pm.response.to.have.status(200));",
+                  "var res = pm.response.json();",
+                  "pm.test('Has totalItems', () => pm.expect(res.totalItems).to.be.a('number'));",
+                  "pm.test('Has lowStock', () => pm.expect(res.lowStock).to.be.a('number'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Cleanup (DELETE)",
+      "item": [
+        {
+          "name": "Delete User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete user OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Delete Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete item OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/items/{{itemId}}"
+          }
+        },
+        {
+          "name": "Delete Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete category OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/categories/{{catId}}"
+          }
+        },
+        {
+          "name": "Delete Department",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete department OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/departments/{{deptId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

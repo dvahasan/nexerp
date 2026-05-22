@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+/* ── Class-based dark mode (v4 requires explicit declaration) ─────────────
+   The app toggles dark mode via document.documentElement.classList.add('dark')
+   so we must tell Tailwind v4 to use the .dark selector strategy.           */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Base additions (Tailwind preflight already resets margin/padding/box-sizing) */
+@layer base {
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f8fafc; /* slate-50 */
+    color: #1e293b;            /* slate-800 */
+  }
+}
