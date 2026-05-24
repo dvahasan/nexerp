@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/Modal';
 import RichTextEditor from '../components/RichTextEditor';
 import BarcodeScanner from '../components/BarcodeScanner';
+import Icon from '../components/Icon';
 import { useAppContext } from '../context/AppContext';
 import { T } from '../theme';
 import { api } from '../api';
