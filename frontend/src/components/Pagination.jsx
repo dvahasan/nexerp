@@ -1,4 +1,11 @@
+import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
+
 export default function Pagination({ page, pages, total, limit, onChange, isAR }) {
+  const { theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
+
   if (!pages || pages <= 1) return null;
 
   const from = Math.min((page - 1) * limit + 1, total);
@@ -14,36 +21,67 @@ export default function Pagination({ page, pages, total, limit, onChange, isAR }
     }
   }
 
+  const btnBase = {
+    minWidth: 30, height: 28, padding: '0 6px', borderRadius: 4,
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+    transition: 'background 120ms', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  };
+
   return (
-    <div className="flex items-center justify-between pt-3 mt-1 border-t border-slate-100 dark:border-slate-700">
-      <span className="text-xs text-slate-400 dark:text-slate-500">
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      paddingTop: 12, marginTop: 4, borderTop: `1px solid ${t.border}`,
+    }}>
+      <span style={{
+        fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle,
+      }}>
         {isAR ? `${from}–${to} من ${total}` : `${from}–${to} of ${total}`}
       </span>
-      <div className="flex items-center gap-0.5">
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        {/* Prev */}
         <button
           onClick={() => onChange(page - 1)}
           disabled={page === 1}
-          className="min-w-[32px] h-8 px-2 rounded-lg text-sm font-bold transition-colors disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-default text-slate-500 dark:text-slate-400 hover:enabled:bg-slate-100 dark:hover:enabled:bg-slate-700"
+          style={{
+            ...btnBase,
+            backgroundColor: 'transparent',
+            color: page === 1 ? t.border : t.fgMuted,
+            cursor: page === 1 ? 'not-allowed' : 'pointer',
+          }}
+          onMouseEnter={e => { if (page !== 1) e.currentTarget.style.backgroundColor = t.sunken; }}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
         >←</button>
 
         {nums.map((n, i) =>
           n === '…'
-            ? <span key={`e${i}`} className="px-1 text-slate-400 text-sm select-none">…</span>
+            ? <span key={`e${i}`} style={{ padding: '0 4px', color: t.fgSubtle, fontSize: 12, userSelect: 'none' }}>…</span>
             : <button
                 key={n}
                 onClick={() => onChange(n)}
-                className={`min-w-[32px] h-8 px-2 rounded-lg text-sm font-semibold transition-colors
-                  ${n === page
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
+                style={{
+                  ...btnBase,
+                  backgroundColor: n === page ? primary : 'transparent',
+                  color: n === page ? '#fff' : t.fgMuted,
+                }}
+                onMouseEnter={e => { if (n !== page) e.currentTarget.style.backgroundColor = t.sunken; }}
+                onMouseLeave={e => { if (n !== page) e.currentTarget.style.backgroundColor = 'transparent'; }}
               >{n}</button>
         )}
 
+        {/* Next */}
         <button
           onClick={() => onChange(page + 1)}
           disabled={page === pages}
-          className="min-w-[32px] h-8 px-2 rounded-lg text-sm font-bold transition-colors disabled:text-slate-300 dark:disabled:text-slate-600 disabled:cursor-default text-slate-500 dark:text-slate-400 hover:enabled:bg-slate-100 dark:hover:enabled:bg-slate-700"
+          style={{
+            ...btnBase,
+            backgroundColor: 'transparent',
+            color: page === pages ? t.border : t.fgMuted,
+            cursor: page === pages ? 'not-allowed' : 'pointer',
+          }}
+          onMouseEnter={e => { if (page !== pages) e.currentTarget.style.backgroundColor = t.sunken; }}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
         >→</button>
       </div>
     </div>

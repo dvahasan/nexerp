@@ -1,47 +1,53 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../api';
 import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 import Icon from './Icon';
 
-// Render basic markdown: **bold**, bullet lines starting with •
-function MsgContent({ text }) {
+// ── Markdown renderer: **bold**, newlines ─────────────────────────────────
+function MsgContent({ text, color }) {
   const lines = text.split('\n');
   return (
-    <div className="space-y-0.5">
+    <div>
       {lines.map((line, i) => {
-        // Bold: **text**
         const parts = line.split(/\*\*(.*?)\*\*/g);
         const rendered = parts.map((p, j) =>
-          j % 2 === 1 ? <strong key={j} className="font-bold">{p}</strong> : p
+          j % 2 === 1
+            ? <strong key={j} style={{ fontWeight: 700, color }}>{p}</strong>
+            : p
         );
-        if (!line.trim()) return <div key={i} className="h-1" />;
-        return <p key={i} className="leading-relaxed">{rendered}</p>;
+        if (!line.trim()) return <div key={i} style={{ height: 4 }} />;
+        return <p key={i} style={{ margin: '2px 0', lineHeight: 1.6 }}>{rendered}</p>;
       })}
     </div>
   );
 }
 
 const SUGGESTIONS = [
-  { en: "What's low on stock?",          ar: "ما الأصناف المنخفضة؟"    },
-  { en: "What's my inventory value?",    ar: "ما قيمة المخزون؟"         },
-  { en: "Any transactions today?",       ar: "هل توجد حركات اليوم؟"    },
-  { en: "What's out of stock?",          ar: "ما الأصناف النافدة؟"      },
+  { en: "What's low on stock?",       ar: 'ما الأصناف المنخفضة؟'   },
+  { en: "What's my inventory value?", ar: 'ما قيمة المخزون؟'        },
+  { en: "Any transactions today?",    ar: 'هل توجد حركات اليوم؟'   },
+  { en: "What's out of stock?",       ar: 'ما الأصناف النافدة؟'     },
 ];
 
 export default function AiChat({ open, onClose }) {
-  const { isAR, company, theme } = useAppContext();
-  const [messages, setMessages] = useState([]);   // { role: 'user'|'bot', text }
+  const { isAR, company, theme, company: comp } = useAppContext();
+  const primary = comp?.primaryColor || '#3b82f6';
+
+  // AI panel is always dark (inverted from app theme) for contrast
+  const p = T.dark;
+
+  const [messages, setMessages] = useState([]);
   const [input,    setInput]    = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [focused,  setFocused]  = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  // Focus input when opened
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
   }, [open]);
@@ -78,87 +84,150 @@ export default function AiChat({ open, onClose }) {
 
   return (
     <>
-      {/* Backdrop — closes panel when clicking outside on any screen size */}
-      <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
+      {/* Transparent backdrop */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={onClose} />
 
-      {/* Panel — anchored to bottom-right, grows upward */}
-      <div
-        className={`fixed z-50 flex flex-col border shadow-2xl overflow-hidden
-          ${theme === 'light' ? 'bg-slate-900 border-slate-700 shadow-black/40 text-slate-200' : 'bg-white border-slate-200 shadow-black/20 text-slate-700'}
-        `}
-        style={{
-          bottom: '96px',       /* sit above the floating button (56px button + 16px gap + 24px margin) */
-          ...(isAR ? { left: '24px' } : { right: '24px' }),
-          width: 'min(400px, calc(100vw - 32px))',
-          maxHeight: 'min(560px, calc(100dvh - 120px))',
-          borderRadius: '20px',
-        }}
-      >
-        {/* Header */}
-        <div 
-          className={`flex items-center gap-3 px-4 py-3.5 border-b flex-shrink-0 
-            ${theme === 'light' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
-          `}
-        >
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
-            ${theme === 'light' ? 'bg-slate-800 text-slate-300' : 'bg-white shadow-sm border border-slate-200 text-slate-700'}`}>
+      {/* Panel */}
+      <div style={{
+        position: 'fixed', zIndex: 50,
+        bottom: 32,
+        ...(isAR ? { left: 24 } : { right: 24 }),
+        width: 'min(400px, calc(100vw - 32px))',
+        maxHeight: 'min(560px, calc(100dvh - 80px))',
+        backgroundColor: p.canvas,
+        border: `1px solid ${p.border}`,
+        borderRadius: 8,
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+      }}>
+
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', flexShrink: 0,
+          backgroundColor: p.elev,
+          borderBottom: `1px solid ${p.border}`,
+        }}>
+          {/* AI icon */}
+          <div style={{
+            width: 32, height: 32, borderRadius: 4, flexShrink: 0,
+            backgroundColor: primary + '22',
+            border: `1px solid ${primary}44`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: primary,
+          }}>
             <Icon name="ai" size={16} />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold leading-tight">
+
+          {/* Title */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: p.fg, lineHeight: 1.2 }}>
               {isAR ? 'مساعد الذكاء الاصطناعي' : 'AI Assistant'}
             </div>
-            <div className={`text-[10px] truncate ${theme === 'light' ? 'text-slate-400' : 'text-slate-500'}`}>
-              {company?.name || 'NexINV'} · {isAR ? 'مدعوم بالذكاء الاصطناعي' : 'Powered by AI'}
+            <div style={{
+              fontSize: 10, color: p.fgSubtle,
+              fontFamily: 'ui-monospace, monospace',
+              letterSpacing: '0.04em', marginTop: 1,
+            }}>
+              {company?.name || 'NexINV'} · {isAR ? 'مدعوم بالذكاء الاصطناعي' : 'POWERED BY AI'}
             </div>
           </div>
+
+          {/* Clear */}
           {messages.length > 0 && (
             <button
               onClick={() => setMessages([])}
               title={isAR ? 'مسح المحادثة' : 'Clear chat'}
-              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/70 hover:text-white"
+              style={{
+                width: 28, height: 28, borderRadius: 4,
+                backgroundColor: 'transparent',
+                border: `1px solid ${p.border}`,
+                color: p.fgMuted, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 120ms',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = p.sunken; e.currentTarget.style.color = p.fg; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = p.fgMuted; }}
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           )}
-          <button onClick={onClose} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/70 hover:text-white flex-shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            style={{
+              width: 28, height: 28, borderRadius: 4,
+              backgroundColor: 'transparent',
+              border: `1px solid ${p.border}`,
+              color: p.fgMuted, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 120ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = p.sunken; e.currentTarget.style.color = p.fg; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = p.fgMuted; }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+        {/* ── Messages ── */}
+        <div style={{
+          flex: 1, overflowY: 'auto', minHeight: 0,
+          padding: '16px 14px',
+          display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
           {messages.length === 0 && (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Welcome */}
-              <div className="text-center py-4">
-                <div 
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg 
-                    ${theme === 'light' ? 'bg-slate-800 shadow-black/40 text-slate-300' : 'bg-slate-100 shadow-black/5 border border-slate-200 text-slate-700'}`}
-                >
-                  <Icon name="ai" size={26} />
+              <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 4,
+                  backgroundColor: primary + '18',
+                  border: `1px solid ${primary}33`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: primary, margin: '0 auto 12px',
+                  fontSize: 22,
+                }}>
+                  <Icon name="ai" size={24} />
                 </div>
-                <p className={`text-sm font-semibold ${theme === 'light' ? 'text-white' : 'text-slate-900'}`}>
-                  {isAR ? 'مرحباً! كيف يمكنني مساعدتك؟' : "Hi! How can I help?"}
+                <p style={{ fontSize: 14, fontWeight: 700, color: p.fg, margin: '0 0 4px' }}>
+                  {isAR ? 'مرحباً! كيف يمكنني مساعدتك؟' : 'Hi! How can I help?'}
                 </p>
-                <p className={`text-xs mt-1 ${theme === 'light' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p style={{ fontSize: 12, color: p.fgMuted, margin: 0 }}>
                   {isAR ? 'اسأل عن مخزونك أو حركاتك' : 'Ask about your inventory or transactions'}
                 </p>
               </div>
+
               {/* Suggestion chips */}
-              <div className="grid grid-cols-2 gap-2">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {SUGGESTIONS.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => send(isAR ? s.ar : s.en)}
-                    className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium border transition-all leading-snug
-                      ${theme === 'light' 
-                        ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-600' 
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300'}`}
+                    style={{
+                      padding: '8px 10px', borderRadius: 4,
+                      backgroundColor: p.elev,
+                      border: `1px solid ${p.border}`,
+                      color: p.fgMuted, fontSize: 11, fontWeight: 500,
+                      cursor: 'pointer', textAlign: 'start',
+                      lineHeight: 1.4, transition: 'all 120ms',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = p.sunken;
+                      e.currentTarget.style.color = p.fg;
+                      e.currentTarget.style.borderColor = primary;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = p.elev;
+                      e.currentTarget.style.color = p.fgMuted;
+                      e.currentTarget.style.borderColor = p.border;
+                    }}
                   >
                     {isAR ? s.ar : s.en}
                   </button>
@@ -168,40 +237,72 @@ export default function AiChat({ open, onClose }) {
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div
+              key={i}
+              style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+                flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
+              }}
+            >
               {/* Avatar */}
-              <div 
-                className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                  msg.role === 'user' 
-                    ? (theme === 'light' ? 'bg-slate-800 text-slate-300 text-[11px] font-black' : 'bg-slate-200 text-slate-700 text-[11px] font-black border border-slate-300') 
-                    : (theme === 'light' ? 'bg-slate-950 text-slate-300' : 'bg-slate-100 text-slate-700 border border-slate-200')
-                }`}
-              >
-                {msg.role === 'user' ? '😊' : <Icon name="ai" size={13} />}
+              <div style={{
+                width: 28, height: 28, borderRadius: 4, flexShrink: 0, marginTop: 2,
+                backgroundColor: msg.role === 'user' ? primary + '22' : p.elev,
+                border: `1px solid ${msg.role === 'user' ? primary + '44' : p.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: msg.role === 'user' ? 14 : 0,
+                color: msg.role === 'user' ? primary : p.fgMuted,
+              }}>
+                {msg.role === 'user'
+                  ? '😊'
+                  : <Icon name="ai" size={13} style={{ color: p.fgMuted }} />
+                }
               </div>
+
               {/* Bubble */}
-              <div 
-                className={`p-3 text-sm leading-relaxed shadow-sm ${
-                  msg.role === 'user'
-                    ? (theme === 'light' ? 'bg-slate-800 text-slate-200 rounded-2xl rounded-tr-sm' : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-2xl rounded-tr-sm')
-                    : (theme === 'light' ? 'bg-slate-950/50 text-slate-300 rounded-2xl rounded-tl-sm border border-slate-800' : 'bg-white text-slate-600 border border-slate-100 shadow-sm rounded-2xl rounded-tl-sm')
-                }`}
-              >
-                {msg.role === 'bot' ? <MsgContent text={msg.text} /> : msg.text}
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: 4,
+                backgroundColor: msg.role === 'user' ? primary + '18' : p.elev,
+                border: `1px solid ${msg.role === 'user' ? primary + '33' : p.border}`,
+                fontSize: 13, lineHeight: 1.6,
+                color: msg.role === 'user' ? p.fg : p.fgMuted,
+                maxWidth: '82%',
+              }}>
+                {msg.role === 'bot'
+                  ? <MsgContent text={msg.text} color={p.fg} />
+                  : msg.text
+                }
               </div>
             </div>
           ))}
 
-          {/* Loading indicator */}
+          {/* Loading dots */}
           {loading && (
-            <div className="flex gap-2.5">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600">
-                <Icon name="ai" size={13} className="text-white" />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 4, flexShrink: 0,
+                backgroundColor: p.elev, border: `1px solid ${p.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name="ai" size={13} style={{ color: p.fgMuted }} />
               </div>
-              <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 4,
+                backgroundColor: p.elev,
+                border: `1px solid ${p.border}`,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                {[0, 150, 300].map(delay => (
+                  <span key={delay} style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    backgroundColor: p.fgSubtle,
+                    display: 'inline-block',
+                    animation: 'bounce 1.2s ease-in-out infinite',
+                    animationDelay: `${delay}ms`,
+                  }} />
+                ))}
               </div>
             </div>
           )}
@@ -209,47 +310,71 @@ export default function AiChat({ open, onClose }) {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
-        <div 
-          className={`p-3 border-t flex-shrink-0
-            ${theme === 'light' ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}
-        >
-          <div 
-            className={`relative flex items-center rounded-xl px-2 shadow-sm border focus-within:ring-2 transition-all
-              ${theme === 'light' 
-                ? 'bg-slate-900 border-slate-700 focus-within:ring-slate-600 focus-within:border-slate-500' 
-                : 'bg-white border-slate-300 focus-within:ring-slate-200 focus-within:border-slate-400'}`}
-          >
+        {/* ── Input ── */}
+        <div style={{
+          padding: '10px 12px', flexShrink: 0,
+          backgroundColor: p.elev,
+          borderTop: `1px solid ${p.border}`,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            backgroundColor: p.canvas,
+            border: `1px solid ${focused ? primary : p.border}`,
+            boxShadow: focused ? `0 0 0 1px ${primary}` : 'none',
+            borderRadius: 4, padding: '0 8px',
+            transition: 'border-color 120ms, box-shadow 120ms',
+          }}>
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               placeholder={isAR ? 'اسأل مساعد الذكاء الاصطناعي...' : 'Ask AI Assistant...'}
-              className={`flex-1 bg-transparent py-3 px-2 outline-none text-sm
-                ${theme === 'light' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
               disabled={loading}
+              style={{
+                flex: 1, height: 38, background: 'transparent',
+                border: 'none', outline: 'none',
+                fontSize: 13, color: p.fg, fontFamily: 'inherit',
+              }}
             />
             <button
               onClick={() => send()}
               disabled={loading || !input.trim()}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
-                ${input.trim() && !loading
-                  ? (theme === 'light' ? 'bg-white text-slate-900 hover:bg-slate-200' : 'bg-slate-900 text-white hover:bg-slate-800')
-                  : (theme === 'light' ? 'text-slate-600' : 'text-slate-300')
-                }`}
+              style={{
+                width: 30, height: 30, borderRadius: 4, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: input.trim() && !loading ? primary : 'transparent',
+                border: `1px solid ${input.trim() && !loading ? primary : p.border}`,
+                color: input.trim() && !loading ? '#fff' : p.fgSubtle,
+                cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                transition: 'all 120ms',
+              }}
             >
-              <svg className="w-4 h-4 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-600 text-center mt-1.5">
-            {isAR ? 'اضغط Enter للإرسال' : 'Press Enter to send'}
+          <p style={{
+            textAlign: 'center', marginTop: 6,
+            fontSize: 10, color: p.fgSubtle,
+            fontFamily: 'ui-monospace, monospace',
+            letterSpacing: '0.04em',
+          }}>
+            {isAR ? 'اضغط Enter للإرسال' : 'ENTER TO SEND · SHIFT+ENTER FOR NEWLINE'}
           </p>
         </div>
       </div>
+
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-6px); }
+        }
+      `}</style>
     </>
   );
 }

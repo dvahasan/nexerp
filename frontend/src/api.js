@@ -1,9 +1,34 @@
-// src/api.js  — all API calls to the backend
+import { getMockDataForPath } from './demoData';
+
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function token() { return localStorage.getItem("nexinv_token"); }
 
+let isDemoMode = false;
+let demoTypeMode = null;
+
+export const setDemoMode = (type) => {
+  if (type) {
+    isDemoMode = true;
+    demoTypeMode = type;
+  } else {
+    isDemoMode = false;
+    demoTypeMode = null;
+  }
+};
+export const getDemoMode = () => isDemoMode;
+
 async function req(method, path, body, isForm = false) {
+  if (isDemoMode) {
+    if (["POST", "PUT", "DELETE"].includes(method)) {
+      if (path !== "/ai/chat" && !path.startsWith("/auth/")) {
+        throw new Error("Action disabled in Demo Mode");
+      }
+    } else if (method === "GET") {
+      return getMockDataForPath(path, demoTypeMode === "enterprise");
+    }
+  }
+
   const headers = {};
   const t = token();
   if (t) headers["Authorization"] = `Bearer ${t}`;
@@ -35,6 +60,7 @@ export const api = {
   // Categories
   getCats:   ()      => req("GET",    "/categories"),
   addCat:    (c)     => req("POST",   "/categories", c),
+  updateCat: (id, c) => req("PUT",    `/categories/${id}`, c),
   deleteCat: (id)    => req("DELETE", `/categories/${id}`),
 
   // Items
@@ -45,9 +71,13 @@ export const api = {
   addItem:        (d)           => req("POST",   "/items", d),
   updateItem:     (id, d)       => req("PUT",    `/items/${id}`, d),
   deleteItem:     (id)          => req("DELETE", `/items/${id}`),
-  uploadPhoto:    (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
-  addItemPhoto:   (id, file)    => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
-  deleteItemPhoto:(id, publicId)=> req("DELETE", `/items/${id}/photos/${encodeURIComponent(publicId)}`),
+  importItems:    (items)       => req("POST",   "/items/import", { items }),
+  uploadPhoto:       (id, file)  => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
+  importPhotoFromUrl:(id, url)   => req("POST", `/items/${id}/photo-from-url`, { url }),
+  addItemPhoto:    (id, file)     => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
+  deleteItemPhoto: (id, publicId) => req("DELETE", `/items/${id}/photos/${encodeURIComponent(publicId)}`),
+  uploadAttachment:(id, file)     => { const fd = new FormData(); fd.append("file", file); return req("POST", `/items/${id}/attachment`, fd, true); },
+  deleteAttachment:(id, publicId) => req("DELETE", `/items/${id}/attachments/${encodeURIComponent(publicId)}`),
 
   // Transactions
   getTxs:      (params = {}) => req("GET", "/transactions?" + new URLSearchParams(params)),
@@ -93,4 +123,7 @@ export const api = {
 
   // AI
   aiChat: (prompt, history = []) => req("POST", "/ai/chat", { prompt, history }),
+
+  // Barcode lookup (server-side proxy — avoids CORS)
+  lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),
 };

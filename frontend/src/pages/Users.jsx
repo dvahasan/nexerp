@@ -1,91 +1,87 @@
 import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 import { api } from '../api';
 import Icon from '../components/Icon';
 import UserModal from './UserModal';
 import Confirm from '../components/Confirm';
-import Skeleton from '../components/Skeleton';
 import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 import LazyScroll from '../components/LazyScroll';
 
 const LIMIT = 12;
 
-const ROLE_META = {
-  enterprise_owner: { bg: 'bg-indigo-100 dark:bg-indigo-500/20', text: 'text-indigo-700 dark:text-indigo-400', dot: 'bg-indigo-500', iconColor: 'bg-indigo-500' },
-  owner:     { bg: 'bg-amber-100 dark:bg-amber-500/20',   text: 'text-amber-700 dark:text-amber-400',   dot: 'bg-amber-500', iconColor: 'bg-amber-500'   },
-  admin:     { bg: 'bg-purple-100 dark:bg-purple-500/20', text: 'text-purple-700 dark:text-purple-400', dot: 'bg-purple-500', iconColor: 'bg-purple-500'  },
-  manager:   { bg: 'bg-blue-100 dark:bg-blue-500/20',    text: 'text-blue-700 dark:text-blue-400',    dot: 'bg-blue-500', iconColor: 'bg-blue-500'    },
-  warehouse: { bg: 'bg-emerald-100 dark:bg-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', iconColor: 'bg-emerald-500' },
-  viewer:    { bg: 'bg-slate-100 dark:bg-slate-700',     text: 'text-slate-600 dark:text-slate-400',  dot: 'bg-slate-400', iconColor: 'bg-slate-500'   },
+const ROLE_COLORS = {
+  owner:     '#f59e0b',
+  admin:     '#8b5cf6',
+  manager:   '#3b82f6',
+  warehouse: '#10b981',
+  viewer:    '#64748b',
 };
 
 const PERM_LABELS = {
-  canAdd:         { icon: 'add',      label: 'Add Items'      },
-  canEdit:        { icon: 'edit',     label: 'Edit Items'     },
-  canDelete:      { icon: 'delete',   label: 'Delete'         },
-  canTx:          { icon: 'swap',     label: 'Transactions'   },
-  canManageUsers: { icon: 'users',    label: 'Manage Users'   },
+  canAdd:         { icon: 'add',    label: 'Add Items'    },
+  canEdit:        { icon: 'edit',   label: 'Edit Items'   },
+  canDelete:      { icon: 'delete', label: 'Delete'       },
+  canTx:          { icon: 'swap',   label: 'Transactions' },
+  canManageUsers: { icon: 'users',  label: 'Manage Users' },
 };
 
 export default function Users() {
-  const { loading: ctxLoading, t, isAR, user: me, removeUser } = useAppContext();
+  const { loading: ctxLoading, t: tr, isAR, user: me, removeUser, theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
 
-  // Server-side paginated state
   const [users,    setUsers]    = useState([]);
   const [total,    setTotal]    = useState(0);
   const [hasMore,  setHasMore]  = useState(false);
   const [page,     setPage]     = useState(1);
   const [fetching, setFetching] = useState(true);
-  // Role counts fetched separately (full list needed for stats strip)
-  const [roleCounts, setRoleCounts] = useState({});
-  // Version bump forces re-fetch even when page === 1
-  const [version, setVersion] = useState(0);
 
-  const [search, setSearch] = useState('');
-  const [roleFilters, setRoleFilters] = useState([]);
+  const [roleCounts,       setRoleCounts]       = useState({});
+  const [enterpriseOwners, setEnterpriseOwners] = useState([]);
+
+  const [roleFilter, setRoleFilter] = useState(null);
+  const [search,     setSearch]     = useState('');
+  const [focused,    setFocused]    = useState(false);
 
   const [userModal,    setUserModal]    = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
   const [confirmOpen,  setConfirmOpen]  = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
+  const [version,      setVersion]      = useState(0);
 
-  // Main paginated fetch
   useEffect(() => {
     let cancelled = false;
     setFetching(true);
     const params = { page, limit: LIMIT };
-    if (search) params.search = search;
-    if (roleFilters.length > 0) params.roles = roleFilters.join(',');
+    if (search)     params.search = search;
+    if (roleFilter) params.role   = roleFilter;
 
     api.getUsersPaged(params)
       .then(res => {
-        if (!cancelled) {
-          const newUsers = res.users || [];
-          if (page === 1) setUsers(newUsers);
-          else            setUsers(prev => [...prev, ...newUsers]);
-          setTotal(res.total || 0);
-          setHasMore(page < (res.pages || 1));
-        }
+        if (cancelled) return;
+        const newUsers = res.users || [];
+        if (page === 1) setUsers(newUsers);
+        else            setUsers(prev => [...prev, ...newUsers]);
+        setTotal(res.total || 0);
+        setHasMore(page < (res.pages || 1));
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setFetching(false); });
     return () => { cancelled = true; };
-  }, [page, search, roleFilters, version]);
+  }, [page, search, roleFilter, version]);
 
-  // Reset to page 1 when search or filter changes
-  useEffect(() => { setPage(1); }, [search, roleFilters]);
+  useEffect(() => { setPage(1); }, [search, roleFilter]);
 
-  // Fetch role counts (full unfiltered list) — runs once on mount and after mutations
   useEffect(() => {
     api.getUsers()
       .then(all => {
-        const counts = {};
-        Object.keys(ROLE_META).forEach(r => { counts[r] = 0; });
-        (Array.isArray(all) ? all : []).forEach(u => {
-          const effectiveRole = u.isEnterprise ? 'enterprise_owner' : u.role;
-          if (counts[effectiveRole] !== undefined) counts[effectiveRole]++;
-        });
+        const list = Array.isArray(all) ? all : [];
+        setEnterpriseOwners(list.filter(u => u.isEnterprise));
+        const regular = list.filter(u => !u.isEnterprise);
+        const counts  = Object.fromEntries(Object.keys(ROLE_COLORS).map(r => [r, 0]));
+        regular.forEach(u => { if (counts[u.role] !== undefined) counts[u.role]++; });
         setRoleCounts(counts);
       })
       .catch(() => {});
@@ -110,249 +106,382 @@ export default function Users() {
       setUsers(prev => prev.filter(u => u._id !== deleteTarget._id));
       setTotal(prev => prev - 1);
       setConfirmOpen(false);
-      // Refresh counts
       setVersion(v => v + 1);
-    }
-    catch { /* toast handled */ }
+    } catch { /* toast handled */ }
     finally { setDeleting(false); }
   };
 
-  if (ctxLoading) return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Skeleton className="h-8 w-48 mb-2" shape="text" />
-          <Skeleton className="h-4 w-64" shape="text" />
+  const showEntOwners = !roleFilter || roleFilter === 'owner';
+
+  if (ctxLoading) {
+    return (
+      <div className="animate-in fade-in duration-500" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: 180, height: 20, borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+          <div style={{ width: 90, height: 32, borderRadius: 4, backgroundColor: t.border }} className="animate-pulse" />
         </div>
-        <Skeleton className="h-10 w-32" shape="rect" />
-      </div>
-      <Skeleton className="h-10 w-64" shape="rect" />
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-4 py-3 flex items-center gap-3">
-            <Skeleton className="w-2.5 h-2.5 shrink-0" shape="circle" />
-            <div className="flex-1">
-              <Skeleton className="h-5 w-8 mb-1" shape="text" />
-              <Skeleton className="h-3 w-16" shape="text" />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-          <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-3">
-              <Skeleton className="w-12 h-12 shrink-0" shape="rect" />
-              <div className="min-w-0 flex-1">
-                <Skeleton className="h-4 w-24 mb-2" shape="text" />
-                <Skeleton className="h-3 w-20 mb-1" shape="text" />
-                <Skeleton className="h-3 w-32" shape="text" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 16 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 4, backgroundColor: t.border, flexShrink: 0 }} className="animate-pulse" />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ height: 14, width: '70%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+                  <div style={{ height: 11, width: '50%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+                </div>
               </div>
-              <Skeleton className="w-2.5 h-2.5 shrink-0 mt-1" shape="circle" />
             </div>
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-6 w-16" shape="rect" />
-              <Skeleton className="h-4 w-12" shape="text" />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
-            {t.users}
-            <span className="ml-2 text-base font-normal text-slate-400">({total})</span>
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {isAR ? 'إدارة مستخدمي الشركة وصلاحياتهم' : 'Manage company members and their access'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {me?.perms?.canManageUsers && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle }}>
+            {tr.users}
+          </span>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgSubtle }}>({total})</span>
+          {roleFilter && (
             <button
-              onClick={openAdd}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-blue-500"
+              onClick={() => setRoleFilter(null)}
+              style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700,
+                color: primary, background: 'none', border: 'none', cursor: 'pointer',
+                textTransform: 'uppercase', letterSpacing: '0.06em',
+              }}
             >
-              <Icon name="add" size={18} /> {t.addUser}
+              × {isAR ? 'إلغاء الفلتر' : 'clear filter'}
             </button>
           )}
         </div>
+        {me?.perms?.canManageUsers && (
+          <button
+            onClick={openAdd}
+            style={{
+              height: 32, padding: '0 14px', borderRadius: 4,
+              backgroundColor: primary, color: '#fff', border: 'none',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'opacity 120ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <Icon name="add" size={16} /> {tr.addUser}
+          </button>
+        )}
       </div>
 
       {/* ── Search ── */}
-      <div className="relative max-w-sm">
-        <Icon name="search" size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-slate-400 pointer-events-none" />
+      <div style={{ position: 'relative', maxWidth: 320 }}>
+        <Icon name="search" size={14} style={{
+          position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
+          color: t.fgSubtle, pointerEvents: 'none',
+        }} />
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={isAR ? 'ابحث باسم أو يوزرنيم...' : 'Search by name or username...'}
-          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-9 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
+          style={{
+            width: '100%', height: 34, padding: '0 10px 0 30px', borderRadius: 4,
+            border: `1px solid ${focused ? primary : t.border}`,
+            backgroundColor: t.canvas, color: t.fg, fontSize: 13,
+            outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+            boxShadow: focused ? `0 0 0 1px ${primary}` : 'none',
+            transition: 'border-color 120ms, box-shadow 120ms',
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         />
       </div>
 
-      {/* ── Stats strip ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-        {Object.entries(ROLE_META).map(([role, meta]) => (
-          <button 
-            key={role} 
-            onClick={() => setRoleFilters(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}
-            className={`border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors text-left ${
-              roleFilters.includes(role) 
-                ? 'border-blue-500 shadow-md ' + meta.bg 
-                : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-            }`}
-          >
-            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${meta.dot}`} />
-            <div>
-              <div className="text-lg font-black text-slate-800 dark:text-white leading-tight">
+      {/* ── Role stats strip ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {Object.entries(ROLE_COLORS).map(([role, color]) => {
+          const active = roleFilter === role;
+          return (
+            <button
+              key={role}
+              onClick={() => setRoleFilter(prev => prev === role ? null : role)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 14px', borderRadius: 4, cursor: 'pointer',
+                border: active ? `1px solid ${color}` : `1px solid ${t.border}`,
+                backgroundColor: active ? color + '14' : t.elev,
+                transition: 'all 120ms',
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 900, color: active ? color : t.fg, lineHeight: 1 }}>
                 {roleCounts[role] ?? '—'}
-              </div>
-              <div className="text-xs font-medium text-slate-400 capitalize">{role.replace('_', ' ')}</div>
-            </div>
-          </button>
-        ))}
+              </span>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: active ? color : t.fgSubtle }}>
+                {role}
+              </span>
+              {active && <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, color: t.fgSubtle }}>✕</span>}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Cards grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {/* Initial loading skeleton */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+
+        {/* Enterprise owner cards */}
+        {showEntOwners && enterpriseOwners.map(eo => (
+          <LazyScroll key={`ent-${eo._id}`} alwaysRender rootMargin="200px">
+            <div style={{
+              backgroundColor: '#f59e0b0a', border: `1px solid #f59e0b44`,
+              borderRadius: 4, padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 4, flexShrink: 0,
+                  backgroundColor: '#f59e0b18', border: '1px solid #f59e0b44',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 900, color: '#f59e0b',
+                }}>
+                  {eo.name.charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: t.fg }}>{eo.name}</span>
+                    <span style={{
+                      fontFamily: 'ui-monospace, monospace', fontSize: 8, fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                      color: '#f59e0b', backgroundColor: '#f59e0b18',
+                      border: '1px solid #f59e0b44', borderRadius: 3, padding: '2px 5px',
+                    }}>
+                      {isAR ? 'مالك المنظومة' : 'Enterprise'}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: t.fgSubtle, marginTop: 3 }}>
+                    @{eo.username}
+                  </div>
+                  {eo.email && <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eo.email}</div>}
+                </div>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>👑</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: `1px solid #f59e0b22` }}>
+                <span style={{
+                  fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  color: '#f59e0b', backgroundColor: '#f59e0b18',
+                  border: '1px solid #f59e0b44', borderRadius: 3, padding: '3px 8px',
+                }}>
+                  👑 {isAR ? 'مالك' : 'OWNER'}
+                </span>
+                <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, color: t.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {isAR ? 'مشرف المنظومة' : 'Enterprise Owner'}
+                </span>
+              </div>
+            </div>
+          </LazyScroll>
+        ))}
+
+        {/* Loading skeleton */}
         {fetching && users.length === 0 && (
           Array.from({ length: LIMIT }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 flex flex-col gap-4">
-              <div className="flex items-start gap-3">
-                <Skeleton className="w-12 h-12 shrink-0" shape="rect" />
-                <div className="min-w-0 flex-1">
-                  <Skeleton className="h-4 w-24 mb-2" shape="text" />
-                  <Skeleton className="h-3 w-20 mb-1" shape="text" />
-                  <Skeleton className="h-3 w-32" shape="text" />
+            <div key={i} style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 16 }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 4, backgroundColor: t.border, flexShrink: 0 }} className="animate-pulse" />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ height: 14, width: '70%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+                  <div style={{ height: 11, width: '50%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
                 </div>
-                <Skeleton className="w-2.5 h-2.5 shrink-0 mt-1" shape="circle" />
-              </div>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-6 w-16" shape="rect" />
-                <Skeleton className="h-4 w-12" shape="text" />
               </div>
             </div>
           ))
         )}
 
         {/* Empty state */}
-        {!fetching && users.length === 0 && (
-          <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500">
-            <Icon name="users" size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium">{isAR ? 'لا يوجد مستخدمون مطابقون' : 'No users match your search'}</p>
+        {!fetching && users.length === 0 && enterpriseOwners.length === 0 && (
+          <div style={{
+            gridColumn: '1 / -1', padding: '48px 0', textAlign: 'center',
+            fontFamily: 'ui-monospace, monospace', fontSize: 11,
+            textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle,
+          }}>
+            {isAR ? 'لا يوجد مستخدمون مطابقون' : 'No users match your search'}
           </div>
         )}
 
-        {users.map((u, idx) => {
-          const effectiveRole = u.isEnterprise ? 'enterprise_owner' : u.role;
-          const rc       = ROLE_META[effectiveRole] || ROLE_META.viewer;
-          const isMe     = me?._id === u._id;
-          const perms    = u.perms || u.permissions || {};
+        {/* Regular user cards */}
+        {users.map(u => {
+          const rc          = ROLE_COLORS[u.role] || '#64748b';
+          const isMe        = me?._id === u._id;
+          const perms       = u.perms || u.permissions || {};
           const activePerms = Object.entries(PERM_LABELS).filter(([k]) => perms[k]);
 
           return (
-            <div key={u._id} className="animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out fill-mode-both">
-            <div
-              onClick={() => openEdit(u)}
-              className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 hover:shadow-md hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200 cursor-pointer group flex flex-col gap-4"
-            >
-              {/* Avatar + Name */}
-              <div className="flex items-start gap-3">
-                <div className={`w-12 h-12 rounded-2xl ${rc.iconColor} flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-sm`}>
-                  {u.name.charAt(0).toUpperCase()}
+            <LazyScroll key={u._id} alwaysRender rootMargin="200px">
+              <div
+                onClick={() => openEdit(u)}
+                style={{
+                  backgroundColor: t.elev, border: `1px solid ${t.border}`,
+                  borderRadius: 4, padding: 16, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: 12,
+                  transition: 'border-color 120ms, box-shadow 120ms',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 1px ${primary}`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = t.border;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {/* Avatar + info */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 4, flexShrink: 0,
+                    backgroundColor: rc + '18', border: `1px solid ${rc}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 900, color: rc,
+                  }}>
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: t.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.name}
+                      </span>
+                      {isMe && (
+                        <span style={{
+                          fontFamily: 'ui-monospace, monospace', fontSize: 8, fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.06em',
+                          color: primary, backgroundColor: primary + '14',
+                          border: `1px solid ${primary}44`, borderRadius: 3, padding: '2px 5px',
+                        }}>
+                          {isAR ? 'أنت' : 'You'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: t.fgSubtle, marginTop: 3 }}>
+                      @{u.username}
+                    </div>
+                    {u.email && (
+                      <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.email}
+                      </div>
+                    )}
+                  </div>
+                  {/* Active dot */}
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 6,
+                    backgroundColor: u.active !== false ? '#16774A' : t.neg,
+                  }} title={u.active !== false ? 'Active' : 'Inactive'} />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm leading-tight">
-                      {u.name}
-                    </h3>
-                    {isMe && (
-                      <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">
-                        {isAR ? 'أنت' : 'You'}
+
+                {/* Role + status */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  paddingTop: 10, borderTop: `1px solid ${t.border}`,
+                }}>
+                  <span style={{
+                    fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                    color: rc, backgroundColor: rc + '14',
+                    border: `1px solid ${rc}44`, borderRadius: 3, padding: '3px 8px',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    {u.role === 'owner' && '👑 '}
+                    {u.role}
+                  </span>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: t.fgSubtle }}>
+                    {u.active !== false ? (isAR ? 'نشط' : 'ACTIVE') : (isAR ? 'معطّل' : 'INACTIVE')}
+                  </span>
+                </div>
+
+                {/* Permission pills */}
+                {activePerms.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {activePerms.slice(0, 3).map(([k, meta]) => (
+                      <span key={k} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        padding: '2px 6px', borderRadius: 3,
+                        fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                        color: t.fgSubtle, backgroundColor: t.sunken, border: `1px solid ${t.border}`,
+                      }}>
+                        <Icon name={meta.icon} size={9} />
+                        {meta.label.split(' ')[0]}
+                      </span>
+                    ))}
+                    {activePerms.length > 3 && (
+                      <span style={{
+                        padding: '2px 6px', borderRadius: 3,
+                        fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+                        color: t.fgSubtle, backgroundColor: t.sunken, border: `1px solid ${t.border}`,
+                      }}>
+                        +{activePerms.length - 3}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">@{u.username}</p>
-                  {u.email && (
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">{u.email}</p>
-                  )}
-                </div>
-                {/* Status dot */}
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${u.active ? 'bg-emerald-500' : 'bg-red-400'}`}
-                  title={u.active ? 'Active' : 'Inactive'} />
-              </div>
+                )}
 
-              {/* Role + Status */}
-              <div className="flex items-center justify-between">
-                <span className={`text-[9px] px-2 py-0.5 rounded-lg font-bold capitalize ${rc.bg} ${rc.text}`}>
-                  {effectiveRole.replace('_', ' ')}
-                </span>
-                <span className="text-[10px] text-slate-400 font-semibold">{isAR ? 'انضم' : 'Joined'} {new Date(u.createdAt).toLocaleDateString()}</span>
-              </div>
-
-              {/* Permission pills */}
-              {activePerms.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {activePerms.slice(0, 3).map(([k, meta]) => (
-                    <span key={k} className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 rounded-lg text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                      <Icon name={meta.icon} size={10} />
-                      {isAR ? k : meta.label}
-                    </span>
-                  ))}
-                  {activePerms.length > 3 && (
-                    <span className="px-2 py-0.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 rounded-lg text-[10px] font-semibold text-slate-400">
-                      +{activePerms.length - 3}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Edit / Delete footer — owner accounts are immutable */}
-              {me?.perms?.canManageUsers && !isMe && u.role !== 'owner' && !u.isEnterprise && (
-                <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={e => { e.stopPropagation(); openEdit(u); }}
-                    className="flex-1 py-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors flex items-center justify-center gap-1"
+                {/* Edit / Delete (hover actions) */}
+                {me?.perms?.canManageUsers && !isMe && u.role !== 'owner' && (
+                  <div
+                    style={{
+                      display: 'flex', gap: 6, paddingTop: 10,
+                      borderTop: `1px solid ${t.border}`,
+                    }}
+                    onClick={e => e.stopPropagation()}
                   >
-                    <Icon name="edit" size={13} /> {t.edit}
-                  </button>
-                  <button
-                    onClick={e => confirmDelete(u, e)}
-                    className="flex-1 py-1.5 text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors flex items-center justify-center gap-1"
-                  >
-                    <Icon name="delete" size={13} /> {t.delete}
-                  </button>
-                </div>
-              )}
-            </div>
-            </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); openEdit(u); }}
+                      style={{
+                        flex: 1, height: 28, borderRadius: 4, fontSize: 11, fontWeight: 700,
+                        fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.04em',
+                        border: `1px solid ${t.border}`, backgroundColor: 'transparent',
+                        color: t.fgMuted, cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: 4, transition: 'all 120ms',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = primary; e.currentTarget.style.backgroundColor = primary + '10'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.fgMuted; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      <Icon name="edit" size={11} /> {tr.edit}
+                    </button>
+                    <button
+                      onClick={e => confirmDelete(u, e)}
+                      style={{
+                        flex: 1, height: 28, borderRadius: 4, fontSize: 11, fontWeight: 700,
+                        fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.04em',
+                        border: `1px solid ${t.border}`, backgroundColor: 'transparent',
+                        color: t.fgMuted, cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', gap: 4, transition: 'all 120ms',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = t.neg; e.currentTarget.style.color = t.neg; e.currentTarget.style.backgroundColor = t.negTint; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.fgMuted; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      <Icon name="delete" size={11} /> {tr.delete}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </LazyScroll>
           );
         })}
       </div>
 
-      {/* Infinite scroll trigger */}
-      <InfiniteScrollTrigger
-        hasMore={hasMore && !fetching}
-        onVisible={() => setPage(p => p + 1)}
-      />
+      {/* Infinite scroll */}
+      <InfiniteScrollTrigger hasMore={hasMore && !fetching} onVisible={() => setPage(p => p + 1)} />
 
-      {/* Fetching-more spinner */}
+      {/* Loading more */}
       {fetching && users.length > 0 && (
-        <div className="py-6 flex justify-center">
-          <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+        <div style={{ padding: '20px 0', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${t.border}`, borderTopColor: primary, animation: 'spin 600ms linear infinite' }} />
         </div>
       )}
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       <UserModal
         open={userModal}
         onClose={() => { setUserModal(false); setEditTarget(null); }}

@@ -1,62 +1,91 @@
 import { useAppContext } from '../context/AppContext';
-
-const icons = {
-  success: (
-    <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  ),
-  error: (
-    <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 18a6 6 0 100-12 6 6 0 000 12z" />
-    </svg>
-  ),
-};
-
-const styles = {
-  success: 'border-green-500/30 bg-green-50/90 dark:bg-green-900/30',
-  error:   'border-red-500/30 bg-red-50/90 dark:bg-red-900/30',
-  info:    'border-blue-500/30 bg-blue-50/90 dark:bg-blue-900/30',
-};
-
-const textStyles = {
-  success: 'text-green-800 dark:text-green-200',
-  error:   'text-red-800 dark:text-red-200',
-  info:    'text-blue-800 dark:text-blue-200',
-};
+import { T } from '../theme';
 
 export default function Toast() {
-  const { toasts, removeToast } = useAppContext();
+  const { toasts, removeToast, theme } = useAppContext();
+  const t = T[theme] || T.light;
+
   if (!toasts?.length) return null;
 
+  const typeConfig = {
+    success: {
+      iconColor: '#16774A',
+      bg: theme === 'dark' ? '#0c1f12' : '#f0fdf4',
+      border: theme === 'dark' ? '#1a4228' : '#bbf7d0',
+    },
+    error: {
+      iconColor: t.neg,
+      bg: t.negTint,
+      border: theme === 'dark' ? '#5c1e1e' : '#fca5a5',
+    },
+    info: {
+      iconColor: 'var(--color-primary, #3b82f6)',
+      bg: theme === 'dark' ? '#0c1a2e' : '#eff6ff',
+      border: theme === 'dark' ? '#1e3a5f' : '#bfdbfe',
+    },
+  };
+
   return (
-    <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2 max-w-sm pointer-events-none">
-      {toasts.map(toast => (
-        <div
-          key={toast.id}
-          className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-sm pointer-events-auto
-            ${styles[toast.type] || styles.info}
-            animate-in slide-in-from-bottom-4 fade-in duration-300`}
-        >
-          <div className="shrink-0 mt-0.5">{icons[toast.type] || icons.info}</div>
-          <p className={`text-sm font-medium flex-1 ${textStyles[toast.type] || textStyles.info}`}>
-            {toast.message}
-          </p>
-          <button
-            onClick={() => removeToast(toast.id)}
-            className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 200,
+      display: 'flex', flexDirection: 'column', gap: 8,
+      maxWidth: 360, pointerEvents: 'none',
+    }}>
+      {toasts.map(toast => {
+        const cfg = typeConfig[toast.type] || typeConfig.info;
+        return (
+          <div
+            key={toast.id}
+            className="animate-in slide-in-from-bottom-4 fade-in duration-300"
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '11px 14px', borderRadius: 4,
+              border: `1px solid ${cfg.border}`,
+              backgroundColor: cfg.bg,
+              pointerEvents: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            }}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      ))}
+            {/* Icon */}
+            <div style={{ color: cfg.iconColor, flexShrink: 0, marginTop: 1 }}>
+              {toast.type === 'success' && (
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {toast.type === 'error' && (
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              {toast.type === 'info' && (
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 18a6 6 0 100-12 6 6 0 000 12z" />
+                </svg>
+              )}
+            </div>
+
+            {/* Message */}
+            <p style={{ fontSize: 12, color: t.fg, flex: 1, lineHeight: 1.55, fontFamily: 'inherit' }}>
+              {toast.message}
+            </p>
+
+            {/* Dismiss */}
+            <button
+              onClick={() => removeToast(toast.id)}
+              style={{
+                background: 'transparent', border: 'none',
+                cursor: 'pointer', color: t.fgSubtle,
+                padding: 0, flexShrink: 0, lineHeight: 1,
+              }}
+            >
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

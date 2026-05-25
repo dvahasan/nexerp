@@ -117,6 +117,7 @@ export default function Layout({ children }) {
   const isOwner          = user?.role === 'owner';
   const canManageUsers   = isOwner || user?.perms?.canManageUsers;
   const canManageCompany = isOwner || user?.perms?.canManageCompany;
+  const canManageDepts   = isOwner || user?.perms?.canManageDepts;
 
   const canTxIn  = isOwner || user?.perms?.canTxIn;
   const canTxOut = isOwner || user?.perms?.canTxOut;
@@ -145,9 +146,17 @@ export default function Layout({ children }) {
     { path: '/myprofile',      icon: 'user',     label: isAR ? 'حسابي' : 'My Profile' },
   ];
 
+  const classificationItems = [
+    ...(canManageDepts ? [
+      { path: '/departments', icon: 'company', label: isAR ? 'الأقسام' : 'Departments' },
+      { path: '/categories',  icon: 'category', label: isAR ? 'التصنيفات' : 'Categories' }
+    ] : [])
+  ];
+
   const navSections = [
     { title: isAR ? 'عام'       : 'Overview',  items: [{ path: '/dashboard', icon: 'dashboard', label: t.dashboard }] },
     { title: isAR ? 'المستودع'  : 'Warehouse', items: warehouseItems },
+    ...(canManageDepts ? [{ title: isAR ? 'التصنيف' : 'Classification', items: classificationItems }] : []),
     { title: isAR ? (canManageUsers || canManageCompany ? 'الإدارة' : 'حسابي')
                   : (canManageUsers || canManageCompany ? 'Administration' : 'Account'),
       items: adminItems },
@@ -169,6 +178,16 @@ export default function Layout({ children }) {
   // ── Sidebar content (shared desktop + mobile) ────────────────────────────
   const SidebarContent = ({ mobile = false }) => {
     const wide = !collapsed || mobile;
+    const activeLinkRef = useRef(null);
+
+    useEffect(() => {
+      const t = setTimeout(() => {
+        if (activeLinkRef.current) {
+          activeLinkRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+      return () => clearTimeout(t);
+    }, [pathname, drawerOpen, wide]);
 
     // Render a single nav item (link or group)
     const renderItem = (item) => {
@@ -234,6 +253,7 @@ export default function Layout({ children }) {
                     <li key={child.path}>
                       <Link
                         to={child.path}
+                        ref={active ? activeLinkRef : null}
                         onClick={() => setDrawerOpen(false)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
@@ -266,6 +286,7 @@ export default function Layout({ children }) {
         <li key={item.path}>
           <Link
             to={item.path}
+            ref={active ? activeLinkRef : null}
             onClick={() => setDrawerOpen(false)}
             title={!wide ? item.label : undefined}
             style={{
@@ -348,8 +369,10 @@ export default function Layout({ children }) {
             /* Collapsed icon column */
             <div className="flex flex-col items-center gap-1 p-2">
               {[
-                { onClick: toggleTheme, icon: theme === 'dark' ? 'light' : 'dark',  title: theme === 'dark' ? (isAR ? 'فاتح' : 'Light') : (isAR ? 'داكن' : 'Dark') },
-                { onClick: toggleLang,  icon: 'translate', title: lang === 'en' ? 'AR' : 'EN' },
+                ...(mobile ? [
+                  { onClick: toggleTheme, icon: theme === 'dark' ? 'light' : 'dark',  title: theme === 'dark' ? (isAR ? 'فاتح' : 'Light') : (isAR ? 'داكن' : 'Dark') },
+                  { onClick: toggleLang,  icon: 'translate', title: lang === 'en' ? 'AR' : 'EN' }
+                ] : []),
                 { onClick: () => { logout(); navigate('/'); }, icon: 'logout', title: t.logout, danger: true },
               ].map((btn, i) => (
                 <button key={i} onClick={btn.onClick} title={btn.title}
@@ -373,23 +396,26 @@ export default function Layout({ children }) {
             /* Expanded controls */
             <div className="p-3 space-y-2">
               {/* User row */}
-              <div className="flex items-center gap-2.5 px-1 py-1.5">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
-                  style={{ backgroundColor: primaryColor }}>
-                  {user?.name?.charAt(0).toUpperCase()}
+              {mobile && (
+                <div className="flex items-center gap-2.5 px-1 py-1.5">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
+                    style={{ backgroundColor: primaryColor }}>
+                    {user?.name?.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium truncate leading-tight" style={{ color: tok.fg }}>{user?.name}</div>
+                    <div className="text-[10px] capitalize leading-tight" style={{ color: tok.fgSubtle, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}>{user?.role}</div>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-medium truncate leading-tight" style={{ color: tok.fg }}>{user?.name}</div>
-                  <div className="text-[10px] capitalize leading-tight" style={{ color: tok.fgSubtle, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}>{user?.role}</div>
-                </div>
-              </div>
+              )}
 
               {/* Theme + lang row */}
-              <div className="flex gap-1.5">
-                {[
-                  { onClick: toggleTheme, icon: theme === 'dark' ? 'light' : 'dark', label: theme === 'dark' ? (isAR ? 'فاتح' : 'Light') : (isAR ? 'داكن' : 'Dark') },
-                  { onClick: toggleLang,  label: lang === 'en' ? 'AR' : 'EN' },
-                ].map((btn, i) => (
+              {mobile && (
+                <div className="flex gap-1.5">
+                  {[
+                    { onClick: toggleTheme, icon: theme === 'dark' ? 'light' : 'dark', label: theme === 'dark' ? (isAR ? 'فاتح' : 'Light') : (isAR ? 'داكن' : 'Dark') },
+                    { onClick: toggleLang,  label: lang === 'en' ? 'AR' : 'EN' },
+                  ].map((btn, i) => (
                   <button key={i} onClick={btn.onClick}
                     style={{
                       flex: 1, height: 28, borderRadius: 4,
@@ -410,6 +436,7 @@ export default function Layout({ children }) {
                   </button>
                 ))}
               </div>
+              )}
 
               {/* Enterprise workspaces */}
               {user?.isEnterprise && (
@@ -496,7 +523,6 @@ export default function Layout({ children }) {
             <input
               value={searchVal}
               onChange={e => setSearchVal(e.target.value)}
-              onFocus={() => { if (searchVal.trim()) setSearchDropdown(true); }}
               onKeyDown={e => {
                 const looksLikeBarcode = /^\d{6,14}$/.test(searchVal.trim());
                 if (e.key === 'Escape') { setSearchDropdown(false); return; }

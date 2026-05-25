@@ -12,6 +12,7 @@ const CompanySchema = new mongoose.Schema(
     primaryColor:   { type: String, default: "#3b82f6" },
     logo:           { type: String, default: "" },
     active:         { type: Boolean, default: true },
+    skuConfig:      { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

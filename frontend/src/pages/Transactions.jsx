@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { T, inputStyle } from '../theme';
 import { api } from '../api';
 import Icon from '../components/Icon';
 import TxModal from './TxModal';
@@ -9,7 +10,10 @@ import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 const LIMIT = 20;
 
 export default function Transactions() {
-  const { t, isAR, user, users, removeTx, saveTx } = useAppContext();
+  const { t: tr, isAR, user, users, removeTx, theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
+
   const canSeeAll = user?.role === 'owner' || user?.role === 'admin';
 
   const [search, setSearch] = useState('');
@@ -27,8 +31,8 @@ export default function Transactions() {
   const [confirmOpen,  setConfirmOpen]  = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
+  const [focused,      setFocused]      = useState('');
 
-  // Single effect: whenever page/typeF/search change, fetch
   useEffect(() => {
     let cancelled = false;
     setFetching(true);
@@ -36,26 +40,25 @@ export default function Transactions() {
     if (typeF !== 'all') params.type = typeF;
     if (userF) params.user = userF;
     if (fromF) params.from = fromF;
-    if (toF) params.to = toF;
+    if (toF)   params.to   = toF;
     api.getTxs(params)
-      .then(res => { 
+      .then(res => {
         if (!cancelled) {
           if (page === 1) setData(res);
           else {
             setData(prev => {
               const prevArr = Array.isArray(prev) ? prev : (prev.txs || []);
-              const newArr = Array.isArray(res) ? res : (res.txs || []);
+              const newArr  = Array.isArray(res)  ? res  : (res.txs  || []);
               return { ...res, txs: [...prevArr, ...newArr] };
             });
           }
-        } 
+        }
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setFetching(false); });
     return () => { cancelled = true; };
   }, [page, typeF, userF, fromF, toF]);
 
-  // Reset page to 1 when filters change
   useEffect(() => { setPage(1); }, [typeF, userF, fromF, toF]);
 
   const refetch = () => {
@@ -64,7 +67,7 @@ export default function Transactions() {
     if (typeF !== 'all') params.type = typeF;
     if (userF) params.user = userF;
     if (fromF) params.from = fromF;
-    if (toF) params.to = toF;
+    if (toF)   params.to   = toF;
     api.getTxs(params)
       .then(res => setData(res))
       .catch(() => {})
@@ -86,12 +89,7 @@ export default function Transactions() {
     finally { setDeleting(false); }
   };
 
-  const handleSaved = () => refetch();
-
-  // Normalise: API may return {txs,total,pages} or a plain array (old backend)
   const txList = Array.isArray(data) ? data : (data.txs || []);
-
-  // Client-side search filter on the current page's rows
   const q = search.toLowerCase();
   const visibleTxs = q
     ? txList.filter(tx =>
@@ -103,165 +101,259 @@ export default function Transactions() {
       )
     : txList;
 
+  // ── Field style helpers
+  const fInput = (name, extra = {}) => ({
+    ...inputStyle(t),
+    height: 36,
+    borderColor: focused === name ? primary : t.border,
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    ...extra,
+  });
+  const fSelect = (name) => ({
+    height: 36, padding: '0 10px', borderRadius: 4,
+    border: `1px solid ${focused === name ? primary : t.border}`,
+    backgroundColor: t.canvas, color: t.fg,
+    fontSize: 13, outline: 'none', cursor: 'pointer',
+    fontFamily: 'inherit', boxSizing: 'border-box',
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    transition: 'border-color 120ms, box-shadow 120ms',
+  });
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
-          {t.transactions}
-          <span className="ml-2 text-base font-normal text-slate-400">({data.total})</span>
-        </h1>
+    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle }}>
+            {tr.transactions}
+          </span>
+          <span style={{ marginLeft: 8, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgSubtle }}>
+            ({data.total ?? 0})
+          </span>
+        </div>
         {user?.perms?.canTx && (
           <button
             onClick={openRecord}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-purple-500"
+            style={{
+              height: 32, padding: '0 14px', borderRadius: 4,
+              backgroundColor: primary, color: '#fff', border: 'none',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'opacity 120ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            <Icon name="add" size={20} /> {t.addTransaction}
+            <Icon name="add" size={18} /> {tr.addTransaction}
           </button>
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row flex-wrap gap-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Icon name="search" size={18} className={`absolute top-1/2 -translate-y-1/2 ${isAR ? 'right-3' : 'left-3'} text-slate-400 pointer-events-none`} />
+      {/* ── Filters ── */}
+      <div style={{
+        backgroundColor: t.elev, border: `1px solid ${t.border}`,
+        borderRadius: 4, padding: '12px 14px',
+        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Icon name="search" size={15} style={{
+            position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
+            color: t.fgSubtle, pointerEvents: 'none',
+          }} />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث عن الصنف، المصدر، الوجهة...' : 'Search item, source, destination...'}
-            className={`w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl ${isAR ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm`}
+            style={{ ...fInput('search'), paddingLeft: 32 }}
+            onFocus={() => setFocused('search')}
+            onBlur={() => setFocused('')}
           />
         </div>
-        <select
-          value={typeF} onChange={e => setTypeF(e.target.value)}
-          className="w-full md:w-auto bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-        >
+
+        {/* Type */}
+        <select value={typeF} onChange={e => setTypeF(e.target.value)}
+          style={fSelect('typeF')} onFocus={() => setFocused('typeF')} onBlur={() => setFocused('')}>
           <option value="all">{isAR ? 'جميع الحركات' : 'All Types'}</option>
-          <option value="IN">↓ {isAR ? 'وارد' : 'Stock IN'}</option>
-          <option value="OUT">↑ {isAR ? 'صادر' : 'Stock OUT'}</option>
+          <option value="IN">↓ {isAR ? 'وارد' : 'IN'}</option>
+          <option value="OUT">↑ {isAR ? 'صادر' : 'OUT'}</option>
         </select>
 
-        {(user?.role === 'owner' || user?.role === 'admin') && (
-          <select
-            value={userF} onChange={e => setUserF(e.target.value)}
-            className="w-full md:w-auto bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-          >
+        {/* User filter (admin/owner only) */}
+        {canSeeAll && (
+          <select value={userF} onChange={e => setUserF(e.target.value)}
+            style={fSelect('userF')} onFocus={() => setFocused('userF')} onBlur={() => setFocused('')}>
             <option value="">{isAR ? 'جميع المستخدمين' : 'All Users'}</option>
-            {users.map(u => (
-              <option key={u._id} value={u._id}>{u.name}</option>
-            ))}
+            {users.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
           </select>
         )}
 
-        <input 
-          type="date"
-          value={fromF}
-          onChange={e => setFromF(e.target.value)}
-          className="w-full md:w-auto bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-        />
-        <input 
-          type="date"
-          value={toF}
-          onChange={e => setToF(e.target.value)}
-          className="w-full md:w-auto bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-        />
+        {/* Date range — From */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <label style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle }}>
+            {isAR ? 'من' : 'From'}
+          </label>
+          <input type="date" value={fromF} onChange={e => setFromF(e.target.value)}
+            style={fInput('fromF')} onFocus={() => setFocused('fromF')} onBlur={() => setFocused('')} />
+        </div>
+
+        {/* Date range — To */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <label style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle }}>
+            {isAR ? 'إلى' : 'To'}
+          </label>
+          <input type="date" value={toF} onChange={e => setToF(e.target.value)}
+            style={fInput('toF')} onFocus={() => setFocused('toF')} onBlur={() => setFocused('')} />
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+      {/* ── Table ── */}
+      <div style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <th className="py-4 px-4 font-semibold w-12 text-center">#</th>
-                <th className="py-4 px-4 font-semibold">{isAR ? 'التاريخ' : 'Date'}</th>
-                <th className="py-4 px-4 font-semibold">{isAR ? 'النوع' : 'Type'}</th>
-                <th className="py-4 px-4 font-semibold">{isAR ? 'الصنف' : 'Item'}</th>
-                <th className="py-4 px-4 font-semibold">{isAR ? 'الكمية' : 'Qty'}</th>
-                <th className="py-4 px-4 font-semibold hidden md:table-cell">{isAR ? 'المصدر/الوجهة' : 'Source/Dest'}</th>
+              <tr style={{ backgroundColor: t.sunken }}>
+                {['#', isAR ? 'التاريخ' : 'Date', isAR ? 'النوع' : 'Type', isAR ? 'الصنف' : 'Item', isAR ? 'الكمية' : 'Qty', isAR ? 'المصدر/الوجهة' : 'Source / Dest'].map((h, idx) => (
+                  <th key={idx} style={{
+                    padding: '10px 14px', textAlign: idx === 0 ? 'center' : 'left',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle,
+                    whiteSpace: 'nowrap', borderBottom: `1px solid ${t.border}`,
+                  }}>
+                    {h}
+                  </th>
+                ))}
                 {canSeeAll && (
-                  <th className="py-4 px-4 font-semibold hidden lg:table-cell">{isAR ? 'المستخدم' : 'User'}</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                    {isAR ? 'المستخدم' : 'User'}
+                  </th>
                 )}
-                {(user?.role === 'owner' || user?.role === 'admin') && (
-                  <th className="py-4 px-4 font-semibold text-right">{isAR ? 'إجراءات' : 'Actions'}</th>
+                {canSeeAll && (
+                  <th style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                    {isAR ? 'إجراءات' : 'Actions'}
+                  </th>
                 )}
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-700/50">
+
+            <tbody>
               {fetching ? (
                 <tr>
-                  <td colSpan="8" className="py-16 text-center">
-                    <div className="w-8 h-8 border-2 border-slate-200 dark:border-slate-700 border-t-purple-500 rounded-full animate-spin mx-auto" />
+                  <td colSpan={canSeeAll ? 8 : 6} style={{ padding: '48px 0', textAlign: 'center' }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', margin: '0 auto',
+                      border: `2px solid ${t.border}`, borderTopColor: primary,
+                      animation: 'spin 600ms linear infinite',
+                    }} />
                   </td>
                 </tr>
               ) : visibleTxs.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={canSeeAll ? 8 : 6} style={{
+                    padding: '48px 0', textAlign: 'center',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 11,
+                    textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle,
+                  }}>
                     {isAR ? 'لا توجد حركات مطابقة' : 'No transactions match your search'}
                   </td>
                 </tr>
               ) : (
                 visibleTxs.map((tx, idx) => (
-                  <tr key={tx._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    {/* Row number */}
-                    <td className="py-3.5 px-4 text-center text-xs font-mono text-slate-400 dark:text-slate-500">
+                  <tr
+                    key={tx._id}
+                    style={{ borderBottom: `1px solid ${t.border}`, transition: 'background 120ms' }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = t.sunken}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {/* # */}
+                    <td style={{ padding: '10px 14px', textAlign: 'center', fontFamily: 'ui-monospace, monospace', fontSize: 10, color: t.fgSubtle }}>
                       {(page - 1) * LIMIT + idx + 1}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
+
+                    {/* Date */}
+                    <td style={{ padding: '10px 14px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted, whiteSpace: 'nowrap' }}>
                       {new Date(tx.date).toLocaleDateString(isAR ? 'ar-EG' : 'en-US', {
                         year: 'numeric', month: 'short', day: 'numeric',
                         hour: '2-digit', minute: '2-digit',
                       })}
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                        tx.type === 'IN'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
-                      }`}>
+
+                    {/* Type badge */}
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '3px 8px', borderRadius: 3, fontSize: 11, fontWeight: 700,
+                        fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase',
+                        backgroundColor: tx.type === 'IN'
+                          ? (theme === 'dark' ? '#0c1f12' : '#f0fdf4')
+                          : (theme === 'dark' ? '#2b1818' : '#fef2f2'),
+                        color: tx.type === 'IN' ? '#16774A' : t.neg,
+                        border: `1px solid ${tx.type === 'IN' ? (theme === 'dark' ? '#1a4228' : '#bbf7d0') : (theme === 'dark' ? '#5c1e1e' : '#fca5a5')}`,
+                      }}>
                         {tx.type === 'IN' ? '↓ IN' : '↑ OUT'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+
+                    {/* Item */}
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: t.fg, fontSize: 13 }}>
                       {isAR ? (tx.itemId?.name || '—') : (tx.itemId?.nameEn || tx.itemId?.name || '—')}
                     </td>
-                    <td className="py-3.5 px-4 font-black text-slate-700 dark:text-slate-300">
+
+                    {/* Qty */}
+                    <td style={{ padding: '10px 14px', fontWeight: 800, color: t.fg, fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>
                       {tx.qty}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 hidden md:table-cell text-xs">
-                      <div className="flex flex-col gap-0.5">
-                        {tx.source && <span>▲ {tx.source}</span>}
-                        {tx.dest   && <span>▼ {tx.dest}</span>}
-                        {!tx.source && !tx.dest && '—'}
-                      </div>
+
+                    {/* Source/Dest */}
+                    <td style={{ padding: '10px 14px', fontSize: 11, color: t.fgMuted, fontFamily: 'ui-monospace, monospace' }}>
+                      {tx.source && <div>▲ {tx.source}</div>}
+                      {tx.dest   && <div>▼ {tx.dest}</div>}
+                      {!tx.source && !tx.dest && '—'}
                     </td>
+
+                    {/* User */}
                     {canSeeAll && (
-                      <td className="py-3.5 px-4 hidden lg:table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 24, height: 24, borderRadius: 4,
+                            backgroundColor: t.border,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 10, fontWeight: 800, color: t.fgMuted,
+                            fontFamily: 'ui-monospace, monospace',
+                          }}>
                             {tx.userName?.charAt(0)?.toUpperCase()}
                           </div>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">{tx.userName}</span>
+                          <span style={{ fontSize: 11, color: t.fgMuted, fontFamily: 'ui-monospace, monospace' }}>
+                            {tx.userName}
+                          </span>
                         </div>
                       </td>
                     )}
-                    {(user?.role === 'owner' || user?.role === 'admin') && (
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex justify-end gap-1">
+
+                    {/* Actions */}
+                    {canSeeAll && (
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                           <button
                             onClick={() => openEdit(tx)}
-                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded transition-colors"
-                            title={t.edit}
+                            title={tr.edit}
+                            style={{ background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: t.fgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, transition: 'background 120ms, color 120ms', width: 26, height: 26 }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = primary + '1a'; e.currentTarget.style.color = primary; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
                           >
-                            <Icon name="edit" size={15} />
+                            <Icon name="edit" size={14} />
                           </button>
                           <button
                             onClick={() => confirmDel(tx)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded transition-colors"
-                            title={t.delete}
+                            title={tr.delete}
+                            style={{ background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: t.fgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, transition: 'background 120ms, color 120ms', width: 26, height: 26 }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; e.currentTarget.style.color = t.neg; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
                           >
-                            <Icon name="delete" size={15} />
+                            <Icon name="delete" size={14} />
                           </button>
                         </div>
                       </td>
@@ -273,26 +365,27 @@ export default function Transactions() {
           </table>
         </div>
 
-      {/* Infinite Scroll */}
-      <InfiniteScrollTrigger 
-        hasMore={data.total ? (page * LIMIT < data.total) : false} 
-        onVisible={() => setPage(p => p + 1)} 
-      />
+        <InfiniteScrollTrigger
+          hasMore={data.total ? (page * LIMIT < data.total) : false}
+          onVisible={() => setPage(p => p + 1)}
+        />
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
       <TxModal
         open={txModal}
         onClose={() => { setTxModal(false); setEditTx(null); }}
         editTx={editTx}
-        onSaved={handleSaved}
+        onSaved={refetch}
       />
       <Confirm
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDelete}
         loading={deleting}
-        message={isAR ? 'هل تريد حذف هذه الحركة؟ سيتم عكس تأثيرها على المخزون.' : 'Delete this transaction? Stock levels will be reversed.'}
+        message={isAR
+          ? 'هل تريد حذف هذه الحركة؟ سيتم عكس تأثيرها على المخزون.'
+          : 'Delete this transaction? Stock levels will be reversed.'}
       />
     </div>
   );
