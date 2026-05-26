@@ -48,7 +48,7 @@ router.get("/", protect, async (req, res) => {
       Transaction.aggregate([
         { $match: { companyId: cid, type: "OUT", date: { $gte: thirtyAgo } } },
         { $lookup: { from: "items", localField: "itemId", foreignField: "_id", as: "item" } },
-        { $unwind: { path: "$item", preserveNullAndEmpty: true } },
+        { $unwind: { path: "$item", preserveNullAndEmptyArrays: true } },
         { $group: {
           _id: null,
           cogs: { $sum: { $multiply: [
@@ -62,7 +62,7 @@ router.get("/", protect, async (req, res) => {
       Transaction.aggregate([
         { $match: { companyId: cid, type: "OUT", date: { $gte: sixtyAgo, $lt: thirtyAgo } } },
         { $lookup: { from: "items", localField: "itemId", foreignField: "_id", as: "item" } },
-        { $unwind: { path: "$item", preserveNullAndEmpty: true } },
+        { $unwind: { path: "$item", preserveNullAndEmptyArrays: true } },
         { $group: {
           _id: null,
           cogs: { $sum: { $multiply: [
