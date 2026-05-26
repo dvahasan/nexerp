@@ -52,25 +52,47 @@ async function txCreateHandler(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { type, itemId, qty, source, dest, date, notes } = req.body;
+    const { type, itemId, qty, source, dest, date, notes, warehouseId, binId, binCode, unitCost, landedCost } = req.body;
 
     const item = await Item.findOne({ _id: itemId, companyId: req.user.companyId }).session(session);
     if (!item) throw new Error("Item not found");
     if (type === "OUT" && item.qty < qty)
       throw new Error(`Insufficient stock — available: ${item.qty}`);
 
+    // ── Update item quantity ───────────────────────────────────────────────
+    const prevQty = item.qty;
     item.qty = type === "IN" ? item.qty + qty : item.qty - qty;
+
+    // ── Update moving-average cost on StockIn ─────────────────────────────
+    if (type === "IN" && unitCost && unitCost > 0) {
+      const totalCostBefore = (item.avgCost || 0) * prevQty;
+      const totalCostIn     = unitCost * qty;
+      item.avgCost = prevQty + qty > 0
+        ? +((totalCostBefore + totalCostIn) / (prevQty + qty)).toFixed(4)
+        : unitCost;
+    }
+
+    // ── Update default warehouse if provided ──────────────────────────────
+    if (warehouseId && !item.warehouseId) {
+      item.warehouseId = warehouseId;
+    }
+
     await item.save({ session });
 
     const [tx] = await Transaction.create([{
       companyId: req.user.companyId,
       type, itemId, qty,
-      source: type === "IN"  ? source    : undefined,
-      dest:   type === "OUT" ? dest      : undefined,
-      userId:   req.user._id,
-      userName: req.user.name,
-      date: date ? new Date(date) : new Date(),
+      source:    type === "IN"  ? source : undefined,
+      dest:      type === "OUT" ? dest   : undefined,
+      userId:    req.user._id,
+      userName:  req.user.name,
+      date:      date ? new Date(date) : new Date(),
       notes,
+      ...(warehouseId ? { warehouseId } : {}),
+      ...(binId       ? { binId }       : {}),
+      ...(binCode     ? { binCode }     : {}),
+      unitCost:    unitCost    ? Number(unitCost)    : 0,
+      landedCost:  landedCost  ? Number(landedCost)  : 0,
     }], { session });
 
     await session.commitTransaction();

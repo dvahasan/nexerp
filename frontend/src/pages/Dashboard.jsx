@@ -247,6 +247,109 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── KPI Row ─────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          {
+            label:  isAR ? 'معدل الدوران' : 'Inventory Turnover',
+            value:  stats.inventoryTurnover != null ? (stats.inventoryTurnover).toFixed(2) : '—',
+            sub:    isAR ? 'مرة / سنة' : 'turns/yr',
+            color:  primaryColor,
+            icon:   'refresh',
+            tip:    isAR ? 'كم مرة يتجدد المخزون سنوياً' : 'How many times inventory is sold per year',
+          },
+          {
+            label:  isAR ? 'أيام المخزون (DSI)' : 'Days Sales of Inventory',
+            value:  stats.dsi != null ? (stats.dsi).toFixed(0) : '—',
+            sub:    isAR ? 'يوم' : 'days',
+            color:  '#8b5cf6',
+            icon:   'calendar',
+            tip:    isAR ? 'عدد الأيام اللازمة لبيع المخزون الحالي' : 'Days to sell current inventory at current pace',
+          },
+          {
+            label:  isAR ? 'معدل النفاد' : 'Stockout Rate',
+            value:  stats.stockoutRate != null ? `${stats.stockoutRate}%` : '—',
+            color:  stats.stockoutRate > 10 ? '#ef4444' : stats.stockoutRate > 5 ? '#f59e0b' : '#10b981',
+            icon:   'error',
+            tip:    isAR ? 'نسبة الأصناف التي نفدت (0 في المخزون)' : 'Percentage of items with zero stock',
+          },
+          {
+            label:  isAR ? 'تكلفة المبيعات (30 يوم)' : 'COGS (30 days)',
+            value:  stats.cogs30 != null ? stats.cogs30.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—',
+            sub:    currency,
+            color:  stats.cogsTrend > 0 ? '#10b981' : stats.cogsTrend < 0 ? '#ef4444' : tok.fgMuted,
+            icon:   'money',
+            trend:  stats.cogsTrend,
+            tip:    isAR ? 'تكلفة البضاعة المباعة خلال 30 يوم الماضية' : 'Cost of goods sold in the last 30 days',
+          },
+        ].map((kpi, i) => (
+          <div key={i} style={{
+            ...panel,
+            padding: '14px 16px',
+            borderTop: `3px solid ${kpi.color}`,
+          }} title={kpi.tip}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <span style={monoLabel}>{kpi.label}</span>
+              <div style={{ width: 24, height: 24, borderRadius: 4, backgroundColor: `${kpi.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={kpi.icon} size={12} style={{ color: kpi.color }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 22, fontWeight: 800, color: kpi.color, lineHeight: 1 }}>
+                {kpi.value}
+              </span>
+              {kpi.sub && <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle }}>{kpi.sub}</span>}
+            </div>
+            {kpi.trend != null && kpi.trend !== 0 && (
+              <div style={{ marginTop: 4, fontFamily: 'ui-monospace, monospace', fontSize: 10, color: kpi.trend > 0 ? '#10b981' : '#ef4444' }}>
+                {kpi.trend > 0 ? '▲' : '▼'} {Math.abs(kpi.trend)}% {isAR ? 'مقارنة بالشهر السابق' : 'vs prev 30d'}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Reorder Alerts ──────────────────────────────────────────────────── */}
+      {(stats.reorderAlerts || []).length > 0 && (
+        <div style={{ ...panel, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${tok.border}`, backgroundColor: '#f59e0b08' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="warning" size={14} style={{ color: '#f59e0b' }} />
+              <span style={{ ...monoLabel, color: '#92400e' }}>
+                {isAR ? 'تنبيهات إعادة الطلب' : 'Reorder Alerts'}
+                {' '}({stats.reorderAlerts.length})
+              </span>
+            </div>
+            <Link to="/inventory" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 600, color: primaryColor, textDecoration: 'none' }}>
+              {isAR ? 'عرض الكل ←' : 'View all →'}
+            </Link>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '10px 16px' }}>
+            {stats.reorderAlerts.map(item => (
+              <div key={item._id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', borderRadius: 4,
+                backgroundColor: tok.sunken, border: `1px solid ${tok.border}`,
+                fontSize: 12,
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: item.qty === 0 ? '#ef4444' : '#f59e0b', flexShrink: 0 }} />
+                <span style={{ color: tok.fg, fontWeight: 500 }}>
+                  {isAR ? item.name : (item.nameEn || item.name)}
+                </span>
+                <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle }}>
+                  {item.qty} / {item.reorderPoint}
+                </span>
+                {item.reorderQty > 0 && (
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: primaryColor, fontWeight: 700 }}>
+                    +{item.reorderQty}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Bottom grid ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 

@@ -1,4 +1,5 @@
 import { useAppContext } from '../context/AppContext';
+import { useTour } from '../hooks/useTour';
 import Icon from './Icon';
 import Toast from './Toast';
 import AiChat from './AiChat';
@@ -42,6 +43,8 @@ export default function Layout({ children }) {
     lastSync, syncing, loginWithToken,
   } = useAppContext();
 
+  const { startSystemTour, startPageTour } = useTour();
+
   const navigate   = useNavigate();
   const { pathname } = useLocation();
 
@@ -55,7 +58,9 @@ export default function Layout({ children }) {
   const [searchItems,     setSearchItems]     = useState([]);  // inventory hits
   const [searchDropdown,  setSearchDropdown]  = useState(false);
   const [searchLoading,   setSearchLoading]   = useState(false);
+  const [tourDropdownOpen, setTourDropdownOpen] = useState(false);
   const searchRef = useRef(null);
+  const tourRef = useRef(null);
   // Transactions group: auto-expand if on a tx route
   const [txOpen, setTxOpen] = useState(() =>
     ['/stock-in', '/stock-out'].includes(window.location.pathname)
@@ -99,15 +104,14 @@ export default function Layout({ children }) {
     return () => clearTimeout(t);
   }, [searchVal]);
 
-  // Close search dropdown when clicking outside
+  // Close search and tour dropdowns
   useEffect(() => {
-    const handler = e => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setSearchDropdown(false);
-      }
+    const handleOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchDropdown(false);
+      if (tourRef.current && !tourRef.current.contains(e.target)) setTourDropdownOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
   const toggleLang  = () => setLang(lang === 'en' ? 'ar' : 'en');
@@ -129,10 +133,12 @@ export default function Layout({ children }) {
   ];
 
   const warehouseItems = [
-    { path: '/inventory', icon: 'inventory', label: t.inventory },
+    { path: '/inventory',  icon: 'inventory',  label: t.inventory },
     // Transactions group (rendered specially in SidebarContent)
     ...(canTx ? [{ type: 'group', id: 'tx', icon: 'transactions', label: isAR ? 'الحركات' : 'Transactions', children: txChildren }] : []),
-    { path: '/files', icon: 'copy', label: isAR ? 'الملفات' : 'Files' },
+    { path: '/warehouses', icon: 'warehouse',  label: isAR ? 'المستودعات' : 'Warehouses' },
+    { path: '/bom',        icon: 'bom',        label: isAR ? 'بيانات المواد' : 'Bill of Materials' },
+    { path: '/files',      icon: 'copy',       label: isAR ? 'الملفات' : 'Files' },
     ...(isOwner ? [{ path: '/import', icon: 'import_data', label: isAR ? 'استيراد البيانات' : 'Import Data' }] : []),
   ];
 
@@ -201,6 +207,7 @@ export default function Layout({ children }) {
           return (
             <li key={item.id}>
               <button
+                className={`tour-${item.id}-link`}
                 onClick={() => setTxOpen(o => !o)}
                 title={item.label}
                 style={{
@@ -224,6 +231,7 @@ export default function Layout({ children }) {
           <li key={item.id}>
             {/* Group header */}
             <button
+              className={`tour-${item.id}-link`}
               onClick={() => setTxOpen(o => !o)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center',
@@ -253,6 +261,7 @@ export default function Layout({ children }) {
                     <li key={child.path}>
                       <Link
                         to={child.path}
+                        className={`tour-${child.path.replace('/', '')}-link`}
                         ref={active ? activeLinkRef : null}
                         onClick={() => setDrawerOpen(false)}
                         style={{
@@ -286,6 +295,7 @@ export default function Layout({ children }) {
         <li key={item.path}>
           <Link
             to={item.path}
+            className={`tour-${item.path.replace('/', '')}-link`}
             ref={active ? activeLinkRef : null}
             onClick={() => setDrawerOpen(false)}
             title={!wide ? item.label : undefined}
@@ -500,6 +510,7 @@ export default function Layout({ children }) {
       >
         {/* Sidebar toggle — collapses on desktop, opens drawer on mobile */}
         <button
+          className="tour-sidebar-toggle"
           onClick={() => window.innerWidth >= 768 ? setCollapsed(c => !c) : setDrawerOpen(true)}
           style={iconBtn(tok)}
           title={collapsed ? (isAR ? 'توسيع' : 'Expand') : (isAR ? 'طي' : 'Collapse')}
@@ -705,8 +716,62 @@ export default function Layout({ children }) {
             {syncing ? 'SYNC' : 'LIVE'}
           </div>
 
+          {/* Tour Dropdown */}
+          <div ref={tourRef} style={{ position: 'relative' }} className="tour-navbar">
+            <button
+              onClick={() => setTourDropdownOpen(prev => !prev)}
+              style={{
+                ...iconBtn(tok),
+                color: tourDropdownOpen ? primaryColor : tok.fgMuted,
+                position: 'relative',
+              }}
+              title={isAR ? 'بدء جولة إرشادية' : 'Start Tour'}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = primaryColor;
+                e.currentTarget.style.backgroundColor = tok.sunken;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = tourDropdownOpen ? primaryColor : tok.fgMuted;
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Icon name="info" size={17} />
+            </button>
+            {tourDropdownOpen && (
+              <div style={{
+                position: 'absolute', top: 32, right: 0, width: 180,
+                backgroundColor: tok.elev, border: `1px solid ${tok.border}`,
+                borderRadius: 4, padding: 4, zIndex: 50,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              }}>
+                <button
+                  onClick={() => { setTourDropdownOpen(false); startPageTour(); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                    fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {isAR ? 'جولة في هذه الصفحة' : 'Tour Current Page'}
+                </button>
+                <button
+                  onClick={() => { setTourDropdownOpen(false); startSystemTour(); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                    fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {isAR ? 'جولة في النظام بأكمله' : 'Tour Whole System'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Theme toggle */}
-          <button onClick={toggleTheme} style={iconBtn(tok)} title="Toggle theme">
+          <button className="tour-theme-toggle" onClick={toggleTheme} style={iconBtn(tok)} title="Toggle theme">
             <Icon name={theme === 'dark' ? 'light' : 'dark'} size={14} />
           </button>
 

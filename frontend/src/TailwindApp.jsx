@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { TourProvider } from './context/TourContext';
 import Layout from './components/Layout';
 import { T } from './theme';
 
@@ -25,7 +26,9 @@ const Import = lazy(() => import('./pages/Import'));
 const ItemPage = lazy(() => import('./pages/ItemPage'));
 const BarcodeLookup = lazy(() => import('./pages/BarcodeLookup'));
 const Departments = lazy(() => import('./pages/Departments'));
-const Categories = lazy(() => import('./pages/Categories'));
+const Categories  = lazy(() => import('./pages/Categories'));
+const Warehouses  = lazy(() => import('./pages/Warehouses'));
+const BOM         = lazy(() => import('./pages/BOM'));
 
 /* ── Loading spinner ─────────────────────────────────────────────────────── */
 function Spinner() {
@@ -154,6 +157,8 @@ function AppRoutes() {
         <Route path="/myprofile"       element={<Protected><Layout><UserProfile /></Layout></Protected>} />
         <Route path="/import"          element={<Protected><Layout><Import /></Layout></Protected>} />
         <Route path="/barcode-lookup"  element={<Protected><Layout><BarcodeLookup /></Layout></Protected>} />
+        <Route path="/warehouses"      element={<Protected><Layout><Warehouses /></Layout></Protected>} />
+        <Route path="/bom"             element={<Protected><Layout><BOM /></Layout></Protected>} />
 
         {/* ── Catch all ───────────────────────────────────────── */}
         <Route path="*" element={authed ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />
@@ -166,7 +171,9 @@ export default function TailwindApp() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <AppRoutes />
+        <TourProvider>
+          <AppRoutes />
+        </TourProvider>
       </AppProvider>
     </BrowserRouter>
   );

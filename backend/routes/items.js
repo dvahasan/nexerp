@@ -11,7 +11,11 @@ const router = express.Router();
 // ── GET /api/items ────────────────────────────────────────────────────────────
 router.get("/", protect, async (req, res) => {
   try {
-    const { search, dept, cat, status, stock, page, limit: rawLimit, all } = req.query;
+    const {
+      search, dept, cat, status, stock, page, limit: rawLimit, all,
+      barcode: barcodeF, photo: photoF, type: typeF,
+      favorites, priceMin, priceMax, hasDescription,
+    } = req.query;
     let q = { companyId: req.user.companyId, deletedAt: null };
 
     if (search) {
@@ -20,14 +24,37 @@ router.get("/", protect, async (req, res) => {
         { nameEn:  { $regex: search, $options: "i" } },
         { sku:     { $regex: search, $options: "i" } },
         { barcode: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
       ];
     }
     if (dept)   q.deptId = dept;
     if (cat)    q.catId  = cat;
     if (status) q.status = status;
+    if (typeF)  q.type   = typeF;
+
+    // Stock level
     if (stock === "out") q.qty = 0;
     if (stock === "low") q.$and = [{ qty: { $gt: 0 } }, { $expr: { $lte: ["$qty", "$minThreshold"] } }];
     if (stock === "ok")  q.$expr = { $gt: ["$qty", "$minThreshold"] };
+
+    // Barcode presence
+    if (barcodeF === "has")  q.barcode = { $exists: true, $nin: [null, ""] };
+    if (barcodeF === "none") q.$and = [...(q.$and || []), { $or: [{ barcode: { $exists: false } }, { barcode: null }, { barcode: "" }] }];
+
+    // Photo presence
+    if (photoF === "has")  q.photo = { $exists: true, $nin: [null, ""] };
+    if (photoF === "none") q.$and = [...(q.$and || []), { $or: [{ photo: { $exists: false } }, { photo: null }, { photo: "" }] }];
+
+    // Description presence
+    if (hasDescription === "yes") q.description = { $exists: true, $nin: [null, ""] };
+    if (hasDescription === "no")  q.$and = [...(q.$and || []), { $or: [{ description: { $exists: false } }, { description: null }, { description: "" }] }];
+
+    // Price range
+    if (priceMin && !isNaN(priceMin)) q.price = { ...(q.price || {}), $gte: Number(priceMin) };
+    if (priceMax && !isNaN(priceMax)) q.price = { ...(q.price || {}), $lte: Number(priceMax) };
+
+    // Favorites
+    if (favorites === "1") q.isFavorite = true;
 
     // ?all=1 → full list for comboboxes (no pagination)
     if (all === "1") {

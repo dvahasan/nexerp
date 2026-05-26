@@ -12,6 +12,15 @@ const TxSchema = new mongoose.Schema(
     userName:  String,
     date:      { type: Date, default: Date.now },
     notes:     String,
+
+    // ── Warehouse & bin ───────────────────────────────────────────────────
+    warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    binId:       { type: mongoose.Schema.Types.ObjectId, ref: "Bin",       default: null },
+    binCode:     { type: String, trim: true },   // denormalised for fast display
+
+    // ── Costing ───────────────────────────────────────────────────────────
+    unitCost:    { type: Number, default: 0, min: 0 },   // cost per unit at time of tx
+    landedCost:  { type: Number, default: 0, min: 0 },   // total landed extras (shipping, duties)
   },
   { timestamps: true }
 );

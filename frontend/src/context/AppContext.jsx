@@ -96,11 +96,12 @@ export const AppProvider = ({ children }) => {
   const [lang,  setLang]  = useState(() => localStorage.getItem('nexinv_lang')  || 'en');
   const [theme, setTheme] = useState(() => localStorage.getItem('nexinv_theme') || 'dark');
 
-  const [items, setItems] = useState([]);
-  const [depts, setDepts] = useState([]);
-  const [cats,  setCats]  = useState([]);
-  const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [items,      setItems]      = useState([]);
+  const [depts,      setDepts]      = useState([]);
+  const [cats,       setCats]       = useState([]);
+  const [users,      setUsers]      = useState([]);
+  const [stats,      setStats]      = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
 
   // ── Toast system ──────────────────────────────────────────────────────────
   const [toasts, setToasts] = useState([]);
@@ -232,7 +233,7 @@ export const AppProvider = ({ children }) => {
     setAuthed(false);
     setUser(null);
     setCompany(null);
-    setItems([]); setDepts([]); setCats([]); setUsers([]); setStats(null);
+    setItems([]); setDepts([]); setCats([]); setUsers([]); setStats(null); setWarehouses([]);
     // Navigation handled by Layout.jsx logout button
   };
 
@@ -245,15 +246,17 @@ export const AppProvider = ({ children }) => {
     if (!silent) return;
     setSyncing(true);
     try {
-      const [iData, d, c, u, s] = await Promise.all([
+      const [iData, d, c, u, s, wh] = await Promise.all([
         api.getItems(),
         api.getDepts(),
         api.getCats(),
         user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
         api.getStats(),
+        api.getWarehouses().catch(() => []),
       ]);
       setItems(Array.isArray(iData) ? iData : (iData.items || []));
       setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setWarehouses(Array.isArray(wh) ? wh : []);
       setLastSync(new Date());
     } catch (e) {
       console.error('Live sync failed', e);
@@ -266,16 +269,18 @@ export const AppProvider = ({ children }) => {
   const reloadData = useCallback(async () => {
     if (!authed) return;
     try {
-      const [iData, d, c, u, s] = await Promise.all([
+      const [iData, d, c, u, s, wh] = await Promise.all([
         api.getItems(),
         api.getDepts(),
         api.getCats(),
         user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
         api.getStats(),
+        api.getWarehouses().catch(() => []),
       ]);
       // getItems returns plain array (all=1 flag)
       setItems(Array.isArray(iData) ? iData : (iData.items || []));
       setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setWarehouses(Array.isArray(wh) ? wh : []);
       setLastSync(new Date());
     } catch (e) {
       console.error('Failed to reload data', e);
@@ -472,7 +477,7 @@ export const AppProvider = ({ children }) => {
   const value = {
     user, company, authed, loading,
     lang, setLang, theme, setTheme,
-    items, depts, cats, users, stats,
+    items, depts, cats, users, stats, warehouses,
     lastSync, syncing,
     login, loginDemo, loginWithToken, logout, loadData: reloadData,
     toasts, showToast, removeToast,

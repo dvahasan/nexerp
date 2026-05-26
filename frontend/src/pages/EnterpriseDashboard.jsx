@@ -466,7 +466,7 @@ export default function EnterpriseDashboard() {
                 )}
 
                 {/* Company grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="tour-companies-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {companies.slice(0, page * LIMIT).map(c => (
                     <CompanyCard
                       key={c._id}

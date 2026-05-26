@@ -188,7 +188,7 @@ export default function Permissions() {
           • bodyRef  – overflow-x:auto; only THIS div scrolls sideways.
                        onScroll drives headRef.scrollLeft in sync.
       ────────────────────────────────────────────────────────────────── */}
-      <div style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4 }}>
+      <div className="tour-permissions-matrix" style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4 }}>
 
         {/* ── Sticky header ── */}
         <div

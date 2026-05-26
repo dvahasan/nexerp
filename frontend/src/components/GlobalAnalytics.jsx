@@ -131,7 +131,7 @@ export default function GlobalAnalytics({ companies, isAR, tok, theme }) {
   );
 
   return (
-    <div className="space-y-4 w-full max-w-6xl mx-auto animate-in fade-in duration-300">
+    <div className="tour-global-analytics space-y-4 w-full max-w-6xl mx-auto animate-in fade-in duration-300">
 
       {/* ── Mixed-currency notice ── */}
       {mixedCurrency && (

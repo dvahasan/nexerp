@@ -1049,7 +1049,7 @@ export default function ItemPage() {
                 {lookupCard.fields.length > 0 && (
                   <div style={{
                     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                    gap: 1, padding: 10, gap: 6,
+                    gap: 6, padding: 10,
                   }}>
                     {lookupCard.fields.map((f, i) => (
                       <div key={i} style={{

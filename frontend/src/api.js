@@ -126,4 +126,25 @@ export const api = {
 
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),
+
+  // Warehouses
+  getWarehouses:    ()          => req("GET",    "/warehouses"),
+  getWarehouse:     (id)        => req("GET",    `/warehouses/${id}`),
+  addWarehouse:     (d)         => req("POST",   "/warehouses", d),
+  updateWarehouse:  (id, d)     => req("PUT",    `/warehouses/${id}`, d),
+  deleteWarehouse:  (id)        => req("DELETE", `/warehouses/${id}`),
+
+  // Bins
+  getBins:     (params = {}) => req("GET",    "/bins?" + new URLSearchParams(params)),
+  addBin:      (d)           => req("POST",   "/bins", d),
+  updateBin:   (id, d)       => req("PUT",    `/bins/${id}`, d),
+  deleteBin:   (id)          => req("DELETE", `/bins/${id}`),
+
+  // BOM (Bill of Materials)
+  getBoms:     ()        => req("GET",    "/bom"),
+  getBom:      (id)      => req("GET",    `/bom/${id}`),
+  addBom:      (d)       => req("POST",   "/bom", d),
+  updateBom:   (id, d)   => req("PUT",    `/bom/${id}`, d),
+  deleteBom:   (id)      => req("DELETE", `/bom/${id}`),
+  produceBom:  (id, d)   => req("POST",   `/bom/${id}/produce`, d),
 };
