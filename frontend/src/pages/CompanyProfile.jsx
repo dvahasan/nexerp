@@ -1,23 +1,24 @@
 import { useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 import Icon from '../components/Icon';
 import LazyScroll from '../components/LazyScroll';
 
 const CURRENCIES = [
-  { code: 'USD', symbol: '$',  name: 'US Dollar'       },
-  { code: 'EUR', symbol: '€',  name: 'Euro'            },
-  { code: 'GBP', symbol: '£',  name: 'British Pound'   },
-  { code: 'AED', symbol: 'د.إ',name: 'UAE Dirham'      },
-  { code: 'SAR', symbol: '﷼',  name: 'Saudi Riyal'     },
-  { code: 'EGP', symbol: 'E£', name: 'Egyptian Pound'  },
-  { code: 'KWD', symbol: 'KD', name: 'Kuwaiti Dinar'   },
-  { code: 'QAR', symbol: 'QR', name: 'Qatari Riyal'    },
-  { code: 'BHD', symbol: 'BD', name: 'Bahraini Dinar'  },
-  { code: 'OMR', symbol: 'OMR',name: 'Omani Rial'      },
-  { code: 'JOD', symbol: 'JD', name: 'Jordanian Dinar' },
-  { code: 'TRY', symbol: '₺',  name: 'Turkish Lira'    },
-  { code: 'INR', symbol: '₹',  name: 'Indian Rupee'    },
-  { code: 'JPY', symbol: '¥',  name: 'Japanese Yen'    },
+  { code: 'USD', symbol: '$',   name: 'US Dollar'       },
+  { code: 'EUR', symbol: '€',   name: 'Euro'            },
+  { code: 'GBP', symbol: '£',   name: 'British Pound'   },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham'      },
+  { code: 'SAR', symbol: '﷼',   name: 'Saudi Riyal'     },
+  { code: 'EGP', symbol: 'E£',  name: 'Egyptian Pound'  },
+  { code: 'KWD', symbol: 'KD',  name: 'Kuwaiti Dinar'   },
+  { code: 'QAR', symbol: 'QR',  name: 'Qatari Riyal'    },
+  { code: 'BHD', symbol: 'BD',  name: 'Bahraini Dinar'  },
+  { code: 'OMR', symbol: 'OMR', name: 'Omani Rial'      },
+  { code: 'JOD', symbol: 'JD',  name: 'Jordanian Dinar' },
+  { code: 'TRY', symbol: '₺',   name: 'Turkish Lira'    },
+  { code: 'INR', symbol: '₹',   name: 'Indian Rupee'    },
+  { code: 'JPY', symbol: '¥',   name: 'Japanese Yen'    },
 ];
 
 const INDUSTRIES = [
@@ -32,49 +33,29 @@ const COLOR_PRESETS = [
   '#14b8a6', '#06b6d4', '#0ea5e9', '#64748b',
 ];
 
-function StatCard({ icon, label, value, sub, accent = 'blue' }) {
-  const colors = {
-    blue:    'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
-    emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    violet:  'bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400',
-    amber:   'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  };
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-5 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colors[accent]}`}>
-        <Icon name={icon} size={22} />
-      </div>
-      <div>
-        <div className="text-2xl font-black text-slate-800 dark:text-white leading-tight">{value}</div>
-        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{label}</div>
-        {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
 export default function CompanyProfile() {
-  const { company, users, items, stats, doUpdateCompany, uploadCompanyLogo, showToast, isAR, user: me } = useAppContext();
+  const { company, users, items, stats, doUpdateCompany, uploadCompanyLogo, isAR, user: me, theme, showToast } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
 
-  // Owner always can edit — role is the source of truth; others need canManageCompany perm
   const isAdmin = me?.role === 'owner' || !!me?.perms?.canManageCompany;
 
   const [form, setForm] = useState({
-    name:           company?.name          || '',
-    description:    company?.description   || '',
-    industry:       company?.industry      || '',
-    baseCurrency:   company?.baseCurrency  || 'USD',
-    primaryColor:   company?.primaryColor  || '#3b82f6',
+    name:         company?.name         || '',
+    description:  company?.description  || '',
+    industry:     company?.industry     || '',
+    baseCurrency: company?.baseCurrency || 'USD',
+    primaryColor: company?.primaryColor || '#3b82f6',
   });
-  const [saving, setSaving]   = useState(false);
-  const [copied, setCopied]   = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [copied,   setCopied]   = useState(false);
+  const [focused,  setFocused]  = useState('');
   const colorRef = useRef(null);
 
   const handleSave = async () => {
     setSaving(true);
-    try {
-      await doUpdateCompany(form);
-    } catch { /* toast handled */ }
+    try { await doUpdateCompany(form); }
+    catch { /* toast handled */ }
     finally { setSaving(false); }
   };
 
@@ -93,135 +74,200 @@ export default function CompanyProfile() {
   const totalValue  = stats?.totalValue || 0;
   const currency    = CURRENCIES.find(c => c.code === company?.baseCurrency) || CURRENCIES[0];
 
+  // helpers
+  const label = (text) => (
+    <label style={{
+      display: 'block', fontFamily: 'ui-monospace, monospace',
+      fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+      letterSpacing: '0.08em', color: t.fgSubtle, marginBottom: 6,
+    }}>{text}</label>
+  );
+
+  const fieldInput = (name, extra = {}) => ({
+    width: '100%', height: 36, padding: '0 10px', borderRadius: 4,
+    border: `1px solid ${focused === name ? primary : t.border}`,
+    backgroundColor: t.canvas, color: t.fg, fontSize: 13,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    transition: 'border-color 120ms, box-shadow 120ms',
+    ...extra,
+  });
+
+  const panel = { backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4 };
+
+  // stat card data
+  const statCards = [
+    { icon: 'users',      label: isAR ? 'الأعضاء النشطون'   : 'Active Members',     value: activeUsers,                             color: '#3b82f6' },
+    { icon: 'inventory',  label: isAR ? 'أصناف المخزون'      : 'Inventory Items',    value: items.length,                            color: '#10b981' },
+    { icon: 'swap',       label: isAR ? 'إجمالي الحركات'     : 'Total Transactions', value: stats?.totalTransactions ?? '—',         color: '#8b5cf6' },
+    { icon: 'trending_up',label: isAR ? 'قيمة المخزون'       : 'Stock Value',        value: `${currency.symbol}${totalValue.toLocaleString()}`, color: '#f59e0b' },
+  ];
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+    <div className="animate-in fade-in duration-300" style={{ maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── Hero Banner ─────────────────────────────────────────────────────── */}
-      <div
-        className="relative rounded-2xl overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${company?.primaryColor || '#3b82f6'} 0%, ${company?.primaryColor || '#3b82f6'}cc 100%)` }}
-      >
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+      {/* ── Hero banner ── */}
+      <div style={{
+        position: 'relative', borderRadius: 4, overflow: 'hidden',
+        background: `linear-gradient(135deg, ${primary} 0%, ${primary}cc 100%)`,
+      }}>
+        {/* Dot pattern overlay */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.08,
+          backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }} />
 
-        <div className="relative px-8 py-10 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          {/* Company avatar / logo */}
-          <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white font-black text-3xl flex-shrink-0 shadow-lg overflow-hidden">
+        <div style={{ position: 'relative', padding: '28px 28px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 20 }}>
+          {/* Logo */}
+          <div style={{
+            width: 72, height: 72, borderRadius: 4,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 900, fontSize: 28, flexShrink: 0, overflow: 'hidden',
+          }}>
             {company?.logo ? (
-              <img src={company.logo} alt="Logo" loading="lazy" className="w-full h-full object-contain bg-white" />
+              <img src={company.logo} alt="Logo" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#fff' }} />
             ) : (
               company?.name?.charAt(0)?.toUpperCase() || 'N'
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
               {company?.name || 'Your Company'}
             </h1>
             {company?.industry && (
-              <p className="text-white/75 text-sm font-medium mt-1">{company.industry}</p>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 4, fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {company.industry}
+              </p>
             )}
             {company?.description && (
-              <p className="text-white/65 text-sm mt-2 leading-relaxed max-w-lg">{company.description}</p>
+              <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 6, lineHeight: 1.5, maxWidth: 480 }}>
+                {company.description}
+              </p>
             )}
           </div>
 
-          {/* Company Code pill */}
+          {/* Company code pill */}
           <button
             onClick={copyCode}
             title={copied ? 'Copied!' : 'Click to copy'}
-            className="flex-shrink-0 bg-white/15 hover:bg-white/25 border border-white/30 rounded-xl px-5 py-3 text-center transition-colors group"
+            style={{
+              flexShrink: 0, backgroundColor: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4,
+              padding: '10px 18px', textAlign: 'center', cursor: 'pointer',
+              transition: 'background 120ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)'}
           >
-            <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1">
+            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
               {isAR ? 'رمز الشركة' : 'Company Code'}
             </div>
-            <div className="text-2xl font-black text-white font-mono tracking-wider">
+            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.08em' }}>
               {company?.code || '—'}
             </div>
-            <div className="text-[10px] text-white/50 mt-1 flex items-center justify-center gap-1">
-              <Icon name="copy" size={10} />
+            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <Icon name="copy" size={9} />
               {copied ? (isAR ? 'تم النسخ!' : 'Copied!') : (isAR ? 'انقر للنسخ' : 'Click to copy')}
             </div>
           </button>
         </div>
 
-        {/* Founded date ribbon */}
-        <div className="bg-black/10 px-8 py-2.5 flex items-center gap-2 border-t border-white/10">
-          <Icon name="calendar" size={13} className="text-white/60" />
-          <span className="text-xs text-white/60 font-medium">
+        {/* Footer strip */}
+        <div style={{
+          marginTop: 16, padding: '8px 28px',
+          backgroundColor: 'rgba(0,0,0,0.1)', borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <Icon name="calendar" size={11} style={{ color: 'rgba(255,255,255,0.5)' }} />
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {isAR ? 'تأسست في' : 'Founded'} {createdDate}
           </span>
-          <span className="mx-2 text-white/20">·</span>
-          <Icon name="dashboard" size={13} className="text-white/60" />
-          <span className="text-xs text-white/60 font-medium">
+          <span style={{ margin: '0 6px', color: 'rgba(255,255,255,0.2)' }}>·</span>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             NexINV SaaS
           </span>
         </div>
       </div>
 
-      {/* ── Stats Grid ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon="users"     label={isAR ? 'الأعضاء النشطون' : 'Active Members'} value={activeUsers}    accent="blue"    />
-        <StatCard icon="inventory" label={isAR ? 'أصناف المخزون'   : 'Inventory Items'} value={items.length}  accent="emerald" />
-        <StatCard icon="swap"      label={isAR ? 'إجمالي الحركات'  : 'Total Transactions'} value={stats?.totalTransactions ?? '—'} accent="violet"  />
-        <StatCard
-          icon="trending_up"
-          label={isAR ? 'قيمة المخزون' : 'Stock Value'}
-          value={`${currency.symbol}${totalValue.toLocaleString()}`}
-          accent="amber"
-        />
+      {/* ── Stat cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+        {statCards.map((card, i) => (
+          <div key={i} style={{ ...panel, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 4, flexShrink: 0,
+              backgroundColor: card.color + '18',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: card.color,
+            }}>
+              <Icon name={card.icon} size={20} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 20, fontWeight: 900, color: t.fg, lineHeight: 1 }}>
+                {card.value}
+              </div>
+              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: t.fgSubtle, marginTop: 4 }}>
+                {card.label}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* ── Edit Form (Admin only) ───────────────────────────────────────────── */}
+      {/* ── Edit form (admin) ── */}
       {isAdmin && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl p-6 space-y-6">
-          <div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-white">
+        <div style={{ ...panel, padding: 24 }}>
+          <div style={{ marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${t.border}` }}>
+            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fg }}>
               {isAR ? 'إعدادات الشركة' : 'Company Settings'}
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            </span>
+            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: t.fgSubtle, marginTop: 4 }}>
               {isAR ? 'هذه الإعدادات تؤثر على كل مستخدمي الشركة' : 'These settings affect all company members'}
-            </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Company Name */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'اسم الشركة' : 'Company Name'}
-              </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 14 }}>
+            {/* Company name — full width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              {label(isAR ? 'اسم الشركة' : 'Company Name')}
               <input
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                style={fieldInput('cname')}
                 placeholder={isAR ? 'اسم شركتك' : 'Your company name'}
+                onFocus={() => setFocused('cname')}
+                onBlur={() => setFocused('')}
               />
             </div>
 
-            {/* Description */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'وصف الشركة' : 'Description'}
-              </label>
+            {/* Description — full width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              {label(isAR ? 'وصف الشركة' : 'Description')}
               <textarea
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors resize-none"
                 placeholder={isAR ? 'وصف مختصر عن نشاط شركتك...' : 'A brief description of your company...'}
+                style={{
+                  ...fieldInput('desc', { height: 'auto', padding: '8px 10px', resize: 'vertical' }),
+                }}
+                onFocus={() => setFocused('desc')}
+                onBlur={() => setFocused('')}
               />
             </div>
 
             {/* Industry */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'القطاع' : 'Industry'}
-              </label>
+              {label(isAR ? 'القطاع' : 'Industry')}
               <select
                 value={form.industry}
                 onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                style={fieldInput('industry')}
+                onFocus={() => setFocused('industry')}
+                onBlur={() => setFocused('')}
               >
                 <option value="">{isAR ? 'اختر القطاع...' : 'Select industry...'}</option>
                 {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
@@ -230,13 +276,13 @@ export default function CompanyProfile() {
 
             {/* Currency */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'العملة' : 'Base Currency'}
-              </label>
+              {label(isAR ? 'العملة' : 'Base Currency')}
               <select
                 value={form.baseCurrency}
                 onChange={e => setForm(f => ({ ...f, baseCurrency: e.target.value }))}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                style={fieldInput('currency')}
+                onFocus={() => setFocused('currency')}
+                onBlur={() => setFocused('')}
               >
                 {CURRENCIES.map(c => (
                   <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>
@@ -244,92 +290,117 @@ export default function CompanyProfile() {
               </select>
             </div>
 
-            {/* Logo Upload */}
+            {/* Logo upload */}
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'شعار الشركة' : 'Company Logo'}
-              </label>
-              <label className="cursor-pointer flex items-center justify-center w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 border-dashed hover:border-blue-500 rounded-xl px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400 transition-colors h-[42px]">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
+              {label(isAR ? 'شعار الشركة' : 'Company Logo')}
+              <label onClick={e => { if (me?.isDemo) { e.preventDefault(); showToast(isAR ? 'رفع الملفات غير متاح في وضع التجربة' : 'File uploads are disabled in Demo Mode', 'error'); } }} style={{
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: 36, borderRadius: 4, border: `1px dashed ${t.border}`,
+                backgroundColor: t.canvas, color: t.fgMuted, fontSize: 12,
+                transition: 'border-color 120ms, color 120ms', gap: 6,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = primary; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.fgMuted; }}
+              >
+                <input type="file" style={{ display: 'none' }} accept="image/*"
                   onChange={async e => {
+                    if (me?.isDemo) {
+                      alert(isAR ? 'رفع الملفات غير متاح في وضع التجربة' : 'Action disabled in Demo Mode');
+                      return;
+                    }
                     if (e.target.files?.[0]) {
                       setSaving(true);
-                      try {
-                        await uploadCompanyLogo(e.target.files[0]);
-                      } finally { setSaving(false); }
+                      try { await uploadCompanyLogo(e.target.files[0]); }
+                      finally { setSaving(false); }
                     }
                   }}
                 />
-                <Icon name="upload" size={16} className="mr-2" />
+                <Icon name="upload" size={14} />
                 {isAR ? 'اختر صورة...' : 'Upload new logo...'}
               </label>
             </div>
-          </div>
 
-          {/* Brand Color */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-              {isAR ? 'لون العلامة التجارية' : 'Brand Color'}
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              {COLOR_PRESETS.map(c => (
+            {/* Brand color — full width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              {label(isAR ? 'لون العلامة التجارية' : 'Brand Color')}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                {COLOR_PRESETS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setForm(f => ({ ...f, primaryColor: c }))}
+                    style={{
+                      width: 28, height: 28, borderRadius: 4, cursor: 'pointer',
+                      backgroundColor: c, border: 'none',
+                      outline: form.primaryColor === c ? `2px solid ${c}` : 'none',
+                      outlineOffset: 2,
+                      transform: form.primaryColor === c ? 'scale(1.15)' : 'scale(1)',
+                      transition: 'transform 120ms',
+                    }}
+                    title={c}
+                  />
+                ))}
+
+                {/* Custom color picker */}
                 <button
-                  key={c}
-                  onClick={() => setForm(f => ({ ...f, primaryColor: c }))}
-                  className={`w-8 h-8 rounded-lg transition-transform hover:scale-110 flex-shrink-0 ${form.primaryColor === c ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 ring-slate-400 scale-110' : ''}`}
-                  style={{ backgroundColor: c }}
-                  title={c}
-                />
-              ))}
-              {/* Custom color picker */}
-              <button
-                onClick={() => colorRef.current?.click()}
-                className="w-8 h-8 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center hover:border-blue-400 transition-colors flex-shrink-0 overflow-hidden relative"
-                title="Custom color"
-              >
-                <input
-                  ref={colorRef}
-                  type="color"
-                  value={form.primaryColor}
-                  onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <Icon name="add" size={14} className="text-slate-400 pointer-events-none" />
-              </button>
-              <div
-                className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex-shrink-0"
-                style={{ backgroundColor: form.primaryColor }}
-              />
-              <span className="text-xs font-mono text-slate-500 dark:text-slate-400">{form.primaryColor}</span>
+                  onClick={() => colorRef.current?.click()}
+                  style={{
+                    width: 28, height: 28, borderRadius: 4,
+                    border: `1px dashed ${t.border}`, cursor: 'pointer',
+                    backgroundColor: 'transparent', position: 'relative', overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: t.fgSubtle, transition: 'border-color 120ms',
+                  }}
+                  title="Custom color"
+                  onMouseEnter={e => e.currentTarget.style.borderColor = primary}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
+                >
+                  <input
+                    ref={colorRef}
+                    type="color"
+                    value={form.primaryColor}
+                    onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                  />
+                  <Icon name="add" size={12} style={{ pointerEvents: 'none' }} />
+                </button>
+
+                {/* Preview swatch */}
+                <div style={{ width: 28, height: 28, borderRadius: 4, backgroundColor: form.primaryColor, border: `1px solid ${t.border}` }} />
+                <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted }}>{form.primaryColor}</span>
+              </div>
             </div>
           </div>
 
           {/* Save */}
-          <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16, marginTop: 16, borderTop: `1px solid ${t.border}` }}>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 border border-blue-500"
+              style={{
+                height: 34, padding: '0 20px', borderRadius: 4,
+                backgroundColor: primary, color: '#fff', border: 'none',
+                cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.06em',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                opacity: saving ? 0.65 : 1, transition: 'opacity 120ms',
+              }}
             >
               {saving
-                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {isAR ? 'جارٍ الحفظ...' : 'Saving...'}</>
-                : <><Icon name="save" size={16} /> {isAR ? 'حفظ التغييرات' : 'Save Changes'}</>
+                ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 600ms linear infinite' }} /> {isAR ? 'جارٍ الحفظ...' : 'Saving...'}</>
+                : <><Icon name="save" size={14} /> {isAR ? 'حفظ التغييرات' : 'Save Changes'}</>
               }
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Company Info Card (read-only for non-admins) ─────────────────────── */}
+      {/* ── Company info (read-only for non-admins) ── */}
       {!isAdmin && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl p-6">
-          <h2 className="text-base font-bold text-slate-800 dark:text-white mb-4">
+        <div style={{ ...panel, padding: 24 }}>
+          <span style={{ display: 'block', marginBottom: 16, fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fg }}>
             {isAR ? 'معلومات الشركة' : 'Company Information'}
-          </h2>
-          <dl className="space-y-3">
+          </span>
+          <dl style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { label: isAR ? 'الاسم'    : 'Name',     value: company?.name },
               { label: isAR ? 'القطاع'   : 'Industry', value: company?.industry || '—' },
@@ -337,45 +408,79 @@ export default function CompanyProfile() {
               { label: isAR ? 'العملة'   : 'Currency', value: `${currency.symbol} ${currency.code} — ${currency.name}` },
               { label: isAR ? 'تأسست في' : 'Founded',  value: createdDate },
             ].map(row => (
-              <div key={row.label} className="flex items-start gap-3">
-                <dt className="text-xs font-bold text-slate-400 uppercase tracking-wider w-24 flex-shrink-0 pt-0.5">{row.label}</dt>
-                <dd className="text-sm text-slate-700 dark:text-slate-300 flex-1">{row.value}</dd>
+              <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <dt style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, width: 80, flexShrink: 0, paddingTop: 1 }}>
+                  {row.label}
+                </dt>
+                <dd style={{ fontSize: 13, color: t.fgMuted, flex: 1 }}>{row.value}</dd>
               </div>
             ))}
           </dl>
         </div>
       )}
 
-      {/* ── Members summary ──────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-slate-800 dark:text-white">
+      {/* ── Team members ── */}
+      <div style={{ ...panel, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${t.border}` }}>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fg }}>
             {isAR ? 'فريق العمل' : 'Team Members'}
-          </h2>
-          <span className="text-xs font-semibold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
+          </span>
+          <span style={{
+            fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700,
+            color: t.fgSubtle, backgroundColor: t.sunken,
+            border: `1px solid ${t.border}`, borderRadius: 3, padding: '2px 8px',
+          }}>
             {users.length}
           </span>
         </div>
-        <div className="space-y-1">
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {users.map((u, i) => {
-            const GRADIENTS = [
-              'from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600',
-              'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600',
-              'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600',
-            ];
+            const palette = ['#3b82f6','#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4'];
+            const avatarColor = palette[i % palette.length];
             return (
               <LazyScroll key={u._id} alwaysRender rootMargin="150px">
-                <div className="flex items-center gap-3 py-2 px-1 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm`}>
+                <div
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '8px 10px', borderRadius: 4, transition: 'background 120ms', cursor: 'default',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = t.sunken}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {/* Avatar */}
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 4, flexShrink: 0,
+                    backgroundColor: avatarColor + '22', border: `1px solid ${avatarColor}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 800, color: avatarColor,
+                  }}>
                     {u.name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 dark:text-white truncate">{u.name}</div>
-                    <div className="text-xs text-slate-400 font-mono">@{u.username}</div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: t.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {u.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: t.fgSubtle, fontFamily: 'ui-monospace, monospace' }}>
+                      @{u.username}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${u.active !== false ? 'bg-emerald-500' : 'bg-red-400'}`} />
-                    <span className="text-[10px] font-bold capitalize px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {/* Online dot */}
+                    <div style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      backgroundColor: u.active !== false ? '#16774A' : t.neg,
+                    }} />
+                    {/* Role badge */}
+                    <span style={{
+                      fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                      color: t.fgSubtle, backgroundColor: t.sunken,
+                      border: `1px solid ${t.border}`, borderRadius: 3,
+                      padding: '2px 6px',
+                    }}>
                       {u.role}
                     </span>
                   </div>
@@ -384,7 +489,7 @@ export default function CompanyProfile() {
             );
           })}
           {users.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-6">
+            <p style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgSubtle, textAlign: 'center', padding: '24px 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {isAR ? 'لا يوجد أعضاء' : 'No members yet'}
             </p>
           )}

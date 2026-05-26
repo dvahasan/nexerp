@@ -1,19 +1,18 @@
-import React from 'react';
+import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 
 export default function Skeleton({ className = "", shape = "rect" }) {
-  // shape can be: 'rect', 'circle', 'text'
-  let shapeClasses = "";
-  if (shape === "circle") {
-    shapeClasses = "rounded-full";
-  } else if (shape === "rect") {
-    shapeClasses = "rounded-2xl";
-  } else if (shape === "text") {
-    shapeClasses = "rounded-md";
-  }
+  const { theme } = useAppContext();
+  const t = T[theme] || T.light;
+
+  let borderRadius = '4px';
+  if (shape === 'circle') borderRadius = '50%';
+  else if (shape === 'text') borderRadius = '3px';
 
   return (
     <div
-      className={`animate-pulse bg-slate-200 dark:bg-slate-800 ${shapeClasses} ${className}`}
+      className={`animate-pulse ${className}`}
+      style={{ backgroundColor: t.border, borderRadius }}
     />
   );
 }

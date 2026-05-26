@@ -1,187 +1,298 @@
-require("dotenv").config();
-const mongoose = require("mongoose");
-const bcrypt   = require("bcryptjs");
+/**
+ * seed.js — NexINV testing data
+ * Run:  node seed.js
+ *
+ * Creates:
+ *   • 1 enterprise owner (login: enterprise / Pass1234)
+ *   • 3 companies owned by that enterprise user
+ *   • For each company: owner, admin, manager, warehouse user, viewer
+ *   • Departments, categories, items (15 per company), transactions (50 per company)
+ */
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => { console.log("✅ Connected"); run(); })
-  .catch(e  => { console.error("❌", e.message); process.exit(1); });
+require('dotenv').config();
+const mongoose = require('mongoose');
+const bcrypt   = require('bcryptjs');
 
-// ── Schemas (mirror of server.js) ─────────────────────────────────────────────
-const Dept = mongoose.model("Department", new mongoose.Schema({
-  name: String, nameEn: String, color: { type: String, default: "#3b82f6" }, active: { type: Boolean, default: true },
-}, { timestamps: true }));
+const Company     = require('./models/Company');
+const User        = require('./models/User');
+const Department  = require('./models/Department');
+const Category    = require('./models/Category');
+const Item        = require('./models/Item');
+const Transaction = require('./models/Transaction');
 
-const Cat = mongoose.model("Category", new mongoose.Schema({
-  name: String, nameEn: String, deptId: mongoose.Schema.Types.ObjectId, active: { type: Boolean, default: true },
-}, { timestamps: true }));
+// ── helpers ───────────────────────────────────────────────────────────────────
+const hash    = p => bcrypt.hash(p, 10);
+const pick    = arr => arr[Math.floor(Math.random() * arr.length)];
+const rnd     = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const daysAgo = n => new Date(Date.now() - n * 86_400_000);
 
-const User = mongoose.model("User", new mongoose.Schema({
-  name: String, nameEn: String, username: { type: String, lowercase: true, trim: true },
-  passwordHash: String, role: String, active: { type: Boolean, default: true },
-}, { timestamps: true }));
+// ── company blueprints ────────────────────────────────────────────────────────
+const COMPANIES = [
+  {
+    code: 'TECH01',
+    name: 'TechCorp Solutions',
+    description: 'Enterprise technology hardware & accessories distributor.',
+    industry: 'Electronics',
+    baseCurrency: 'USD',
+    primaryColor: '#3b82f6',
+    departments: [
+      { name: 'Networking',  nameEn: 'Networking',  color: '#3b82f6' },
+      { name: 'Peripherals', nameEn: 'Peripherals', color: '#8b5cf6' },
+      { name: 'Storage',     nameEn: 'Storage',     color: '#06b6d4' },
+    ],
+    categories: {
+      'Networking':  ['Routers', 'Switches', 'Access Points'],
+      'Peripherals': ['Keyboards', 'Mice', 'Monitors'],
+      'Storage':     ['SSDs', 'HDDs', 'USB Drives'],
+    },
+    items: [
+      { name: 'Cisco RV340 Router',         sku: 'NET-001', price: 350, qty: 24,  minThreshold: 5,   type: 'unit',  dept: 'Networking',  cat: 'Routers'       },
+      { name: 'TP-Link 24-Port Switch',     sku: 'NET-002', price: 180, qty: 15,  minThreshold: 3,   type: 'unit',  dept: 'Networking',  cat: 'Switches'      },
+      { name: 'UniFi AP AC Pro',            sku: 'NET-003', price: 130, qty: 40,  minThreshold: 8,   type: 'unit',  dept: 'Networking',  cat: 'Access Points' },
+      { name: 'Ubiquiti ER-X Router',       sku: 'NET-004', price: 79,  qty: 18,  minThreshold: 4,   type: 'unit',  dept: 'Networking',  cat: 'Routers'       },
+      { name: 'Netgear 8-Port Switch',      sku: 'NET-005', price: 45,  qty: 60,  minThreshold: 10,  type: 'unit',  dept: 'Networking',  cat: 'Switches'      },
+      { name: 'Logitech MX Keys',           sku: 'PER-001', price: 110, qty: 35,  minThreshold: 5,   type: 'unit',  dept: 'Peripherals', cat: 'Keyboards'     },
+      { name: 'Logitech MX Master 3',       sku: 'PER-002', price: 100, qty: 50,  minThreshold: 8,   type: 'unit',  dept: 'Peripherals', cat: 'Mice'          },
+      { name: 'Dell 27" 4K Monitor',        sku: 'PER-003', price: 480, qty: 12,  minThreshold: 2,   type: 'unit',  dept: 'Peripherals', cat: 'Monitors'      },
+      { name: 'Keychron K2 Keyboard',       sku: 'PER-004', price: 90,  qty: 28,  minThreshold: 5,   type: 'unit',  dept: 'Peripherals', cat: 'Keyboards'     },
+      { name: 'Samsung 27" Curved Monitor', sku: 'PER-005', price: 320, qty: 8,   minThreshold: 2,   type: 'unit',  dept: 'Peripherals', cat: 'Monitors'      },
+      { name: 'Samsung 980 Pro 1TB SSD',    sku: 'STR-001', price: 120, qty: 80,  minThreshold: 15,  type: 'unit',  dept: 'Storage',     cat: 'SSDs'          },
+      { name: 'WD Blue 2TB HDD',            sku: 'STR-002', price: 55,  qty: 95,  minThreshold: 20,  type: 'unit',  dept: 'Storage',     cat: 'HDDs'          },
+      { name: 'Kingston 128GB USB 3.2',     sku: 'STR-003', price: 18,  qty: 200, minThreshold: 30,  type: 'unit',  dept: 'Storage',     cat: 'USB Drives'    },
+      { name: 'Seagate 4TB External HDD',   sku: 'STR-004', price: 90,  qty: 45,  minThreshold: 10,  type: 'unit',  dept: 'Storage',     cat: 'HDDs'          },
+      { name: 'Crucial MX500 500GB SSD',    sku: 'STR-005', price: 60,  qty: 110, minThreshold: 20,  type: 'unit',  dept: 'Storage',     cat: 'SSDs'          },
+    ],
+  },
+  {
+    code: 'FOOD01',
+    name: 'FoodLine Group',
+    description: 'Wholesale food & beverage supply chain management.',
+    industry: 'Food & Beverage',
+    baseCurrency: 'USD',
+    primaryColor: '#10b981',
+    departments: [
+      { name: 'Dairy',     nameEn: 'Dairy',     color: '#10b981' },
+      { name: 'Beverages', nameEn: 'Beverages', color: '#f59e0b' },
+      { name: 'Dry Goods', nameEn: 'Dry Goods', color: '#ef4444' },
+    ],
+    categories: {
+      'Dairy':     ['Cheese', 'Yogurt', 'Butter'],
+      'Beverages': ['Juices', 'Water', 'Energy Drinks'],
+      'Dry Goods': ['Grains', 'Pasta', 'Canned Goods'],
+    },
+    items: [
+      { name: 'Cheddar Cheese Block 1kg',   sku: 'DAI-001', price: 12,  qty: 300,  minThreshold: 50,  type: 'unit', dept: 'Dairy',     cat: 'Cheese'        },
+      { name: 'Greek Yogurt 500g',          sku: 'DAI-002', price: 4,   qty: 500,  minThreshold: 100, type: 'unit', dept: 'Dairy',     cat: 'Yogurt'        },
+      { name: 'Butter Unsalted 250g',       sku: 'DAI-003', price: 3,   qty: 400,  minThreshold: 80,  type: 'pack', dept: 'Dairy',     cat: 'Butter'        },
+      { name: 'Mozzarella 500g',            sku: 'DAI-004', price: 8,   qty: 250,  minThreshold: 40,  type: 'unit', dept: 'Dairy',     cat: 'Cheese'        },
+      { name: 'Strawberry Yogurt 6-Pack',   sku: 'DAI-005', price: 6,   qty: 180,  minThreshold: 30,  type: 'pack', dept: 'Dairy',     cat: 'Yogurt'        },
+      { name: 'Orange Juice 1L',            sku: 'BEV-001', price: 3,   qty: 600,  minThreshold: 100, type: 'unit', dept: 'Beverages', cat: 'Juices'        },
+      { name: 'Mineral Water 500ml 24pk',   sku: 'BEV-002', price: 8,   qty: 400,  minThreshold: 80,  type: 'pack', dept: 'Beverages', cat: 'Water'         },
+      { name: 'Red Bull 250ml 24pk',        sku: 'BEV-003', price: 36,  qty: 150,  minThreshold: 25,  type: 'pack', dept: 'Beverages', cat: 'Energy Drinks' },
+      { name: 'Apple Juice 1L',             sku: 'BEV-004', price: 3,   qty: 500,  minThreshold: 90,  type: 'unit', dept: 'Beverages', cat: 'Juices'        },
+      { name: 'Sparkling Water 1L',         sku: 'BEV-005', price: 2,   qty: 700,  minThreshold: 120, type: 'unit', dept: 'Beverages', cat: 'Water'         },
+      { name: 'Basmati Rice 5kg',           sku: 'DRY-001', price: 9,   qty: 350,  minThreshold: 60,  type: 'bag',  dept: 'Dry Goods', cat: 'Grains'        },
+      { name: 'Spaghetti 500g',             sku: 'DRY-002', price: 2,   qty: 800,  minThreshold: 150, type: 'pack', dept: 'Dry Goods', cat: 'Pasta'         },
+      { name: 'Canned Tomatoes 400g',       sku: 'DRY-003', price: 2,   qty: 1000, minThreshold: 200, type: 'unit', dept: 'Dry Goods', cat: 'Canned Goods'  },
+      { name: 'Oats 1kg',                   sku: 'DRY-004', price: 4,   qty: 420,  minThreshold: 70,  type: 'bag',  dept: 'Dry Goods', cat: 'Grains'        },
+      { name: 'Penne Pasta 500g',           sku: 'DRY-005', price: 2,   qty: 650,  minThreshold: 100, type: 'pack', dept: 'Dry Goods', cat: 'Pasta'         },
+    ],
+  },
+  {
+    code: 'BLDG01',
+    name: 'BuildRight Materials',
+    description: 'Construction materials and supplies distribution.',
+    industry: 'Construction',
+    baseCurrency: 'USD',
+    primaryColor: '#f59e0b',
+    departments: [
+      { name: 'Structural', nameEn: 'Structural', color: '#f59e0b' },
+      { name: 'Finishing',  nameEn: 'Finishing',  color: '#ef4444' },
+      { name: 'Electrical', nameEn: 'Electrical', color: '#8b5cf6' },
+    ],
+    categories: {
+      'Structural': ['Cement', 'Steel', 'Lumber'],
+      'Finishing':  ['Paint', 'Tiles', 'Flooring'],
+      'Electrical': ['Cables', 'Conduits', 'Fixtures'],
+    },
+    items: [
+      { name: 'Portland Cement 50kg Bag',   sku: 'BLD-STR-001', price: 12,  qty: 500,  minThreshold: 80,  type: 'bag',  dept: 'Structural', cat: 'Cement'   },
+      { name: 'Rebar Steel 12mm 6m',        sku: 'BLD-STR-002', price: 18,  qty: 300,  minThreshold: 50,  type: 'unit', dept: 'Structural', cat: 'Steel'    },
+      { name: 'Pine Timber 2x4x8ft',        sku: 'BLD-STR-003', price: 8,   qty: 800,  minThreshold: 150, type: 'unit', dept: 'Structural', cat: 'Lumber'   },
+      { name: 'Concrete Block 20x40x20cm',  sku: 'BLD-STR-004', price: 2,   qty: 2000, minThreshold: 400, type: 'unit', dept: 'Structural', cat: 'Cement'   },
+      { name: 'Steel I-Beam 150x150x6m',    sku: 'BLD-STR-005', price: 220, qty: 45,   minThreshold: 8,   type: 'unit', dept: 'Structural', cat: 'Steel'    },
+      { name: 'Interior Wall Paint 20L',    sku: 'BLD-FIN-001', price: 55,  qty: 120,  minThreshold: 20,  type: 'unit', dept: 'Finishing',  cat: 'Paint'    },
+      { name: 'Porcelain Floor Tile 60x60', sku: 'BLD-FIN-002', price: 22,  qty: 600,  minThreshold: 100, type: 'box',  dept: 'Finishing',  cat: 'Tiles'    },
+      { name: 'Laminate Flooring 2.5m2 pk', sku: 'BLD-FIN-003', price: 35,  qty: 200,  minThreshold: 30,  type: 'pack', dept: 'Finishing',  cat: 'Flooring' },
+      { name: 'Exterior Masonry Paint 15L', sku: 'BLD-FIN-004', price: 68,  qty: 80,   minThreshold: 15,  type: 'unit', dept: 'Finishing',  cat: 'Paint'    },
+      { name: 'Ceramic Wall Tile 30x60',    sku: 'BLD-FIN-005', price: 16,  qty: 750,  minThreshold: 120, type: 'box',  dept: 'Finishing',  cat: 'Tiles'    },
+      { name: 'NYM Cable 3x2.5mm 100m',     sku: 'BLD-ELC-001', price: 95,  qty: 80,   minThreshold: 12,  type: 'roll', dept: 'Electrical', cat: 'Cables'   },
+      { name: 'PVC Conduit 20mm 3m',        sku: 'BLD-ELC-002', price: 3,   qty: 1000, minThreshold: 200, type: 'unit', dept: 'Electrical', cat: 'Conduits' },
+      { name: 'LED Batten Fixture 120cm',   sku: 'BLD-ELC-003', price: 28,  qty: 150,  minThreshold: 25,  type: 'unit', dept: 'Electrical', cat: 'Fixtures' },
+      { name: 'NYY Cable 4x4mm 50m',        sku: 'BLD-ELC-004', price: 140, qty: 35,   minThreshold: 6,   type: 'roll', dept: 'Electrical', cat: 'Cables'   },
+      { name: 'Flush Downlight 10W',        sku: 'BLD-ELC-005', price: 14,  qty: 400,  minThreshold: 60,  type: 'unit', dept: 'Electrical', cat: 'Fixtures' },
+    ],
+  },
+];
 
-const Item = mongoose.model("Item", new mongoose.Schema({
-  name: String, nameEn: String, description: String,
-  deptId: mongoose.Schema.Types.ObjectId, catId: mongoose.Schema.Types.ObjectId,
-  sku: String, barcode: String, price: Number, qty: Number, minThreshold: Number,
-  type: String, status: String, photo: String,
-}, { timestamps: true }));
+const STAFF_TEMPLATES = [
+  { suffix: 'admin',     role: 'admin',     namePrefix: 'Admin'     },
+  { suffix: 'manager',   role: 'manager',   namePrefix: 'Manager'   },
+  { suffix: 'warehouse', role: 'warehouse', namePrefix: 'Warehouse' },
+  { suffix: 'viewer',    role: 'viewer',    namePrefix: 'Viewer'    },
+];
 
-const Transaction = mongoose.model("Transaction", new mongoose.Schema({
-  type: String, itemId: mongoose.Schema.Types.ObjectId, qty: Number,
-  source: String, dest: String, userId: mongoose.Schema.Types.ObjectId,
-  userName: String, date: Date, notes: String,
-}, { timestamps: true }));
+// ── main ──────────────────────────────────────────────────────────────────────
+async function seed() {
+  console.log('Connecting to MongoDB…');
+  await mongoose.connect(process.env.MONGODB_URI);
+  console.log('Connected.\n');
 
-// ── Seed ──────────────────────────────────────────────────────────────────────
-async function run() {
-  console.log("🗑  Clearing existing data...");
-  await Promise.all([
-    Dept.deleteMany({}), Cat.deleteMany({}),
-    User.deleteMany({}), Item.deleteMany({}), Transaction.deleteMany({}),
-  ]);
+  // 1. Enterprise user
+  let enterpriseUser = await User.findOne({ isEnterprise: true, username: 'enterprise' });
+  if (!enterpriseUser) {
+    enterpriseUser = await User.create({
+      name:         'Mohammed Hassan',
+      nameEn:       'Mohammed Hassan',
+      username:     'enterprise',
+      email:        'enterprise@nexinv.app',
+      passwordHash: await hash('Pass1234'),
+      role:         'owner',
+      isEnterprise: true,
+      active:       true,
+    });
+    console.log('✓ Enterprise user created  (enterprise / Pass1234)');
+  } else {
+    console.log('• Enterprise user already exists — skipping');
+  }
 
-  // ── Users ──────────────────────────────────────────────────────────────────
-  console.log("👥 Creating users...");
-  const hash = (p) => bcrypt.hash(p, 12);
-  const users = await User.create([
-    { name:"مدير النظام",    nameEn:"System Admin",    username:"admin",   passwordHash: await hash("admin"), role:"admin"     },
-    { name:"أحمد محمد",      nameEn:"Ahmed Mohamed",   username:"ahmed",   passwordHash: await hash("123"),   role:"manager"   },
-    { name:"سارة علي",       nameEn:"Sara Ali",        username:"sara",    passwordHash: await hash("123"),   role:"warehouse" },
-    { name:"خالد عمر",       nameEn:"Khaled Omar",     username:"khaled",  passwordHash: await hash("123"),   role:"viewer"    },
-    { name:"منى حسن",        nameEn:"Mona Hassan",     username:"mona",    passwordHash: await hash("123"),   role:"warehouse" },
-    { name:"يوسف إبراهيم",   nameEn:"Youssef Ibrahim", username:"youssef", passwordHash: await hash("123"),   role:"manager"   },
-  ]);
-  const [admin, ahmed, sara, , mona, youssef] = users;
+  // 2. Companies + per-company data
+  for (const bp of COMPANIES) {
+    console.log(`\n── ${bp.name} (${bp.code}) ─────────`);
 
-  // ── Departments ────────────────────────────────────────────────────────────
-  console.log("🏢 Creating departments...");
-  const depts = await Dept.create([
-    { name:"كهربائي",         nameEn:"Electrical",    color:"#f59e0b" },
-    { name:"ميكانيكي",        nameEn:"Mechanical",    color:"#3b82f6" },
-    { name:"هيدروليكي",       nameEn:"Hydraulic",     color:"#06b6d4" },
-    { name:"تقنية المعلومات", nameEn:"IT",            color:"#8b5cf6" },
-    { name:"مواد البناء",     nameEn:"Construction",  color:"#f97316" },
-    { name:"سلامة وحماية",    nameEn:"Safety",        color:"#ef4444" },
-  ]);
-  const [elec, mech, hydro, it, civil, safety] = depts;
+    // Company
+    let company = await Company.findOne({ code: bp.code });
+    if (!company) {
+      company = await Company.create({
+        code: bp.code, name: bp.name, description: bp.description,
+        industry: bp.industry, baseCurrency: bp.baseCurrency,
+        primaryColor: bp.primaryColor, active: true,
+      });
+      console.log('  ✓ Company created');
+    } else {
+      console.log('  • Company exists — reusing');
+    }
 
-  // ── Categories ─────────────────────────────────────────────────────────────
-  console.log("📂 Creating categories...");
-  const cats = await Cat.create([
-    { name:"محركات",       nameEn:"Motors",          deptId: elec._id  },
-    { name:"كابلات",       nameEn:"Cables",          deptId: elec._id  },
-    { name:"لوحات تحكم",   nameEn:"Control Panels",  deptId: elec._id  },
-    { name:"مضخات",        nameEn:"Pumps",           deptId: mech._id  },
-    { name:"تروس",         nameEn:"Gears",           deptId: mech._id  },
-    { name:"صمامات",       nameEn:"Valves",          deptId: hydro._id },
-    { name:"خراطيم",       nameEn:"Hoses",           deptId: hydro._id },
-    { name:"أجهزة",        nameEn:"Hardware",        deptId: it._id    },
-    { name:"شبكات",        nameEn:"Networking",      deptId: it._id    },
-    { name:"أنابيب",       nameEn:"Pipes",           deptId: civil._id },
-    { name:"أسمنت ومواد",  nameEn:"Cement & Materials", deptId: civil._id },
-    { name:"معدات حماية",  nameEn:"PPE",             deptId: safety._id },
-  ]);
-  const [cMotors, cCables, cPanels, cPumps, cGears, cValves, cHoses, cHardware, cNet, cPipes, cCement, cPPE] = cats;
+    // Link to enterprise user
+    await User.updateOne({ _id: enterpriseUser._id }, { $addToSet: { ownedCompanies: company._id } });
 
-  // ── Items ──────────────────────────────────────────────────────────────────
-  // photos: picsum.photos (always works, no auth needed)
-  const pic = (id, w=400, h=300) => `https://picsum.photos/id/${id}/${w}/${h}`;
+    // Owner
+    const ownerUsername = bp.code.toLowerCase() + '_owner';
+    let owner = await User.findOne({ companyId: company._id, username: ownerUsername });
+    if (!owner) {
+      owner = await User.create({
+        companyId: company._id,
+        name: `${bp.name} Owner`, nameEn: `${bp.name} Owner`,
+        username: ownerUsername,
+        email: `owner@${bp.code.toLowerCase()}.com`,
+        passwordHash: await hash('Pass1234'),
+        role: 'owner', active: true,
+      });
+      console.log(`  ✓ Owner: ${ownerUsername} / Pass1234`);
+    }
 
-  console.log("📦 Creating items...");
-  const items = await Item.create([
-    // Electrical – Motors
-    { name:"محرك كهربائي 5HP",    nameEn:"Electric Motor 5HP",      deptId:elec._id,  catId:cMotors._id,  sku:"EM-001", barcode:"6221023001001", price:4500,  qty:24,  minThreshold:5,  type:"unit",  status:"active",       description:"محرك ثلاثي الأوجه للاستخدام الصناعي", photo:pic(1056) },
-    { name:"محرك كهربائي 10HP",   nameEn:"Electric Motor 10HP",     deptId:elec._id,  catId:cMotors._id,  sku:"EM-002", barcode:"6221023001002", price:7800,  qty:12,  minThreshold:3,  type:"unit",  status:"active",       description:"محرك صناعي عالي الأداء",              photo:pic(1060) },
-    { name:"محرك سيرفو 750W",     nameEn:"Servo Motor 750W",        deptId:elec._id,  catId:cMotors._id,  sku:"EM-003", barcode:"6221023001003", price:2900,  qty:8,   minThreshold:2,  type:"unit",  status:"active",       description:"محرك سيرفو دقيق للتحكم الآلي",        photo:pic(1062) },
-    // Electrical – Cables
-    { name:"كابل نحاسي 16مم",     nameEn:"Copper Cable 16mm",       deptId:elec._id,  catId:cCables._id,  sku:"CC-001", barcode:"6221023002001", price:85,    qty:800, minThreshold:100,type:"roll",  status:"active",       description:"كابل طاقة للمتر",                      photo:pic(1080) },
-    { name:"كابل نحاسي 6مم",      nameEn:"Copper Cable 6mm",        deptId:elec._id,  catId:cCables._id,  sku:"CC-002", barcode:"6221023002002", price:38,    qty:1200,minThreshold:200,type:"roll",  status:"active",       description:"كابل توزيع خفيف",                      photo:pic(1082) },
-    { name:"كابل بيانات CAT6",    nameEn:"CAT6 Data Cable",         deptId:elec._id,  catId:cCables._id,  sku:"CC-003", barcode:"6221023002003", price:22,    qty:500, minThreshold:100,type:"roll",  status:"active",       description:"كابل شبكات عالي السرعة",               photo:pic(1083) },
-    // Electrical – Panels
-    { name:"لوحة تحكم كهربائية",  nameEn:"Electrical Control Panel",deptId:elec._id,  catId:cPanels._id,  sku:"CP-001", barcode:"6221023003001", price:15000, qty:3,   minThreshold:2,  type:"unit",  status:"active",       description:"لوحة توزيع رئيسية 400A",               photo:pic(325)  },
-    { name:"قاطع حرارى 63A",      nameEn:"Thermal Breaker 63A",     deptId:elec._id,  catId:cPanels._id,  sku:"CP-002", barcode:"6221023003002", price:320,   qty:0,   minThreshold:10, type:"unit",  status:"active",       description:"قاطع كهربائي حماية",                   photo:pic(326)  },
-    // Mechanical – Pumps
-    { name:"مضخة هيدروليكية",     nameEn:"Hydraulic Pump",          deptId:mech._id,  catId:cPumps._id,   sku:"HP-001", barcode:"6221023004001", price:8200,  qty:3,   minThreshold:5,  type:"unit",  status:"active",       description:"مضخة طرد مركزي عالية الضغط",           photo:pic(206)  },
-    { name:"مضخة مياه 2 بوصة",    nameEn:"Water Pump 2\"",          deptId:mech._id,  catId:cPumps._id,   sku:"HP-002", barcode:"6221023004002", price:1800,  qty:15,  minThreshold:4,  type:"unit",  status:"active",       description:"مضخة رفع مياه",                        photo:pic(207)  },
-    // Mechanical – Gears
-    { name:"علبة تروس صناعية",    nameEn:"Industrial Gearbox",      deptId:mech._id,  catId:cGears._id,   sku:"GB-001", barcode:"6221023005001", price:12000, qty:7,   minThreshold:3,  type:"unit",  status:"active",       description:"علبة تروس للماكينات الثقيلة",           photo:pic(450)  },
-    { name:"تروس مخروطية 1:5",    nameEn:"Bevel Gear 1:5",          deptId:mech._id,  catId:cGears._id,   sku:"GB-002", barcode:"6221023005002", price:3400,  qty:20,  minThreshold:5,  type:"unit",  status:"active",       description:"تروس دقيقة لناقل الحركة",               photo:pic(451)  },
-    // Hydraulic – Valves
-    { name:"صمام فراشة DN80",     nameEn:"Butterfly Valve DN80",    deptId:hydro._id, catId:cValves._id,  sku:"BV-001", barcode:"6221023006001", price:1800,  qty:0,   minThreshold:10, type:"unit",  status:"active",       description:"صمام صناعي PN16",                       photo:pic(500)  },
-    { name:"صمام كروي ½ بوصة",    nameEn:"Ball Valve 1/2\"",        deptId:hydro._id, catId:cValves._id,  sku:"BV-002", barcode:"6221023006002", price:95,    qty:200, minThreshold:30, type:"unit",  status:"active",       description:"صمام كروي ستانلس",                      photo:pic(501)  },
-    { name:"صمام تحكم كهربائي",   nameEn:"Electric Control Valve",  deptId:hydro._id, catId:cValves._id,  sku:"BV-003", barcode:"6221023006003", price:4500,  qty:4,   minThreshold:5,  type:"unit",  status:"active",       description:"صمام تحكم 24V DC",                      photo:pic(502)  },
-    // Hydraulic – Hoses
-    { name:"خرطوم هيدروليك DN25", nameEn:"Hydraulic Hose DN25",     deptId:hydro._id, catId:cHoses._id,   sku:"HH-001", barcode:"6221023007001", price:450,   qty:60,  minThreshold:15, type:"roll",  status:"active",       description:"خرطوم ضغط عالي 250 بار",               photo:pic(514)  },
-    // IT – Hardware
-    { name:"وحدة تخزين 32TB",     nameEn:"NAS Storage 32TB",        deptId:it._id,    catId:cHardware._id,sku:"NS-001", barcode:"6221023008001", price:35000, qty:4,   minThreshold:2,  type:"unit",  status:"active",       description:"وحدة تخزين شبكية",                     photo:pic(48)   },
-    { name:"خادم رك 2U",          nameEn:"Rack Server 2U",          deptId:it._id,    catId:cHardware._id,sku:"NS-002", barcode:"6221023008002", price:65000, qty:2,   minThreshold:1,  type:"unit",  status:"active",       description:"خادم إنتاج Intel Xeon",                 photo:pic(49)   },
-    { name:"شاشة 27 بوصة 4K",     nameEn:"27\" 4K Monitor",         deptId:it._id,    catId:cHardware._id,sku:"NS-003", barcode:"6221023008003", price:4200,  qty:18,  minThreshold:3,  type:"unit",  status:"active",       description:"شاشة IPS احترافية",                    photo:pic(50)   },
-    // IT – Networking
-    { name:"سويتش 24 منفذ",       nameEn:"24-Port Switch",          deptId:it._id,    catId:cNet._id,     sku:"NT-001", barcode:"6221023009001", price:3800,  qty:6,   minThreshold:2,  type:"unit",  status:"active",       description:"سويتش مُدار Gigabit",                   photo:pic(303)  },
-    { name:"راوتر صناعي",          nameEn:"Industrial Router",       deptId:it._id,    catId:cNet._id,     sku:"NT-002", barcode:"6221023009002", price:8500,  qty:3,   minThreshold:1,  type:"unit",  status:"active",       description:"راوتر شبكة داخلية عالي الأداء",         photo:pic(304)  },
-    // Construction – Pipes
-    { name:"أنبوب PVC 4 بوصة",    nameEn:"PVC Pipe 4\"",            deptId:civil._id, catId:cPipes._id,   sku:"PP-001", barcode:"6221023010001", price:75,    qty:350, minThreshold:50, type:"unit",  status:"active",       description:"أنبوب صرف صحي",                        photo:pic(255)  },
-    { name:"أنبوب حديد 2 بوصة",   nameEn:"Steel Pipe 2\"",          deptId:civil._id, catId:cPipes._id,   sku:"PP-002", barcode:"6221023010002", price:210,   qty:180, minThreshold:30, type:"unit",  status:"active",       description:"أنبوب مجلفن ضغط",                      photo:pic(256)  },
-    // Construction – Cement
-    { name:"أسمنت بورتلاندي",      nameEn:"Portland Cement",         deptId:civil._id, catId:cCement._id,  sku:"CM-001", barcode:"6221023011001", price:28,    qty:0,   minThreshold:100,type:"bag",   status:"active",       description:"أسمنت 42.5N كيس 50 كجم",              photo:pic(280)  },
-    { name:"رمل ناعم",             nameEn:"Fine Sand",               deptId:civil._id, catId:cCement._id,  sku:"CM-002", barcode:"6221023011002", price:15,    qty:600, minThreshold:200,type:"bag",   status:"active",       description:"رمل مناخل للبناء",                     photo:pic(281)  },
-    // Safety – PPE
-    { name:"خوذة سلامة",           nameEn:"Safety Helmet",           deptId:safety._id,catId:cPPE._id,     sku:"SF-001", barcode:"6221023012001", price:85,    qty:50,  minThreshold:20, type:"unit",  status:"active",       description:"خوذة حماية مطابقة ISO",                photo:pic(627)  },
-    { name:"حذاء سلامة S3",        nameEn:"Safety Shoe S3",          deptId:safety._id,catId:cPPE._id,     sku:"SF-002", barcode:"6221023012002", price:420,   qty:30,  minThreshold:10, type:"unit",  status:"active",       description:"حذاء مقاوم للاختراق والانزلاق",        photo:pic(628)  },
-    { name:"نظارات واقية",          nameEn:"Safety Goggles",          deptId:safety._id,catId:cPPE._id,     sku:"SF-003", barcode:"6221023012003", price:45,    qty:4,   minThreshold:15, type:"unit",  status:"active",       description:"نظارات مضادة للبخار والغبار",           photo:pic(629)  },
-    { name:"قفازات عمل نيتريل",    nameEn:"Nitrile Work Gloves",     deptId:safety._id,catId:cPPE._id,     sku:"SF-004", barcode:"6221023012004", price:18,    qty:200, minThreshold:50, type:"pack",  status:"active",       description:"علبة 100 قفاز",                        photo:pic(630)  },
-    { name:"حزام أمان كامل",       nameEn:"Full Body Harness",       deptId:safety._id,catId:cPPE._id,     sku:"SF-005", barcode:"6221023012005", price:680,   qty:12,  minThreshold:5,  type:"unit",  status:"discontinued", description:"حزام أمان للعمل على الارتفاعات",       photo:pic(631)  },
-  ]);
+    // Staff
+    for (const tmpl of STAFF_TEMPLATES) {
+      const uname = `${bp.code.toLowerCase()}_${tmpl.suffix}`;
+      const exists = await User.findOne({ companyId: company._id, username: uname });
+      if (!exists) {
+        await User.create({
+          companyId: company._id,
+          name: `${tmpl.namePrefix} — ${bp.name}`, nameEn: `${tmpl.namePrefix} — ${bp.name}`,
+          username: uname,
+          email: `${tmpl.suffix}@${bp.code.toLowerCase()}.com`,
+          passwordHash: await hash('Pass1234'),
+          role: tmpl.role, active: true,
+        });
+      }
+    }
+    console.log('  ✓ Staff users (admin / manager / warehouse / viewer — all Pass1234)');
 
-  // ── Transactions ───────────────────────────────────────────────────────────
-  console.log("🔄 Creating transactions...");
-  const d = (daysAgo) => new Date(Date.now() - daysAgo * 86400000);
+    // Departments
+    const deptMap = {};
+    for (const d of bp.departments) {
+      let dept = await Department.findOne({ companyId: company._id, name: d.name });
+      if (!dept) dept = await Department.create({ companyId: company._id, ...d, active: true });
+      deptMap[d.name] = dept._id;
+    }
+    console.log(`  ✓ ${bp.departments.length} departments`);
 
-  await Transaction.create([
-    // IN transactions
-    { type:"IN",  itemId:items[0]._id,  qty:10, source:"شركة المحركات العربية",        userId:ahmed._id, userName:"أحمد محمد",    date:d(30), notes:"توريد ربع سنوي" },
-    { type:"IN",  itemId:items[3]._id,  qty:500,source:"مستودع الكابلات المركزي",      userId:youssef._id,userName:"يوسف إبراهيم",date:d(28), notes:"شراء دفعة" },
-    { type:"IN",  itemId:items[8]._id,  qty:5,  source:"شركة المضخات الدولية",         userId:ahmed._id, userName:"أحمد محمد",    date:d(25), notes:"استبدال معطل" },
-    { type:"IN",  itemId:items[15]._id, qty:2,  source:"مستودع تقنية المعلومات",       userId:youssef._id,userName:"يوسف إبراهيم",date:d(20), notes:"توسعة المستودع" },
-    { type:"IN",  itemId:items[20]._id, qty:100,source:"مورد البناء الوطني",           userId:ahmed._id, userName:"أحمد محمد",    date:d(18) },
-    { type:"IN",  itemId:items[24]._id, qty:30, source:"شركة معدات السلامة",           userId:sara._id,  userName:"سارة علي",     date:d(15), notes:"توريد شهري PPE" },
-    { type:"IN",  itemId:items[10]._id, qty:3,  source:"الوكيل الإقليمي للتروس",       userId:youssef._id,userName:"يوسف إبراهيم",date:d(14) },
-    { type:"IN",  itemId:items[4]._id,  qty:300,source:"مستودع الكابلات المركزي",      userId:sara._id,  userName:"سارة علي",     date:d(12) },
-    { type:"IN",  itemId:items[12]._id, qty:50, source:"موردو الصمامات الصناعية",      userId:ahmed._id, userName:"أحمد محمد",    date:d(10), notes:"تجديد مخزون" },
-    { type:"IN",  itemId:items[17]._id, qty:5,  source:"وكيل HP الرسمي",              userId:youssef._id,userName:"يوسف إبراهيم",date:d(8),  notes:"توسعة الطاقة" },
-    { type:"IN",  itemId:items[26]._id, qty:20, source:"شركة معدات السلامة",           userId:mona._id,  userName:"منى حسن",      date:d(5),  notes:"طلبية طارئة" },
-    { type:"IN",  itemId:items[1]._id,  qty:5,  source:"شركة المحركات العربية",        userId:ahmed._id, userName:"أحمد محمد",    date:d(3) },
-    { type:"IN",  itemId:items[22]._id, qty:200,source:"مصنع الأسمنت الوطني",         userId:mona._id,  userName:"منى حسن",      date:d(2),  notes:"مشروع البناء الجديد" },
-    // OUT transactions
-    { type:"OUT", itemId:items[0]._id,  qty:2,  dest:"مشروع خط التبريد A",            userId:sara._id,  userName:"سارة علي",     date:d(27), notes:"صرف للتركيب" },
-    { type:"OUT", itemId:items[6]._id,  qty:1,  dest:"ورشة الكهرباء الرئيسية",        userId:mona._id,  userName:"منى حسن",      date:d(24), notes:"صيانة لوحة رئيسية" },
-    { type:"OUT", itemId:items[3]._id,  qty:200,dest:"مشروع التوسعة B",               userId:sara._id,  userName:"سارة علي",     date:d(22) },
-    { type:"OUT", itemId:items[11]._id, qty:2,  dest:"ماكينة الإنتاج #3",             userId:mona._id,  userName:"منى حسن",      date:d(19), notes:"تبديل تروس تالفة" },
-    { type:"OUT", itemId:items[16]._id, qty:1,  dest:"غرفة السيرفر الرئيسية",         userId:sara._id,  userName:"سارة علي",     date:d(17), notes:"تركيب" },
-    { type:"OUT", itemId:items[9]._id,  qty:3,  dest:"وحدة المعالجة #1",              userId:mona._id,  userName:"منى حسن",      date:d(13) },
-    { type:"OUT", itemId:items[20]._id, qty:50, dest:"مشروع مبنى الإدارة",            userId:sara._id,  userName:"سارة علي",     date:d(11), notes:"أساسات الطابق الأول" },
-    { type:"OUT", itemId:items[24]._id, qty:10, dest:"فريق الصيانة الميداني",          userId:mona._id,  userName:"منى حسن",      date:d(9),  notes:"توزيع أسبوعي" },
-    { type:"OUT", itemId:items[25]._id, qty:5,  dest:"ورشة الميكانيكا",               userId:sara._id,  userName:"سارة علي",     date:d(7) },
-    { type:"OUT", itemId:items[14]._id, qty:1,  dest:"خط الإنتاج #2",                 userId:mona._id,  userName:"منى حسن",      date:d(6),  notes:"صيانة طارئة" },
-    { type:"OUT", itemId:items[18]._id, qty:2,  dest:"مكتب المشاريع الجديد",          userId:sara._id,  userName:"سارة علي",     date:d(4) },
-    { type:"OUT", itemId:items[8]._id,  qty:1,  dest:"محطة الضخ الرئيسية",            userId:mona._id,  userName:"منى حسن",      date:d(2),  notes:"بديل للمضخة التالفة" },
-    { type:"OUT", itemId:items[1]._id,  qty:1,  dest:"مشروع خط التبريد B",            userId:sara._id,  userName:"سارة علي",     date:d(1),  notes:"تركيب اليوم" },
-  ]);
+    // Categories
+    const catMap = {};
+    for (const [deptName, catNames] of Object.entries(bp.categories)) {
+      for (const catName of catNames) {
+        let cat = await Category.findOne({ companyId: company._id, name: catName });
+        if (!cat) cat = await Category.create({ companyId: company._id, name: catName, nameEn: catName, deptId: deptMap[deptName], active: true });
+        catMap[catName] = cat._id;
+      }
+    }
+    console.log('  ✓ Categories created');
 
-  console.log("✅ Seeded successfully!");
-  console.log("─────────────────────────────────────");
-  console.log("  Users:");
-  console.log("    admin   / admin  (System Admin)");
-  console.log("    ahmed   / 123    (Manager)");
-  console.log("    sara    / 123    (Warehouse)");
-  console.log("    khaled  / 123    (Viewer)");
-  console.log("    mona    / 123    (Warehouse)");
-  console.log("    youssef / 123    (Manager)");
-  console.log("─────────────────────────────────────");
-  console.log(`  ${depts.length} departments, ${cats.length} categories`);
-  console.log(`  ${items.length} items, 26 transactions`);
-  console.log("─────────────────────────────────────");
+    // Items
+    const itemMap = {};
+    for (const it of bp.items) {
+      let item = await Item.findOne({ companyId: company._id, sku: it.sku });
+      if (!item) {
+        item = await Item.create({
+          companyId: company._id,
+          name: it.name, nameEn: it.name, sku: it.sku,
+          price: it.price, qty: it.qty, minThreshold: it.minThreshold,
+          type: it.type, deptId: deptMap[it.dept], catId: catMap[it.cat],
+          status: 'active',
+        });
+      }
+      itemMap[it.sku] = item._id;
+    }
+    console.log(`  ✓ ${bp.items.length} items`);
 
-  mongoose.disconnect();
+    // Transactions
+    const existingTx = await Transaction.countDocuments({ companyId: company._id });
+    if (existingTx === 0) {
+      const itemIds = Object.values(itemMap);
+      const sources = ['Supplier A', 'Supplier B', 'Supplier C', 'Central Warehouse', 'Direct Import'];
+      const dests   = ['Showroom', 'Site A', 'Site B', 'Client Delivery', 'Main Store'];
+      const txDocs  = [];
+
+      for (let i = 0; i < 50; i++) {
+        const type = i % 3 === 0 ? 'OUT' : 'IN';
+        txDocs.push({
+          companyId: company._id,
+          type,
+          itemId:   pick(itemIds),
+          qty:      rnd(1, 20),
+          source:   type === 'IN'  ? pick(sources) : undefined,
+          dest:     type === 'OUT' ? pick(dests)   : undefined,
+          userId:   owner._id,
+          userName: owner.name,
+          date:     daysAgo(rnd(0, 60)),
+          notes:    `Seed tx #${i + 1}`,
+        });
+      }
+      await Transaction.insertMany(txDocs);
+      console.log('  ✓ 50 transactions (spread over last 60 days)');
+    } else {
+      console.log(`  • Transactions already exist (${existingTx}) — skipping`);
+    }
+  }
+
+  console.log('\n✅ Seed complete!\n');
+  console.log('─────────────────────────────────────────────');
+  console.log('Enterprise :  enterprise         /  Pass1234');
+  console.log('Owners     :  tech01_owner etc.  /  Pass1234');
+  console.log('Staff      :  tech01_admin  etc. /  Pass1234');
+  console.log('─────────────────────────────────────────────\n');
+
+  await mongoose.disconnect();
 }
+
+seed().catch(err => { console.error(err); process.exit(1); });

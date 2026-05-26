@@ -1,18 +1,27 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { useAppContext } from '../context/AppContext';
-import { MdBusiness, MdPerson, MdEmail, MdLock, MdArrowForward } from 'react-icons/md';
-import { useNavigate, Link } from 'react-router-dom';
+import { T } from '../theme';
+import { useNavigate } from 'react-router-dom';
+import Icon from '../components/Icon';
 
 export default function Register() {
-  const { loginWithToken } = useAppContext();
+  const { loginWithToken, theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ companyName: '', adminUsername: '', adminEmail: '', password: '', isEnterprise: false });
-  const [loading, setLoading] = useState(false);
-  const [entering, setEntering] = useState(false);
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    companyName: '', adminUsername: '', adminEmail: '', password: '', isEnterprise: false,
+  });
+  const [loading,     setLoading]     = useState(false);
+  const [entering,    setEntering]    = useState(false);
+  const [error,       setError]       = useState('');
   const [successData, setSuccessData] = useState(null);
+  const [focused,     setFocused]     = useState('');
+  const [showPass,    setShowPass]    = useState(false);
+
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +31,7 @@ export default function Register() {
       const res = await api.register(form);
       setSuccessData({ token: res.token, code: res.companyCode, isEnterprise: res.isEnterprise });
     } catch (err) {
-      setError(err.message || "Failed to register");
+      setError(err.message || 'Failed to register');
     } finally {
       setLoading(false);
     }
@@ -35,178 +44,383 @@ export default function Register() {
       await loginWithToken(successData.token);
       navigate('/dashboard', { replace: true });
     } catch {
-      setError("Failed to enter workspace. Please log in manually.");
+      setError('Failed to enter workspace. Please log in manually.');
     } finally {
       setEntering(false);
     }
   };
 
+  // ── style helpers ─────────────────────────────────────────────────────────
+  const lbl = (text) => (
+    <label style={{
+      display: 'block',
+      fontFamily: 'ui-monospace, monospace',
+      fontSize: 10, fontWeight: 600,
+      textTransform: 'uppercase', letterSpacing: '0.08em',
+      color: t.fgSubtle, marginBottom: 5,
+    }}>
+      {text}
+    </label>
+  );
+
+  const inp = (name, extra = {}) => ({
+    width: '100%', height: 38, padding: '0 12px',
+    borderRadius: 4, fontSize: 13, outline: 'none',
+    border: `1px solid ${focused === name ? primary : t.border}`,
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    backgroundColor: t.canvas, color: t.fg,
+    fontFamily: 'inherit', boxSizing: 'border-box',
+    transition: 'border-color 120ms, box-shadow 120ms',
+    ...extra,
+  });
+
+  // ── Success screen ─────────────────────────────────────────────────────────
   if (successData) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4 selection:bg-blue-500/30 font-sans">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 border border-slate-100 dark:border-slate-700 text-center animate-in zoom-in-95 duration-500">
-          <div className="w-20 h-20 bg-green-100 dark:bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: t.canvas,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24, fontFamily: 'inherit',
+      }}>
+        <div style={{
+          width: '100%', maxWidth: 420,
+          backgroundColor: t.elev,
+          border: `1px solid ${t.border}`,
+          borderRadius: 4, padding: 40,
+          textAlign: 'center',
+        }}>
+          {/* Icon */}
+          <div style={{
+            width: 64, height: 64, borderRadius: 4,
+            backgroundColor: '#10b98118',
+            border: '1px solid #10b98144',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, margin: '0 auto 24px',
+          }}>
             🎉
           </div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Welcome to NexINV!</h2>
+
+          <div style={{ fontSize: 22, fontWeight: 900, color: t.fg, marginBottom: 8, letterSpacing: '-0.02em' }}>
+            Welcome to NexINV!
+          </div>
+
           {successData.isEnterprise ? (
-            <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">
-              Your Enterprise account is ready.
+            <p style={{ fontSize: 13, color: t.fgMuted, marginBottom: 28, lineHeight: 1.6 }}>
+              Your Enterprise account is ready. You can now manage multiple companies.
             </p>
           ) : (
-            <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">
-              Your company code is: <br />
-              <span className="text-2xl font-black text-slate-800 dark:text-white tracking-widest mt-2 inline-block bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div style={{ marginBottom: 28 }}>
+              <p style={{ fontSize: 13, color: t.fgMuted, marginBottom: 12 }}>
+                Your company has been created. Here's your company code:
+              </p>
+              <div style={{
+                display: 'inline-block',
+                fontFamily: 'ui-monospace, monospace',
+                fontSize: 24, fontWeight: 900,
+                letterSpacing: '0.2em', color: t.fg,
+                backgroundColor: t.sunken,
+                border: `1px solid ${t.border}`,
+                borderRadius: 4, padding: '10px 24px',
+              }}>
                 {successData.code}
-              </span>
-            </p>
+              </div>
+              <p style={{ fontSize: 11, color: t.fgSubtle, marginTop: 8, fontFamily: 'ui-monospace, monospace' }}>
+                Share this code with your team members to join
+              </p>
+            </div>
           )}
 
           <button
             onClick={handleEnterWorkspace}
             disabled={entering}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500 flex items-center justify-center gap-2 disabled:opacity-70"
+            style={{
+              width: '100%', height: 42, borderRadius: 4,
+              backgroundColor: primary, color: '#fff',
+              border: 'none', cursor: entering ? 'not-allowed' : 'pointer',
+              fontSize: 14, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: entering ? 0.7 : 1,
+              transition: 'opacity 120ms',
+            }}
           >
-            {entering
-              ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Entering...</>
-              : 'Enter Workspace'}
+            {entering ? (
+              <>
+                <div style={{
+                  width: 14, height: 14,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff', borderRadius: '50%',
+                  animation: 'spin 600ms linear infinite',
+                }} />
+                Entering...
+              </>
+            ) : (
+              <>Enter Workspace →</>
+            )}
           </button>
         </div>
       </div>
     );
   }
 
+  // ── Registration form ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row font-sans selection:bg-blue-500/30">
-      
-      {/* Left Banner */}
-      <div className="hidden md:flex flex-1 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 text-white flex-col justify-between relative overflow-hidden">
-        <div className="relative z-10">
-          <a href="/" className="flex items-center gap-3 w-max">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30 shadow-xl">
-              <span className="text-white font-black text-2xl">N</span>
-            </div>
-            <span className="text-2xl font-black tracking-tight">NexINV</span>
-          </a>
-        </div>
-        
-        <div className="relative z-10 max-w-md">
-          <h1 className="text-5xl font-black mb-6 leading-tight">Scale your operations instantly.</h1>
-          <p className="text-blue-100 text-lg leading-relaxed">Join NexINV's multi-tenant platform to organize your inventory and boost your team's productivity with AI.</p>
-        </div>
-        
-        <div className="relative z-10 flex items-center gap-4 text-sm font-medium text-blue-200">
-          <div className="flex -space-x-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 border border-white/30"></div>
-            <div className="w-8 h-8 rounded-full bg-white/30 border border-white/30"></div>
-            <div className="w-8 h-8 rounded-full bg-white/40 border border-white/30"></div>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex', fontFamily: 'inherit',
+    }}>
+      {/* ── Left banner ── */}
+      <div style={{
+        flex: 1,
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #4c1d95 100%)',
+        padding: '48px 56px',
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        position: 'relative', overflow: 'hidden',
+        minWidth: 0,
+      }}
+        className="hidden-mobile"
+      >
+        {/* Dot grid overlay */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.12,
+          backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Logo */}
+        <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, width: 'fit-content', position: 'relative', zIndex: 1 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 4,
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, fontWeight: 900, color: '#fff',
+          }}>
+            N
           </div>
-          Join hundreds of companies
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>NexINV</span>
+        </a>
+
+        {/* Hero text */}
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 420 }}>
+          <h1 style={{
+            fontSize: 40, fontWeight: 900, color: '#fff',
+            lineHeight: 1.15, letterSpacing: '-0.03em', margin: '0 0 16px',
+          }}>
+            Scale your operations instantly.
+          </h1>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65, margin: 0 }}>
+            Join NexINV's multi-tenant platform to organize your inventory and boost your team's productivity.
+          </p>
+        </div>
+
+        {/* Social proof */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex' }}>
+            {['#60a5fa', '#a78bfa', '#34d399'].map((c, i) => (
+              <div key={i} style={{
+                width: 30, height: 30, borderRadius: '50%',
+                backgroundColor: c + '44',
+                border: '2px solid rgba(255,255,255,0.3)',
+                marginLeft: i === 0 ? 0 : -8,
+              }} />
+            ))}
+          </div>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>
+            Join hundreds of companies worldwide
+          </span>
         </div>
       </div>
 
-      {/* Right Form */}
-      <div className="flex-1 flex items-center justify-center p-6 md:p-12 relative">
-        <a href="/" className="md:hidden absolute top-6 left-6 text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">NexINV</a>
-        
-        <div className="w-full max-w-md animate-in slide-in-from-right-8 fade-in duration-700">
-          <div className="mb-10">
-            <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Create Company</h2>
-            <p className="text-slate-500 dark:text-slate-400 font-medium">Set up your workspace and admin account.</p>
+      {/* ── Right form ── */}
+      <div style={{
+        flex: 1,
+        backgroundColor: t.canvas,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '48px 40px',
+        minWidth: 360,
+      }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+
+          {/* Mobile logo */}
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: t.fg, marginBottom: 6, letterSpacing: '-0.02em' }}>
+              Create Company
+            </div>
+            <p style={{ fontSize: 13, color: t.fgMuted, margin: 0 }}>
+              Set up your workspace and admin account.
+            </p>
           </div>
 
+          {/* Error */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl mb-6 text-sm font-bold flex items-center gap-2">
+            <div style={{
+              backgroundColor: t.negTint,
+              border: `1px solid ${t.neg}44`,
+              borderRadius: 4, padding: '10px 14px',
+              marginBottom: 18,
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 13, fontWeight: 600, color: t.neg,
+            }}>
               ⚠️ {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-500/10 p-3 rounded-xl border border-blue-100 dark:border-blue-500/20">
-              <input 
-                type="checkbox" 
-                id="isEnterprise"
-                checked={form.isEnterprise}
-                onChange={e => setForm({...form, isEnterprise: e.target.checked, companyName: ''})}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="isEnterprise" className="text-sm font-bold text-blue-900 dark:text-blue-300 cursor-pointer">
-                Register as an Enterprise (Manage multiple companies)
-              </label>
-            </div>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {!form.isEnterprise && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Company Name</label>
-              <div className="relative">
-                <MdBusiness className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" size={20} />
-                <input 
-                  type="text" required
-                  value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-12 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm"
-                  placeholder="Acme Corp"
-                />
+            {/* Enterprise toggle */}
+            <div style={{
+              backgroundColor: t.sunken,
+              border: `1px solid ${t.border}`,
+              borderRadius: 4, padding: '12px 14px',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              {/* DMMAS switch */}
+              <div
+                onClick={() => set('isEnterprise', !form.isEnterprise)}
+                style={{
+                  position: 'relative', width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+                  backgroundColor: form.isEnterprise ? primary : t.border,
+                  transition: 'background 120ms', cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 3,
+                  left: form.isEnterprise ? 19 : 3,
+                  width: 14, height: 14, borderRadius: '50%',
+                  backgroundColor: '#fff', transition: 'left 120ms',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: t.fg, lineHeight: 1.2 }}>
+                  Enterprise Account
+                </div>
+                <div style={{ fontSize: 11, color: t.fgMuted, marginTop: 2 }}>
+                  Manage multiple companies under one account
+                </div>
               </div>
             </div>
+
+            {/* Company Name (non-enterprise only) */}
+            {!form.isEnterprise && (
+              <div>
+                {lbl('Company Name *')}
+                <input
+                  type="text" required
+                  value={form.companyName}
+                  onChange={e => set('companyName', e.target.value)}
+                  placeholder="Acme Corp"
+                  style={inp('company')}
+                  onFocus={() => setFocused('company')}
+                  onBlur={() => setFocused('')}
+                />
+              </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Admin Username</label>
-              <div className="relative">
-                <MdPerson className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" size={20} />
-                <input 
-                  type="text" required
-                  value={form.adminUsername} onChange={e => setForm({...form, adminUsername: e.target.value})}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-12 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm"
-                  placeholder="admin"
-                />
-              </div>
+            {/* Admin Username */}
+            <div>
+              {lbl('Admin Username *')}
+              <input
+                type="text" required
+                value={form.adminUsername}
+                onChange={e => set('adminUsername', e.target.value.toLowerCase().replace(/\s/g, ''))}
+                placeholder="admin"
+                style={inp('username', { fontFamily: 'ui-monospace, monospace' })}
+                onFocus={() => setFocused('username')}
+                onBlur={() => setFocused('')}
+              />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Admin Email (Optional)</label>
-              <div className="relative">
-                <MdEmail className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" size={20} />
-                <input 
-                  type="email" 
-                  value={form.adminEmail} onChange={e => setForm({...form, adminEmail: e.target.value})}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-12 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm"
-                  placeholder="admin@acme.com"
-                />
-              </div>
+            {/* Admin Email */}
+            <div>
+              {lbl('Admin Email (optional)')}
+              <input
+                type="email"
+                value={form.adminEmail}
+                onChange={e => set('adminEmail', e.target.value)}
+                placeholder="admin@acme.com"
+                style={inp('email')}
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused('')}
+              />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Password</label>
-              <div className="relative">
-                <MdLock className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" size={20} />
-                <input 
-                  type="password" required
-                  value={form.password} onChange={e => setForm({...form, password: e.target.value})}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white rounded-xl pl-12 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm"
+            {/* Password */}
+            <div>
+              {lbl('Password *')}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPass ? 'text' : 'password'} required
+                  value={form.password}
+                  onChange={e => set('password', e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="new-password"
+                  style={inp('pass', { paddingRight: 40 })}
+                  onFocus={() => setFocused('pass')}
+                  onBlur={() => setFocused('')}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
+                  style={{
+                    position: 'absolute', top: '50%', right: 10,
+                    transform: 'translateY(-50%)',
+                    background: 'none', border: 'none',
+                    cursor: 'pointer', color: t.fgSubtle, padding: 0,
+                    display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <Icon name={showPass ? 'visibility_off' : 'visibility'} size={16} />
+                </button>
               </div>
             </div>
 
-            <button 
-              type="submit" 
+            {/* Divider */}
+            <div style={{ height: 1, backgroundColor: t.border, margin: '4px 0' }} />
+
+            {/* Submit */}
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg transition-colors border border-blue-500 mt-4 flex items-center justify-center gap-2 disabled:opacity-70"
+              style={{
+                width: '100%', height: 42, borderRadius: 4,
+                backgroundColor: primary, color: '#fff',
+                border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: 14, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: loading ? 0.7 : 1, transition: 'opacity 120ms',
+              }}
             >
               {loading ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div style={{
+                  width: 16, height: 16,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff', borderRadius: '50%',
+                  animation: 'spin 600ms linear infinite',
+                }} />
               ) : (
-                <>Sign Up <MdArrowForward size={20}/></>
+                <>Sign Up →</>
               )}
             </button>
-          </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">
-              Already have a workspace? <a href="/login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Log in here</a>
-            </p>
-          </div>
+            {/* Login link */}
+            <div style={{ textAlign: 'center', paddingTop: 4 }}>
+              <span style={{ fontSize: 13, color: t.fgMuted }}>
+                Already have a workspace?{' '}
+                <a href="/login" style={{
+                  color: primary, fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  Log in here
+                </a>
+              </span>
+            </div>
+          </form>
         </div>
       </div>
     </div>

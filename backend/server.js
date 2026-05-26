@@ -32,6 +32,8 @@ const enterpriseRoutes   = require("./routes/enterprise");
 const aiRoutes           = require("./routes/ai");
 const fileRoutes         = require("./routes/files");
 const adminRoutes        = require("./routes/admin");
+const barcodeRoutes      = require("./routes/barcode");
+const importRoutes       = require("./routes/import");
 
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
@@ -78,6 +80,8 @@ app.use("/api/enterprise",   enterpriseRoutes);
 app.use("/api/ai",           aiRoutes);
 app.use("/api/files",        fileRoutes);
 app.use("/api/admin",        adminRoutes);
+app.use("/api/barcode",      barcodeRoutes);
+app.use("/api/import",       importRoutes);
 
 // ── Database connection & seed ────────────────────────────────────────────────
 connectDB(seedData);

@@ -1,55 +1,72 @@
 import Modal from './Modal';
 import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 
 /**
- * Confirm.jsx — "Are you sure?" dialog
+ * Confirm.jsx — DMMAS-styled "Are you sure?" dialog
  * Props:
  *   open      boolean
  *   onClose   () => void
  *   onConfirm () => void
- *   title     string   (optional, falls back to t.deleteConfirmTitle)
- *   message   string   (optional, falls back to t.deleteConfirmMsg)
- *   danger    boolean  – if true, confirm button is red (default: true)
+ *   title     string
+ *   message   string
+ *   danger    boolean  – confirm button is red (default: true)
  *   loading   boolean  – shows spinner on confirm button
  */
 export default function Confirm({
-  open,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  danger = true,
-  loading = false,
+  open, onClose, onConfirm, title, message, danger = true, loading = false,
 }) {
-  const { t } = useAppContext();
+  const { t: tr, theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
 
   return (
-    <Modal open={open} onClose={onClose} title={title || t.deleteConfirmTitle}>
-      <div className="space-y-6">
-        <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-          {message || t.deleteConfirmMsg}
+    <Modal open={open} onClose={onClose} title={title || tr.deleteConfirmTitle}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <p style={{ fontSize: 13, color: t.fgMuted, lineHeight: 1.65 }}>
+          {message || tr.deleteConfirmMsg}
         </p>
 
-        <div className="flex justify-end gap-3">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          {/* Cancel */}
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+            style={{
+              height: 32, padding: '0 14px', borderRadius: 4,
+              backgroundColor: 'transparent', color: t.fgMuted,
+              border: `1px solid ${t.border}`, cursor: 'pointer',
+              fontSize: 13, fontWeight: 500,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'background 120ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = t.sunken}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            {t.cancel}
+            {tr.cancel}
           </button>
+
+          {/* Confirm */}
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors flex items-center gap-2 disabled:opacity-70 ${
-              danger
-                ? 'bg-red-600 hover:bg-red-700 border border-red-500'
-                : 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
-            }`}
+            style={{
+              height: 32, padding: '0 14px', borderRadius: 4,
+              backgroundColor: danger ? t.neg : primary,
+              color: '#fff', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: 13, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'opacity 120ms', opacity: loading ? 0.65 : 1,
+            }}
           >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : null}
-            {t.confirm}
+            {loading && (
+              <div style={{
+                width: 14, height: 14,
+                border: '2px solid rgba(255,255,255,0.3)',
+                borderTopColor: '#fff', borderRadius: '50%',
+                animation: 'spin 600ms linear infinite',
+              }} />
+            )}
+            {tr.confirm}
           </button>
         </div>
       </div>

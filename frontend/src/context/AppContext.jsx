@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { api } from '../api';
+import { api, setDemoMode, getDemoMode } from '../api';
 
 const AppContext = createContext();
 
@@ -24,7 +24,9 @@ const T = {
     destination: "Destination", date: "Date", role: "Role", email: "Email",
     phone: "Phone", permissions: "Permissions", canAdd: "Can Add Items",
     canEdit: "Can Edit Items", canDelete: "Can Delete Items",
+    canTxIn: "Can Record Stock In", canTxOut: "Can Record Stock Out",
     canTx: "Can Record Transactions", canManageUsers: "Can Manage Users",
+    stockIn: "Stock In", stockOut: "Stock Out",
     deleteConfirmTitle: "Confirm Delete",
     deleteConfirmMsg: "Are you sure you want to delete this? This action cannot be undone.",
     iconPack: "Icon Pack", theme: "Theme",
@@ -50,8 +52,9 @@ const T = {
     notes: "ملاحظات", source: "المصدر", destination: "الوجهة",
     date: "التاريخ", role: "الدور", email: "البريد الإلكتروني", phone: "الهاتف",
     permissions: "الصلاحيات", canAdd: "إضافة أصناف", canEdit: "تعديل أصناف",
-    canDelete: "حذف أصناف", canTx: "تسجيل الحركات",
-    canManageUsers: "إدارة المستخدمين",
+    canDelete: "حذف أصناف", canTxIn: "تسجيل وارد", canTxOut: "تسجيل صادر",
+    canTx: "تسجيل الحركات", canManageUsers: "إدارة المستخدمين",
+    stockIn: "وارد (IN)", stockOut: "صادر (OUT)",
     deleteConfirmTitle: "تأكيد الحذف",
     deleteConfirmMsg: "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
     iconPack: "مجموعة الأيقونات", theme: "المظهر",
@@ -174,7 +177,8 @@ export const AppProvider = ({ children }) => {
   const checkAuth = async () => {
     try {
       const data = await api.me();
-      setUser({ ...data.user, perms: data.perms });
+      const isDemo = getDemoMode();
+      setUser({ ...data.user, perms: data.perms, isDemo });
       setCompany(data.company);
       setAuthed(true);
       if (data.user.preferredLanguage) setLang(data.user.preferredLanguage);
@@ -189,19 +193,30 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (localStorage.getItem('nexinv_token')) checkAuth();
-    else setLoading(false);
+    if (localStorage.getItem('nexinv_token') || getDemoMode()) {
+      checkAuth();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const login = async (code, username, password) => {
     const data = await api.login(code, username, password);
     localStorage.setItem('nexinv_token', data.token);
-    setUser({ ...data.user, perms: data.perms });
+    setDemoMode(null);
+    setUser({ ...data.user, perms: data.perms, isDemo: false });
     setCompany(data.company);
     setAuthed(true);
     if (data.user.preferredLanguage) setLang(data.user.preferredLanguage);
     if (data.company?.theme) setTheme(data.company.theme);
     // Navigation handled by the calling component (Login.jsx)
+  };
+
+  const loginDemo = async (type) => {
+    // Completely bypass backend for demo login and use ephemeral memory state
+    setDemoMode(type);
+    // Since isDemo is true, checkAuth will hit our mock /auth/me via api.js
+    await checkAuth();
   };
 
   // Called after registration — token already issued, just load the session
@@ -213,6 +228,7 @@ export const AppProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('nexinv_token');
+    setDemoMode(null);
     setAuthed(false);
     setUser(null);
     setCompany(null);
@@ -281,7 +297,7 @@ export const AppProvider = ({ children }) => {
       
       const events = [
         'dept_added', 'dept_updated', 'dept_deleted',
-        'cat_added', 'cat_deleted',
+        'cat_added', 'cat_updated', 'cat_deleted',
         'item_added', 'item_updated', 'item_deleted',
         'tx_added', 'tx_updated', 'tx_deleted',
         'user_added', 'user_updated', 'user_deleted'
@@ -304,6 +320,10 @@ export const AppProvider = ({ children }) => {
 
   // ── CRUD — Items ──────────────────────────────────────────────────────────
   const saveItem = async (data, id = null) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       const result = id ? await api.updateItem(id, data) : await api.addItem(data);
       await reloadData();
@@ -316,6 +336,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const removeItem = async (id) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       await api.deleteItem(id);
       setItems(prev => prev.filter(i => i._id !== id));
@@ -328,6 +352,10 @@ export const AppProvider = ({ children }) => {
 
   // ── CRUD — Transactions ───────────────────────────────────────────────────
   const saveTx = async (data, id = null) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       const result = id ? await api.updateTx(id, data) : await api.addTx(data);
       // Reload items/stats so stock levels update; transactions are managed by the page itself
@@ -343,6 +371,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const removeTx = async (id) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       await api.deleteTx(id);
       const [iData, s] = await Promise.all([api.getItems(), api.getStats()]);
@@ -357,6 +389,10 @@ export const AppProvider = ({ children }) => {
 
   // ── CRUD — Users ──────────────────────────────────────────────────────────
   const saveUser = async (data, id = null, { silent = false } = {}) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       const result = id ? await api.updateUser(id, data) : await api.addUser(data);
       const fresh = await api.getUsers();
@@ -372,6 +408,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const removeUser = async (id) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      throw new Error('Demo Mode');
+    }
     try {
       await api.deleteUser(id);
       setUsers(prev => prev.filter(u => u._id !== id));
@@ -384,6 +424,10 @@ export const AppProvider = ({ children }) => {
 
   // ── Company update ────────────────────────────────────────────────────────
   const doUpdateCompany = async (data) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      return;
+    }
     try {
       await api.updateCompany(data);
       setCompany(prev => ({ ...prev, ...data }));
@@ -395,6 +439,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const uploadCompanyLogo = async (file) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      return;
+    }
     try {
       const res = await api.uploadCompanyLogo(file);
       setCompany(prev => ({ ...prev, logo: res.logo }));
@@ -406,9 +454,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const doUpdateProfile = async (data) => {
+    if (user?.isDemo) {
+      showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
+      return;
+    }
     try {
       const updatedUser = await api.updateProfile(data);
-      setUser({ ...updatedUser, perms: user.perms });
+      setUser({ ...updatedUser, perms: user.perms, isDemo: user.isDemo });
       showToast(lang === 'ar' ? 'تم تحديث الملف الشخصي' : 'Profile updated successfully');
     } catch (e) {
       showToast(e.message || 'Error updating profile', 'error');
@@ -422,7 +474,7 @@ export const AppProvider = ({ children }) => {
     lang, setLang, theme, setTheme,
     items, depts, cats, users, stats,
     lastSync, syncing,
-    login, loginWithToken, logout, loadData: reloadData,
+    login, loginDemo, loginWithToken, logout, loadData: reloadData,
     toasts, showToast, removeToast,
     saveItem, removeItem,
     saveTx, removeTx,

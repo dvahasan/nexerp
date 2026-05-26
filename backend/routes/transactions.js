@@ -39,7 +39,16 @@ router.get("/", protect, async (req, res) => {
 });
 
 // ── POST /api/transactions ───────────────────────────────────────────────────
-router.post("/", protect, need("canTx"), async (req, res) => {
+router.post("/", protect, async (req, res) => {
+  // Check type-specific permission: canTxIn for IN, canTxOut for OUT
+  const reqType = (req.body.type || '').toUpperCase();
+  const requiredPerm = reqType === 'IN' ? 'canTxIn' : 'canTxOut';
+  if (!req.perms?.[requiredPerm]) {
+    return res.status(403).json({ message: `No ${requiredPerm} permission` });
+  }
+  return txCreateHandler(req, res);
+});
+async function txCreateHandler(req, res) {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -70,7 +79,7 @@ router.post("/", protect, need("canTx"), async (req, res) => {
     await session.abortTransaction();
     res.status(statusFor(e)).json({ message: friendly(e) });
   } finally { session.endSession(); }
-});
+}
 
 // ── PUT /api/transactions/:id ────────────────────────────────────────────────
 router.put("/:id", protect, need("canManageUsers"), async (req, res) => {

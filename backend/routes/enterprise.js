@@ -34,8 +34,8 @@ router.get("/companies", protectEnterprise, async (req, res) => {
             activeMembers: users.filter(u => u.active).length,
             itemsCount:    items.length,
             stockValue, alerts,
-            txIn:          txs.filter(t => t.type === "in").length,
-            txOut:         txs.filter(t => t.type === "out").length,
+            txIn:          txs.filter(t => t.type === "IN").length,
+            txOut:         txs.filter(t => t.type === "OUT").length,
             filesCount,
           },
         };

@@ -18,6 +18,7 @@ import {
   MdStar, MdChat, MdSend, MdAutoAwesome, MdPerson, MdNotifications,
   MdLock, MdEmail, MdPhone, MdHome, MdInsights, MdColorLens,
   MdContentCopy, MdCalendarToday, MdArrowUpward, MdArrowDownward,
+  MdCameraAlt, MdQrCodeScanner, MdUploadFile, MdTableChart, MdPublic,
 } from 'react-icons/md';
 
 // ── Heroicons (outline) ───────────────────────────────────────────────────
@@ -32,6 +33,7 @@ import {
   ChevronUpIcon, InformationCircleIcon, StarIcon, ChatBubbleLeftIcon,
   PaperAirplaneIcon, SparklesIcon, UserIcon, BellIcon, LockClosedIcon,
   EnvelopeIcon, PhoneIcon, DocumentDuplicateIcon, CalendarIcon, ArrowUpIcon, ArrowDownIcon,
+  CameraIcon, DocumentArrowUpIcon, TableCellsIcon, GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Lucide ────────────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ import {
   TrendingUp, Check, ArrowLeft, Eye, EyeOff, LogOut, Building2,
   Tag, QrCode, Filter, RefreshCw, ChevronDown, ChevronUp, Info,
   Star, MessageSquare, Send, Sparkles, User, Bell, Lock, Mail, Phone, Copy, Calendar, ArrowUp, ArrowDown,
+  Camera, ScanLine, FileUp, Table2, Globe,
 } from 'lucide-react';
 
 // ── Phosphor ──────────────────────────────────────────────────────────────
@@ -55,6 +58,7 @@ import {
   CaretDown, CaretUp, Info as PhInfo, Star as PhStar, Chat, PaperPlaneRight,
   Sparkle, User as PhUser, Bell as PhBell, Lock as PhLock, EnvelopeSimple, Phone as PhPhone,
   Copy as PhCopy, Calendar as PhCalendar, ArrowUp as PhArrowUp, ArrowDown as PhArrowDown,
+  Camera as PhCamera, Scan, FilePlus, Table, Globe as PhGlobe,
 } from 'phosphor-react';
 
 // ── Icon name → component map per pack ────────────────────────────────────
@@ -76,6 +80,8 @@ const ICON_MAP = {
     insights: MdInsights, theme: MdColorLens,
     copy: MdContentCopy, calendar: MdCalendarToday, trending_up: MdTrendingUp,
     arrow_up: MdArrowUpward, arrow_down: MdArrowDownward,
+    camera: MdCameraAlt, scan: MdQrCodeScanner, import_data: MdUploadFile,
+    table: MdTableChart, globe: MdPublic,
   },
   heroicons: {
     dashboard: HomeIcon, inventory: ArchiveBoxIcon, transactions: ListBulletIcon,
@@ -94,6 +100,8 @@ const ICON_MAP = {
     home: HomeIcon, insights: ArrowTrendingUpIcon, theme: Cog6ToothIcon,
     copy: DocumentDuplicateIcon, calendar: CalendarIcon, trending_up: ArrowTrendingUpIcon,
     arrow_up: ArrowUpIcon, arrow_down: ArrowDownIcon,
+    camera: CameraIcon, scan: QrCodeIcon, import_data: DocumentArrowUpIcon,
+    table: TableCellsIcon, globe: GlobeAltIcon,
   },
   lucide: {
     dashboard: LayoutDashboard, inventory: Package, transactions: ClipboardList,
@@ -112,6 +120,8 @@ const ICON_MAP = {
     home: LayoutDashboard, insights: TrendingUp, theme: Settings,
     copy: Copy, calendar: Calendar, trending_up: TrendingUp,
     arrow_up: ArrowUp, arrow_down: ArrowDown,
+    camera: Camera, scan: ScanLine, import_data: FileUp,
+    table: Table2, globe: Globe,
   },
   phosphor: {
     dashboard: House, inventory: PhPackage, transactions: ClipboardText,
@@ -130,6 +140,8 @@ const ICON_MAP = {
     home: House, insights: PhTrending, theme: GearSix,
     copy: PhCopy, calendar: PhCalendar, trending_up: PhTrending,
     arrow_up: PhArrowUp, arrow_down: PhArrowDown,
+    camera: PhCamera, scan: Scan, import_data: FilePlus,
+    table: Table, globe: PhGlobe,
   },
 };
 

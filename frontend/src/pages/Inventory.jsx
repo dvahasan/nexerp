@@ -1,48 +1,47 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { T, inputStyle, inputFocus, labelStyle } from '../theme';
 import { api } from '../api';
 import Icon from '../components/Icon';
-import Skeleton from '../components/Skeleton';
 import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 import LazyScroll from '../components/LazyScroll';
-import ItemModal from './ItemModal';
 import TxModal from './TxModal';
 import Confirm from '../components/Confirm';
 
 const LIMIT = 12;
 
 export default function Inventory() {
-  const { depts, loading: ctxLoading, t, isAR, company, user, removeItem } = useAppContext();
+  const navigate = useNavigate();
+  const { depts, loading: ctxLoading, t: tr, isAR, company, user, removeItem, theme } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
 
   const [search, setSearch] = useState('');
   const [deptF,  setDeptF]  = useState('all');
   const [stF,    setStF]    = useState('all');
 
-  // Server-side paginated state
   const [items,    setItems]    = useState([]);
   const [total,    setTotal]    = useState(0);
   const [hasMore,  setHasMore]  = useState(false);
   const [page,     setPage]     = useState(1);
   const [fetching, setFetching] = useState(true);
-  // Version bump forces a re-fetch even when page is already 1
-  const [version, setVersion] = useState(0);
+  const [version,  setVersion]  = useState(0);
 
-  // Modal state
-  const [itemModal,    setItemModal]    = useState(false);
-  const [editTarget,   setEditTarget]   = useState(null);
   const [txModal,      setTxModal]      = useState(false);
   const [txItem,       setTxItem]       = useState(null);
   const [confirmOpen,  setConfirmOpen]  = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
 
-  // Pick up pre-applied filter from Dashboard card click
+  // Focus tracking for inputs
+  const [focused, setFocused] = useState('');
+
   useEffect(() => {
     const f = sessionStorage.getItem('nexinv_inv_filter');
     if (f) { setStF(f); sessionStorage.removeItem('nexinv_inv_filter'); }
   }, []);
 
-  // Main fetch — accumulates on scroll, replaces on page-1 fetches
   useEffect(() => {
     let cancelled = false;
     setFetching(true);
@@ -66,21 +65,19 @@ export default function Inventory() {
     return () => { cancelled = true; };
   }, [page, search, deptF, stF, version]);
 
-  // Reset to page 1 whenever filters change
   useEffect(() => { setPage(1); }, [search, deptF, stF]);
 
-  // Explicit refresh (after save/delete): bump version so the effect re-runs even if page===1
   const refresh = () => { setPage(1); setVersion(v => v + 1); };
 
   const getStatus = (i) => {
-    if (i.qty === 0) return { label: isAR ? 'نفذت' : 'Out',  color: 'bg-red-500',    text: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-500/10' };
+    if (i.qty === 0) return { label: isAR ? 'نفذت' : 'Out',    dot: '#ef4444', fg: '#ef4444', bg: t.negTint     };
     if (i.minThreshold > 0 && i.qty <= i.minThreshold)
-      return { label: isAR ? 'منخفض' : 'Low', color: 'bg-yellow-500', text: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-500/10' };
-    return   { label: isAR ? 'متوفر' : 'OK',   color: 'bg-green-500',  text: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-500/10' };
+      return               { label: isAR ? 'منخفض' : 'Low',   dot: '#f59e0b', fg: '#f59e0b', bg: theme === 'dark' ? '#2b1f0a' : '#fffbeb' };
+    return                 { label: isAR ? 'متوفر' : 'OK',    dot: '#16774A', fg: '#16774A', bg: theme === 'dark' ? '#0c1f12' : '#f0fdf4' };
   };
 
-  const openAdd  = ()     => { setEditTarget(null); setItemModal(true); };
-  const openEdit = (item) => { setEditTarget(item);  setItemModal(true); };
+  const openAdd  = ()     => navigate('/item/new');
+  const openEdit = (item) => navigate('/item/' + item._id);
   const openTx   = (item) => { setTxItem(item);      setTxModal(true);  };
 
   const confirmDelete = (item) => { setDeleteTarget(item); setConfirmOpen(true); };
@@ -89,7 +86,6 @@ export default function Inventory() {
     setDeleting(true);
     try {
       await removeItem(deleteTarget._id);
-      // Remove from local display state immediately
       setItems(prev => prev.filter(i => i._id !== deleteTarget._id));
       setTotal(prev => prev - 1);
       setConfirmOpen(false);
@@ -98,109 +94,150 @@ export default function Inventory() {
     finally { setDeleting(false); }
   };
 
-  const handleSaved = () => refresh();
-
   const currencySymbol = company?.baseCurrency || '';
+
+  // ── filter input style helper
+  const filterInput = (name, extra = {}) => ({
+    ...inputStyle(t),
+    height: 36,
+    borderColor: focused === name ? primary : t.border,
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    ...extra,
+  });
+
+  const selectStyle = (name) => ({
+    height: 36, padding: '0 10px', borderRadius: 4,
+    border: `1px solid ${focused === name ? primary : t.border}`,
+    backgroundColor: t.canvas, color: t.fg,
+    fontSize: 13, outline: 'none', fontFamily: 'inherit',
+    cursor: 'pointer', transition: 'border-color 120ms, box-shadow 120ms',
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+  });
 
   if (ctxLoading) {
     return (
-      <div className="flex-1 animate-in fade-in duration-500">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" shape="text" />
-            <Skeleton className="h-4 w-64" shape="text" />
-          </div>
-          <Skeleton className="h-10 w-32" shape="rect" />
+      <div style={{ flex: 1 }} className="animate-in fade-in duration-500">
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: 20,
+        }}>
+          <div style={{ width: 180, height: 24, borderRadius: 4, backgroundColor: t.border }} className="animate-pulse" />
+          <div style={{ width: 100, height: 34, borderRadius: 4, backgroundColor: t.border }} className="animate-pulse" />
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex gap-4">
-            <Skeleton className="h-10 w-full" shape="rect" />
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-                  <Skeleton className="h-44 w-full" shape="rect" />
-                  <div className="p-4 space-y-3">
-                    <Skeleton className="h-5 w-3/4" shape="text" />
-                    <Skeleton className="h-4 w-1/2" shape="text" />
-                  </div>
-                </div>
-              ))}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12,
+        }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: 160, backgroundColor: t.border }} className="animate-pulse" />
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ height: 14, width: '70%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+                <div style={{ height: 12, width: '50%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">
-          {t.inventory}
-          <span className="ml-2 text-base font-normal text-slate-400">({total})</span>
-        </h1>
-        <div className="flex gap-2">
-          {user?.perms?.canAdd && (
-            <button
-              onClick={openAdd}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 border border-blue-500"
-            >
-              <Icon name="add" size={20} /> {t.addItem}
-            </button>
-          )}
+    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle }}>
+            {tr.inventory}
+          </span>
+          <span style={{ marginLeft: 8, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgSubtle }}>
+            ({total})
+          </span>
         </div>
+        {user?.perms?.canAdd && (
+          <button
+            onClick={openAdd}
+            style={{
+              height: 32, padding: '0 14px', borderRadius: 4,
+              backgroundColor: primary, color: '#fff', border: 'none',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'opacity 120ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <Icon name="add" size={18} /> {tr.addItem}
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Icon name="search" size={18} className="absolute top-1/2 -translate-y-1/2 left-3 text-slate-400 pointer-events-none" />
+      {/* ── Filters ── */}
+      <div style={{
+        backgroundColor: t.elev, border: `1px solid ${t.border}`,
+        borderRadius: 4, padding: '12px 14px',
+        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Icon name="search" size={15} style={{
+            position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
+            color: t.fgSubtle, pointerEvents: 'none',
+          }} />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={isAR ? 'ابحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-            className="w-full bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
+            style={{ ...filterInput('search'), paddingLeft: 32 }}
+            onFocus={() => setFocused('search')}
+            onBlur={() => setFocused('')}
           />
         </div>
-        <div className="flex gap-2 md:w-auto w-full">
-          <select
-            value={deptF} onChange={e => setDeptF(e.target.value)}
-            className="flex-1 md:w-44 bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="all">{isAR ? 'جميع الأقسام' : 'All Depts'}</option>
-            {depts.map(d => <option key={d._id} value={d._id}>{isAR ? d.name : (d.nameEn || d.name)}</option>)}
-          </select>
-          <select
-            value={stF} onChange={e => setStF(e.target.value)}
-            className="flex-1 md:w-36 bg-white dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="all">{isAR ? 'الجميع' : 'All'}</option>
-            <option value="ok">✅ {isAR ? 'متوفر' : 'OK'}</option>
-            <option value="low">⚠️ {isAR ? 'منخفض' : 'Low'}</option>
-            <option value="out">🔴 {isAR ? 'نفد' : 'Out'}</option>
-          </select>
-        </div>
+
+        {/* Dept filter */}
+        <select
+          value={deptF}
+          onChange={e => setDeptF(e.target.value)}
+          style={{ ...selectStyle('deptF'), minWidth: 140 }}
+          onFocus={() => setFocused('deptF')}
+          onBlur={() => setFocused('')}
+        >
+          <option value="all">{isAR ? 'جميع الأقسام' : 'All Depts'}</option>
+          {depts.map(d => (
+            <option key={d._id} value={d._id}>{isAR ? d.name : (d.nameEn || d.name)}</option>
+          ))}
+        </select>
+
+        {/* Stock status filter */}
+        <select
+          value={stF}
+          onChange={e => setStF(e.target.value)}
+          style={{ ...selectStyle('stF'), minWidth: 110 }}
+          onFocus={() => setFocused('stF')}
+          onBlur={() => setFocused('')}
+        >
+          <option value="all">{isAR ? 'الجميع' : 'All'}</option>
+          <option value="ok">✓ {isAR ? 'متوفر' : 'OK'}</option>
+          <option value="low">⚠ {isAR ? 'منخفض' : 'Low'}</option>
+          <option value="out">✕ {isAR ? 'نفد' : 'Out'}</option>
+        </select>
       </div>
 
-      {/* Item grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {/* Initial loading skeleton */}
+      {/* ── Item grid ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+        gap: 12,
+      }}>
+        {/* Loading skeleton */}
         {fetching && items.length === 0 && (
           Array.from({ length: LIMIT }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-              <Skeleton className="h-44 w-full" shape="rect" />
-              <div className="p-4 space-y-3">
-                <Skeleton className="h-5 w-3/4" shape="text" />
-                <Skeleton className="h-4 w-1/2" shape="text" />
-                <div className="grid grid-cols-3 gap-1.5">
-                  <Skeleton className="h-10" shape="rect" />
-                  <Skeleton className="h-10" shape="rect" />
-                  <Skeleton className="h-10" shape="rect" />
-                </div>
+            <div key={i} style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: 160, backgroundColor: t.border }} className="animate-pulse" />
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ height: 14, width: '70%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
+                <div style={{ height: 12, width: '50%', borderRadius: 3, backgroundColor: t.border }} className="animate-pulse" />
               </div>
             </div>
           ))
@@ -208,7 +245,12 @@ export default function Inventory() {
 
         {/* Empty state */}
         {!fetching && items.length === 0 && (
-          <div className="col-span-full py-20 text-center text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+          <div style={{
+            gridColumn: '1 / -1', padding: '60px 20px', textAlign: 'center',
+            backgroundColor: t.elev, border: `1px dashed ${t.border}`, borderRadius: 4,
+            color: t.fgSubtle, fontFamily: 'ui-monospace, monospace',
+            fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
             {isAR ? 'لا توجد أصناف مطابقة للبحث' : 'No items match your search'}
           </div>
         )}
@@ -219,137 +261,211 @@ export default function Inventory() {
 
           return (
             <LazyScroll key={item._id} alwaysRender rootMargin="200px">
-            <div
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[transform,box-shadow] duration-300 group cursor-pointer"
-              onClick={() => openEdit(item)}
-            >
-              {/* Photo */}
-              <div className="h-44 bg-slate-100 dark:bg-slate-900 relative flex items-center justify-center overflow-hidden">
-                {item.photo ? (
-                  <img
-                    src={item.photo.startsWith('/') ? `http://localhost:5000${item.photo}` : item.photo}
-                    alt={item.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
-                ) : (
-                  <Icon name="image" size={56} className="text-slate-300 dark:text-slate-700" />
-                )}
-                {dept && (
-                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-sm" style={{ backgroundColor: dept.color }}>
-                    {isAR ? dept.name : (dept.nameEn || dept.name)}
-                  </div>
-                )}
-                <div className={`absolute top-3 right-3 w-3 h-3 rounded-full shadow-sm ring-2 ring-white dark:ring-slate-800 ${st.color}`} />
-                {item.photos?.length > 1 && (
-                  <div className="absolute bottom-2 right-2 text-xs bg-black/50 text-white px-2 py-0.5 rounded-full">
-                    +{item.photos.length - 1}
-                  </div>
-                )}
-              </div>
+              <div
+                style={{
+                  backgroundColor: t.elev, border: `1px solid ${t.border}`,
+                  borderRadius: 4, overflow: 'hidden', cursor: 'pointer',
+                  transition: 'border-color 120ms, box-shadow 120ms',
+                }}
+                onClick={() => openEdit(item)}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 1px ${primary}`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = t.border;
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {/* Photo area */}
+                <div style={{
+                  height: 160, backgroundColor: t.sunken,
+                  position: 'relative', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {item.photo ? (
+                    <img
+                      src={item.photo.startsWith('/') ? `http://localhost:5000${item.photo}` : item.photo}
+                      alt={item.name}
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <Icon name="image" size={48} style={{ color: t.border }} />
+                  )}
 
-              {/* Body */}
-              <div className="p-4">
-                <div className="mb-3">
-                  <h3 className="font-bold text-slate-800 dark:text-white truncate text-sm">
-                    {isAR ? item.name : (item.nameEn || item.name)}
-                  </h3>
-                  {item.datasheet && (
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-mono">#{item.datasheet}</p>
+                  {dept && (
+                    <div style={{
+                      position: 'absolute', top: 8, left: 8,
+                      padding: '3px 8px', borderRadius: 3,
+                      fontSize: 10, fontWeight: 700, color: '#fff',
+                      backgroundColor: dept.color,
+                      fontFamily: 'ui-monospace, monospace',
+                      textTransform: 'uppercase', letterSpacing: '0.04em',
+                    }}>
+                      {isAR ? dept.name : (dept.nameEn || dept.name)}
+                    </div>
+                  )}
+
+                  {/* Status dot */}
+                  <div style={{
+                    position: 'absolute', top: 10, right: 10,
+                    width: 8, height: 8, borderRadius: '50%',
+                    backgroundColor: st.dot,
+                    boxShadow: `0 0 0 2px ${t.elev}`,
+                  }} />
+
+                  {item.photos?.length > 1 && (
+                    <div style={{
+                      position: 'absolute', bottom: 6, right: 6,
+                      fontSize: 10, backgroundColor: 'rgba(0,0,0,0.5)',
+                      color: '#fff', padding: '2px 6px', borderRadius: 3,
+                      fontFamily: 'ui-monospace, monospace',
+                    }}>
+                      +{item.photos.length - 1}
+                    </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5 mb-3">
-                  <div className={`rounded-lg p-1.5 text-center ${st.bg}`}>
-                    <div className="text-[9px] uppercase font-bold text-slate-400">{isAR ? 'كمية' : 'Qty'}</div>
-                    <div className={`text-sm font-black ${st.text}`}>{item.qty}</div>
+                {/* Card body */}
+                <div style={{ padding: 14 }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, color: t.fg, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isAR ? item.name : (item.nameEn || item.name)}
+                    </div>
+                    {item.datasheet && (
+                      <div style={{ fontSize: 11, color: t.fgSubtle, marginTop: 2, fontFamily: 'ui-monospace, monospace' }}>
+                        #{item.datasheet}
+                      </div>
+                    )}
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-1.5 text-center">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">{isAR ? 'سعر' : 'Price'}</div>
-                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300">{currencySymbol}{item.price}</div>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-1.5 text-center overflow-hidden">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">SKU</div>
-                    <div className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{item.sku || '—'}</div>
-                  </div>
-                </div>
 
-                {item.minThreshold > 0 && (
-                  <div className="w-full h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
-                    <div
-                      className={`h-full rounded-full ${st.color}`}
-                      style={{ width: `${Math.min(100, (item.qty / Math.max(item.minThreshold * 3, 1)) * 100)}%` }}
-                    />
+                  {/* Stats row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+                    {/* Qty */}
+                    <div style={{
+                      backgroundColor: st.bg, borderRadius: 3,
+                      padding: '5px 4px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: t.fgSubtle }}>
+                        {isAR ? 'كمية' : 'Qty'}
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: st.fg }}>
+                        {item.qty}
+                      </div>
+                    </div>
+                    {/* Price */}
+                    <div style={{
+                      backgroundColor: t.sunken, borderRadius: 3,
+                      padding: '5px 4px', textAlign: 'center',
+                    }}>
+                      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: t.fgSubtle }}>
+                        {isAR ? 'سعر' : 'Price'}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: t.fgMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currencySymbol}{item.price}
+                      </div>
+                    </div>
+                    {/* SKU */}
+                    <div style={{
+                      backgroundColor: t.sunken, borderRadius: 3,
+                      padding: '5px 4px', textAlign: 'center', overflow: 'hidden',
+                    }}>
+                      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: t.fgSubtle }}>
+                        SKU
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: t.fgSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'ui-monospace, monospace' }}>
+                        {item.sku || '—'}
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                {/* Action buttons */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                  <span className="text-xs font-mono text-slate-400 truncate w-20">{item.barcode || '—'}</span>
-                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    {user?.perms?.canTx && (
-                      <button
-                        onClick={() => openTx(item)}
-                        title={isAR ? 'تسجيل حركة' : 'Record Transaction'}
-                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                      >
-                        <Icon name="swap" size={17} />
-                      </button>
-                    )}
-                    {user?.perms?.canEdit && (
-                      <button
-                        onClick={() => openEdit(item)}
-                        title={t.edit}
-                        className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
-                      >
-                        <Icon name="edit" size={17} />
-                      </button>
-                    )}
-                    {user?.perms?.canDelete && (
-                      <button
-                        onClick={() => confirmDelete(item)}
-                        title={t.delete}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                      >
-                        <Icon name="delete" size={17} />
-                      </button>
-                    )}
+                  {/* Stock level bar */}
+                  {item.minThreshold > 0 && (
+                    <div style={{ height: 3, backgroundColor: t.border, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+                      <div style={{
+                        height: '100%', borderRadius: 2, backgroundColor: st.dot,
+                        width: `${Math.min(100, (item.qty / Math.max(item.minThreshold * 3, 1)) * 100)}%`,
+                        transition: 'width 300ms',
+                      }} />
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      paddingTop: 10, borderTop: `1px solid ${t.border}`,
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <span style={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', color: t.fgSubtle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
+                      {item.barcode || '—'}
+                    </span>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {user?.perms?.canTx && (
+                        <button
+                          onClick={() => openTx(item)}
+                          title={isAR ? 'تسجيل حركة' : 'Record Transaction'}
+                          style={{ background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: t.fgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, transition: 'background 120ms, color 120ms', width: 28, height: 28 }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = primary + '1a'; e.currentTarget.style.color = primary; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+                        >
+                          <Icon name="swap" size={15} />
+                        </button>
+                      )}
+                      {user?.perms?.canEdit && (
+                        <button
+                          onClick={() => openEdit(item)}
+                          title={tr.edit}
+                          style={{ background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: t.fgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, transition: 'background 120ms, color 120ms', width: 28, height: 28 }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f59e0b1a'; e.currentTarget.style.color = '#f59e0b'; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+                        >
+                          <Icon name="edit" size={15} />
+                        </button>
+                      )}
+                      {user?.perms?.canDelete && (
+                        <button
+                          onClick={() => confirmDelete(item)}
+                          title={tr.delete}
+                          style={{ background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: t.fgMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, transition: 'background 120ms, color 120ms', width: 28, height: 28 }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; e.currentTarget.style.color = t.neg; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+                        >
+                          <Icon name="delete" size={15} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             </LazyScroll>
           );
         })}
       </div>
 
-      {/* Infinite Scroll trigger */}
-      <InfiniteScrollTrigger
-        hasMore={hasMore && !fetching}
-        onVisible={() => setPage(p => p + 1)}
-      />
+      {/* Infinite scroll trigger */}
+      <InfiniteScrollTrigger hasMore={hasMore && !fetching} onVisible={() => setPage(p => p + 1)} />
 
-      {/* Fetching-more spinner (subsequent pages) */}
+      {/* Loading more spinner */}
       {fetching && items.length > 0 && (
-        <div className="py-6 flex justify-center">
-          <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+        <div style={{ padding: '20px 0', display: 'flex', justifyContent: 'center' }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: '50%',
+            border: `2px solid ${t.border}`, borderTopColor: primary,
+            animation: 'spin 600ms linear infinite',
+          }} />
         </div>
       )}
 
       {/* ── Modals ── */}
-      <ItemModal
-        open={itemModal}
-        onClose={() => { setItemModal(false); setEditTarget(null); }}
-        editItem={editTarget}
-        onSaved={handleSaved}
-      />
-
       <TxModal
         open={txModal}
         onClose={() => { setTxModal(false); setTxItem(null); }}
         editTx={txItem ? { itemId: txItem } : null}
-        onSaved={handleSaved}
+        onSaved={refresh}
       />
 
       <Confirm

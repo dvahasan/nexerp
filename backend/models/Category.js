@@ -6,6 +6,8 @@ const CatSchema = new mongoose.Schema(
     name:      { type: String, required: true },
     nameEn:    String,
     deptId:    { type: mongoose.Schema.Types.ObjectId, ref: "Department", required: true },
+    parentId:  { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
+    path:      { type: String, default: null, index: true },
     active:    { type: Boolean, default: true },
   },
   { timestamps: true }

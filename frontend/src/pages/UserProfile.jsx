@@ -1,121 +1,177 @@
 import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { T } from '../theme';
 import Icon from '../components/Icon';
 
 export default function UserProfile() {
-  const { user, doUpdateProfile, isAR } = useAppContext();
+  const { user, doUpdateProfile, isAR, theme, company } = useAppContext();
+  const t = T[theme] || T.light;
+  const primary = company?.primaryColor || '#3b82f6';
 
   const [form, setForm] = useState({
-    name: user?.name || '',
+    name:     user?.name     || '',
     username: user?.username || '',
-    email: user?.email || '',
+    email:    user?.email    || '',
     password: '',
   });
-  const [saving, setSaving] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [focused, setFocused] = useState('');
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await doUpdateProfile(form);
-      setForm(f => ({ ...f, password: '' })); // clear password after save
-    } catch {
-      // toast is handled in AppContext
-    } finally {
-      setSaving(false);
-    }
+      setForm(f => ({ ...f, password: '' }));
+    } catch { /* toast handled */ }
+    finally { setSaving(false); }
   };
 
+  const fieldInput = (name, extra = {}) => ({
+    width: '100%', height: 36, padding: '0 10px', borderRadius: 4,
+    border: `1px solid ${focused === name ? primary : t.border}`,
+    backgroundColor: t.canvas, color: t.fg, fontSize: 13,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+    boxShadow: focused === name ? `0 0 0 1px ${primary}` : 'none',
+    transition: 'border-color 120ms, box-shadow 120ms',
+    ...extra,
+  });
+
+  const label = (text) => (
+    <label style={{
+      display: 'block', fontFamily: 'ui-monospace, monospace',
+      fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+      letterSpacing: '0.08em', color: t.fgSubtle, marginBottom: 6,
+    }}>
+      {text}
+    </label>
+  );
+
+  // Avatar color based on role
+  const avatarColors = {
+    owner:     '#3b82f6', admin:   '#6366f1', manager: '#10b981',
+    warehouse: '#f59e0b', viewer: '#64748b',
+  };
+  const avatarColor = avatarColors[user?.role] || primary;
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 flex items-center gap-6 border border-slate-100 dark:border-slate-700 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 dark:bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        
-        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-3xl shadow-lg flex-shrink-0 relative z-10">
+    <div className="animate-in fade-in duration-300" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* ── Header card ── */}
+      <div style={{
+        backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4,
+        padding: 24, display: 'flex', alignItems: 'center', gap: 20, overflow: 'hidden', position: 'relative',
+      }}>
+        {/* Subtle background tint */}
+        <div style={{
+          position: 'absolute', top: -20, right: -20, width: 100, height: 100,
+          borderRadius: '50%', backgroundColor: avatarColor + '12', pointerEvents: 'none',
+        }} />
+
+        {/* Avatar */}
+        <div style={{
+          width: 64, height: 64, borderRadius: 4, flexShrink: 0,
+          backgroundColor: avatarColor + '18', border: `1px solid ${avatarColor}44`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'ui-monospace, monospace', fontSize: 24, fontWeight: 900,
+          color: avatarColor, position: 'relative',
+        }}>
           {user?.name?.charAt(0)?.toUpperCase()}
         </div>
-        
-        <div className="flex-1 min-w-0 relative z-10">
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white truncate">
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: t.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {user?.name}
-          </h1>
-          <div className="text-sm font-mono text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-            <Icon name="user" size={14} /> @{user?.username}
           </div>
-          <div className="mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300">
+          <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="user" size={12} /> @{user?.username}
+          </div>
+          <div style={{
+            marginTop: 8, display: 'inline-flex', alignItems: 'center',
+            padding: '2px 8px', borderRadius: 3,
+            backgroundColor: avatarColor + '14', border: `1px solid ${avatarColor}44`,
+            fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em', color: avatarColor,
+          }}>
             {user?.role}
           </div>
         </div>
       </div>
 
-      {/* Form */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-6 md:p-8">
-        <h2 className="text-base font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-          <Icon name="settings" size={18} className="text-blue-500" />
-          {isAR ? 'إعدادات الحساب' : 'Account Settings'}
-        </h2>
+      {/* ── Edit form ── */}
+      <div style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${t.border}` }}>
+          <Icon name="settings" size={15} style={{ color: primary }} />
+          <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fg }}>
+            {isAR ? 'إعدادات الحساب' : 'Account Settings'}
+          </span>
+        </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'الاسم بالكامل' : 'Full Name'}
-              </label>
+              {label(isAR ? 'الاسم بالكامل' : 'Full Name')}
               <input
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                style={fieldInput('name')}
+                onFocus={() => setFocused('name')}
+                onBlur={() => setFocused('')}
               />
             </div>
-            
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                {isAR ? 'اسم المستخدم' : 'Username'}
-              </label>
+              {label(isAR ? 'اسم المستخدم' : 'Username')}
               <input
                 value={form.username}
                 onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                style={{ ...fieldInput('username'), fontFamily: 'ui-monospace, monospace' }}
+                onFocus={() => setFocused('username')}
+                onBlur={() => setFocused('')}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-              {isAR ? 'البريد الإلكتروني' : 'Email Address'}
-            </label>
+            {label(isAR ? 'البريد الإلكتروني' : 'Email Address')}
             <input
               type="email"
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              placeholder="admin@company.com"
-              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              placeholder="user@company.com"
+              style={fieldInput('email')}
+              onFocus={() => setFocused('email')}
+              onBlur={() => setFocused('')}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-              {isAR ? 'كلمة المرور الجديدة' : 'New Password'}
-            </label>
+            {label(isAR ? 'كلمة المرور الجديدة' : 'New Password')}
             <input
               type="password"
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               placeholder={isAR ? 'اتركه فارغاً للاحتفاظ بكلمة المرور الحالية' : 'Leave blank to keep current password'}
-              className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              style={fieldInput('password')}
+              onFocus={() => setFocused('password')}
+              onBlur={() => setFocused('')}
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 12, marginTop: 4, borderTop: `1px solid ${t.border}` }}>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2"
+              style={{
+                height: 34, padding: '0 20px', borderRadius: 4,
+                backgroundColor: primary, color: '#fff', border: 'none',
+                cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700,
+                fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.06em',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                opacity: saving ? 0.65 : 1, transition: 'opacity 120ms',
+              }}
             >
               {saving
-                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {isAR ? 'جارٍ الحفظ...' : 'Saving...'}</>
-                : <><Icon name="save" size={16} /> {isAR ? 'حفظ التغييرات' : 'Save Changes'}</>
+                ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 600ms linear infinite' }} /> {isAR ? 'جارٍ الحفظ...' : 'Saving...'}</>
+                : <><Icon name="save" size={14} /> {isAR ? 'حفظ التغييرات' : 'Save Changes'}</>
               }
             </button>
           </div>
