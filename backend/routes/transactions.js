@@ -9,18 +9,36 @@ const router = express.Router();
 // ── GET /api/transactions ────────────────────────────────────────────────────
 router.get("/", protect, async (req, res) => {
   try {
-    const { item, type, from, to, page, limit: rawLimit, user } = req.query;
+    const { item, type, from, to, page, limit: rawLimit, user, search } = req.query;
     const canSeeAll = req.user.role === "owner" || req.user.role === "admin";
 
     let q = { companyId: req.user.companyId };
-    if (!canSeeAll)       q.userId = req.user._id;
-    else if (user)        q.userId = user;
-    if (item)             q.itemId = item;
-    if (type && type !== "all") q.type = type;
+    if (!canSeeAll)            q.userId = req.user._id;
+    else if (user)             q.userId = user;
+    if (item)                  q.itemId = item;
+    if (type && type !== "all") q.type  = type;
     if (from || to) {
       q.date = {};
       if (from) q.date.$gte = new Date(from);
       if (to)   q.date.$lte = new Date(to + "T23:59:59");
+    }
+
+    // ── Text search: item name/nameEn/SKU/barcode + source/dest/notes/user ──
+    if (search && search.trim()) {
+      const re = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const matchingItems = await Item.find(
+        { companyId: req.user.companyId,
+          $or: [{ name: re }, { nameEn: re }, { sku: re }, { barcode: re }] },
+        "_id"
+      ).lean();
+      const ids = matchingItems.map(i => i._id);
+      q.$or = [
+        { source:   re },
+        { dest:     re },
+        { notes:    re },
+        { userName: re },
+        ...(ids.length ? [{ itemId: { $in: ids } }] : []),
+      ];
     }
 
     const pg    = Math.max(1, parseInt(page) || 1);
@@ -29,7 +47,7 @@ router.get("/", protect, async (req, res) => {
 
     const [txs, total] = await Promise.all([
       Transaction.find(q)
-        .populate("itemId", "name nameEn sku")
+        .populate("itemId", "name nameEn sku barcode")
         .sort({ date: -1 })
         .skip(skip).limit(limit),
       Transaction.countDocuments(q),
