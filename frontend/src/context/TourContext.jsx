@@ -171,21 +171,21 @@ export function TourProvider({ children }) {
         run={run}
         stepIndex={stepIndex}
         continuous
-        showProgress
-        onEvent={handleEvent}          /* v3: was `callback` in v2 */
-        spotlightPadding={4}
-        skipScroll                     /* v3: was `disableScrolling` in v2 */
-        options={{                     /* v3: was nested in styles.options in v2 */
-          arrowColor:   tok.elev,
-          backgroundColor: tok.elev,
-          overlayColor: 'rgba(0,0,0,0.45)',
+        onEvent={handleEvent}
+        options={{
+          arrowColor:         tok.elev,
+          backgroundColor:    tok.elev,
+          overlayColor:       'rgba(0,0,0,0.45)',
           primaryColor,
-          textColor:    tok.fg,
-          zIndex:       10000,
-          overlayClickAction: 'stop',  /* v3: was `disableOverlayClose` in v2 */
+          textColor:          tok.fg,
+          zIndex:             10000,
+          overlayClickAction: false,   /* don't close tour on overlay click */
           targetWaitTimeout:  3000,
           showProgress:       true,
-          buttons: ['back', 'primary', 'skip'],
+          spotlightPadding:   4,
+          skipScroll:         true,    /* v3: was disableScrolling in v2 */
+          skipBeacon:         true,    /* v3: was disableBeacon per-step in v2 */
+          buttons:            ['back', 'primary', 'skip'],
         }}
         styles={{
           tooltip: {

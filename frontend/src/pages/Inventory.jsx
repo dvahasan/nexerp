@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { T, inputStyle, inputFocus, labelStyle } from '../theme';
@@ -8,6 +8,7 @@ import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 import LazyScroll from '../components/LazyScroll';
 import TxModal from './TxModal';
 import Confirm from '../components/Confirm';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 const LIMIT = 12;
 
@@ -45,6 +46,15 @@ export default function Inventory() {
 
   // Focus tracking for inputs
   const [focused, setFocused] = useState('');
+
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleBarcodeScan = useCallback((code) => {
+    setScannerOpen(false);
+    setSearch(code);   // populate search → triggers re-fetch filtering by name/SKU/barcode
+    setPage(1);
+  }, []);
 
   useEffect(() => {
     const f = sessionStorage.getItem('nexinv_inv_filter');
@@ -206,21 +216,42 @@ export default function Inventory() {
         {/* ── Row 1: primary filters ── */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
 
-          {/* Search */}
-          <div className="tour-inventory-search" style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
-            <Icon name="search" size={15} style={{
-              position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
-              color: t.fgSubtle, pointerEvents: 'none',
-            }} />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={isAR ? 'ابحث بالاسم، SKU، الباركود، أو الوصف...' : 'Search name, SKU, barcode or description…'}
-              style={{ ...filterInput('search'), paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
-              onFocus={() => setFocused('search')}
-              onBlur={() => setFocused('')}
-            />
+          {/* Search + scan */}
+          <div className="tour-inventory-search" style={{ display: 'flex', gap: 6, flex: '1 1 200px', minWidth: 180 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Icon name="search" size={15} style={{
+                position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
+                color: t.fgSubtle, pointerEvents: 'none',
+              }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={isAR ? 'ابحث بالاسم، SKU، الباركود، أو الوصف...' : 'Search name, SKU, barcode or description…'}
+                style={{ ...filterInput('search'), paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
+                onFocus={() => setFocused('search')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+            {/* Camera barcode scan */}
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              title={isAR ? 'مسح الباركود بالكاميرا' : 'Scan barcode with camera'}
+              style={{
+                width: 34, height: 34, borderRadius: 4, flexShrink: 0,
+                border: `1px solid ${t.border}`,
+                backgroundColor: 'transparent',
+                color: t.fgMuted,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 120ms',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.sunken; e.currentTarget.style.color = primary; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+            >
+              <Icon name="scan" size={16} />
+            </button>
           </div>
 
           {/* Department */}
@@ -700,6 +731,13 @@ export default function Inventory() {
         message={isAR
           ? `هل تريد حذف "${deleteTarget?.name}"؟ لا يمكن التراجع.`
           : `Delete "${deleteTarget?.nameEn || deleteTarget?.name}"? This cannot be undone.`}
+      />
+
+      {/* ── Barcode scanner overlay (inventory search) ── */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={handleBarcodeScan}
       />
     </div>
   );

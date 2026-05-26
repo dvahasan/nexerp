@@ -1,156 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { api } from '../api';
 import { T } from '../theme';
 import Icon from '../components/Icon';
 import Modal from '../components/Modal';
 import Confirm from '../components/Confirm';
+import ItemPicker from '../components/ItemPicker';
 
-/* ── Searchable item picker ──────────────────────────────────────────────────
-   Props:
-   - value      : selected item _id (string)
-   - onChange   : (id, item) => void
-   - items      : full item list
-   - exclude    : array of _ids to hide (e.g. already-selected components)
-   - placeholder: string
-   - isAR       : bool
-   - t          : theme tokens
-   - required   : bool
-*/
-function ItemPicker({ value, onChange, items, exclude = [], placeholder, isAR, t, required }) {
-  const [open,   setOpen]   = useState(false);
-  const [search, setSearch] = useState('');
-  const ref = useRef(null);
-
-  const selected = items.find(i => i._id === value);
-  const label    = selected
-    ? (isAR ? selected.name : (selected.nameEn || selected.name))
-    : '';
-
-  const filtered = items
-    .filter(i => !exclude.includes(i._id))
-    .filter(i => {
-      if (!search) return true;
-      const s = search.toLowerCase();
-      return (
-        i.name?.toLowerCase().includes(s) ||
-        i.nameEn?.toLowerCase().includes(s) ||
-        i.sku?.toLowerCase().includes(s)
-      );
-    });
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const select = (item) => {
-    onChange(item._id, item);
-    setSearch('');
-    setOpen(false);
-  };
-
-  const clear = (e) => {
-    e.stopPropagation();
-    onChange('', null);
-    setSearch('');
-  };
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Trigger */}
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          height: 34, padding: '0 32px 0 10px', borderRadius: 4,
-          border: `1px solid ${open ? t.fg + '60' : t.border}`,
-          backgroundColor: t.canvas, color: value ? t.fg : t.fgSubtle,
-          fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center',
-          userSelect: 'none', boxSizing: 'border-box', position: 'relative',
-        }}
-      >
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {label || placeholder}
-        </span>
-        {value && (
-          <span
-            onClick={clear}
-            style={{ position: 'absolute', right: 28, color: t.fgSubtle, fontSize: 14, lineHeight: 1, cursor: 'pointer' }}
-          >×</span>
-        )}
-        <span style={{ position: 'absolute', right: 8, color: t.fgSubtle, fontSize: 10 }}>▾</span>
-      </div>
-
-      {/* Hidden native input so form required validation works */}
-      <input
-        tabIndex={-1}
-        required={required}
-        value={value || ''}
-        onChange={() => {}}
-        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-      />
-
-      {/* Dropdown */}
-      {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
-          backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', marginTop: 2,
-          maxHeight: 220, display: 'flex', flexDirection: 'column',
-        }}>
-          {/* Search box */}
-          <div style={{ padding: '6px 8px', borderBottom: `1px solid ${t.border}` }}>
-            <input
-              autoFocus
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={isAR ? 'ابحث...' : 'Search...'}
-              style={{
-                width: '100%', height: 28, padding: '0 8px', borderRadius: 3,
-                border: `1px solid ${t.border}`, backgroundColor: t.canvas,
-                color: t.fg, fontSize: 12, outline: 'none', boxSizing: 'border-box',
-              }}
-              onClick={e => e.stopPropagation()}
-            />
-          </div>
-
-          {/* Options */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: '12px 10px', fontSize: 12, color: t.fgSubtle, textAlign: 'center' }}>
-                {isAR ? 'لا توجد نتائج' : 'No items found'}
-              </div>
-            ) : filtered.map(item => {
-              const name = isAR ? item.name : (item.nameEn || item.name);
-              const isSelected = item._id === value;
-              return (
-                <div
-                  key={item._id}
-                  onClick={() => select(item)}
-                  style={{
-                    padding: '7px 10px', cursor: 'pointer', fontSize: 13,
-                    backgroundColor: isSelected ? `${t.fg}10` : 'transparent',
-                    borderBottom: `1px solid ${t.border}`,
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = `${t.fg}08`}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = isSelected ? `${t.fg}10` : 'transparent'}
-                >
-                  <span style={{ color: t.fg, fontWeight: isSelected ? 600 : 400 }}>{name}</span>
-                  <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, color: t.fgSubtle }}>
-                    {item.sku && `${item.sku} · `}qty:{item.qty ?? '?'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ── Default form ─────────────────────────────────────────────────────────── */
 const defaultBomForm = {
@@ -564,8 +420,6 @@ export default function BOM() {
                   items={allItems}
                   exclude={usedCompIds}
                   placeholder={isAR ? 'اختر الصنف المنتج...' : 'Select finished product...'}
-                  isAR={isAR}
-                  t={t}
                   required
                 />
               )}
@@ -611,8 +465,6 @@ export default function BOM() {
                         items={allItems}
                         exclude={[bomForm.outputItemId, ...usedCompIds.filter((_, idx) => idx !== i)].filter(Boolean)}
                         placeholder={isAR ? 'اختر مادة خام...' : 'Select raw material...'}
-                        isAR={isAR}
-                        t={t}
                       />
                     </div>
                     <div>
