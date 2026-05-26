@@ -24,6 +24,7 @@ export default function BOM() {
 
   const [boms,        setBoms]        = useState([]);
   const [loading,     setLoading]     = useState(true);
+  const [fetchError,  setFetchError]  = useState('');
   const [bomModal,    setBomModal]    = useState(false);
   const [bomForm,     setBomForm]     = useState({ ...defaultBomForm });
   const [editBom,     setEditBom]     = useState(null);
@@ -41,11 +42,13 @@ export default function BOM() {
 
   // ── Load BOMs ──────────────────────────────────────────────────────────────
   const loadBoms = useCallback(async () => {
+    setFetchError('');
     try {
       const data = await api.getBoms();
-      setBoms(data || []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      setBoms(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setFetchError(err.message || 'Failed to load BOMs');
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadBoms(); }, [loadBoms]);
@@ -202,6 +205,14 @@ export default function BOM() {
       {loading ? (
         <div style={{ padding: '48px 0', textAlign: 'center' }}>
           <div style={{ width: 22, height: 22, margin: '0 auto', borderRadius: '50%', border: `2px solid ${t.border}`, borderTopColor: primary, animation: 'spin 600ms linear infinite' }} />
+        </div>
+      ) : fetchError ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', backgroundColor: t.elev, border: `1px solid ${t.neg}30`, borderRadius: 4 }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>⚠️</div>
+          <p style={{ color: t.neg, fontSize: 13, marginBottom: 12 }}>{fetchError}</p>
+          <button onClick={loadBoms} style={{ height: 30, padding: '0 14px', borderRadius: 4, backgroundColor: primary, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            {isAR ? 'إعادة المحاولة' : 'Retry'}
+          </button>
         </div>
       ) : boms.length === 0 ? (
         <div style={{ padding: '60px 24px', textAlign: 'center', backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4 }}>

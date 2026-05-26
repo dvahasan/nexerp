@@ -54,7 +54,7 @@ export default function Warehouses() {
   const loadWarehouses = useCallback(async () => {
     try {
       const data = await api.getWarehouses();
-      setWarehouses(data || []);
+      setWarehouses(Array.isArray(data) ? data : []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
