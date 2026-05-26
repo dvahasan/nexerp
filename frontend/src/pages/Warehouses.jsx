@@ -414,11 +414,14 @@ export default function Warehouses() {
                   </div>
                 )}
 
-                {/* Bin locations */}
+                {/* Bin locations — zone-grouped table */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle }}>
-                      {isAR ? 'الأرفف والمواقع' : 'Bin Locations'} ({(selected.bins || []).length})
+                      {isAR ? 'مواقع التخزين (الأرفف)' : 'Storage Bins'}{' '}
+                      <span style={{ backgroundColor: t.border, color: t.fgMuted, borderRadius: 8, padding: '1px 6px', fontSize: 9 }}>
+                        {(selected.bins || []).length}
+                      </span>
                     </div>
                     {canManage && (
                       <button
@@ -432,41 +435,95 @@ export default function Warehouses() {
                   </div>
 
                   {(selected.bins || []).length === 0 ? (
-                    <p style={{ fontSize: 12, color: t.fgSubtle, textAlign: 'center', padding: '12px 0' }}>
-                      {isAR ? 'لا توجد أرفف بعد' : 'No bins defined yet'}
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {(selected.bins || []).map(bin => (
-                        <div
-                          key={bin._id}
-                          style={{
-                            padding: '5px 10px', borderRadius: 4,
-                            backgroundColor: t.sunken, border: `1px solid ${t.border}`,
-                            fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 700, color: t.fg,
-                            display: 'flex', alignItems: 'center', gap: 6,
-                          }}
-                        >
-                          <span>{bin.code}</span>
-                          <span style={{ fontSize: 10, color: t.fgSubtle, fontWeight: 400 }}>×{bin.capacity}</span>
-                          {canManage && (
-                            <>
-                              <button onClick={() => openEditBin(bin)} style={{ width: 18, height: 18, border: 'none', background: 'transparent', cursor: 'pointer', color: t.fgSubtle, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2, padding: 0 }}
-                                onMouseEnter={e => e.currentTarget.style.color = primary}
-                                onMouseLeave={e => e.currentTarget.style.color = t.fgSubtle}>
-                                <Icon name="edit" size={11} />
-                              </button>
-                              <button onClick={() => { setConfirmTarget({ type: 'bin', id: bin._id }); setConfirmOpen(true); }} style={{ width: 18, height: 18, border: 'none', background: 'transparent', cursor: 'pointer', color: t.fgSubtle, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2, padding: 0 }}
-                                onMouseEnter={e => e.currentTarget.style.color = t.neg}
-                                onMouseLeave={e => e.currentTarget.style.color = t.fgSubtle}>
-                                <Icon name="delete" size={11} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                    <div style={{ padding: '20px 0', textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: 4 }}>
+                      <p style={{ fontSize: 12, color: t.fgSubtle, margin: 0 }}>
+                        {isAR ? 'لا توجد أرفف — اضغط "إضافة موقع" لإنشاء رمز تخزين' : 'No bins yet — click "Add Bin" to define storage locations'}
+                      </p>
                     </div>
-                  )}
+                  ) : (() => {
+                    // Group bins by zone
+                    const zones = {};
+                    (selected.bins || []).forEach(bin => {
+                      const z = bin.zone || '—';
+                      if (!zones[z]) zones[z] = [];
+                      zones[z].push(bin);
+                    });
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {Object.entries(zones).sort(([a], [b]) => a.localeCompare(b)).map(([zone, zoneBins]) => (
+                          <div key={zone}>
+                            {/* Zone header */}
+                            <div style={{
+                              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4,
+                              padding: '3px 8px', backgroundColor: `${primary}10`,
+                              borderRadius: 3, borderLeft: `3px solid ${primary}`,
+                            }}>
+                              <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 800, color: primary }}>
+                                {isAR ? 'المنطقة' : 'Zone'} {zone}
+                              </span>
+                              <span style={{ fontSize: 10, color: t.fgSubtle }}>{zoneBins.length} {isAR ? 'موقع' : 'bins'}</span>
+                            </div>
+                            {/* Bins table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                              <thead>
+                                <tr style={{ backgroundColor: t.sunken }}>
+                                  {[
+                                    isAR ? 'الكود'    : 'Code',
+                                    isAR ? 'الممر'    : 'Aisle',
+                                    isAR ? 'المستوى'  : 'Level',
+                                    isAR ? 'السعة'    : 'Cap.',
+                                    '',
+                                  ].map((h, i) => (
+                                    <th key={i} style={{ padding: '4px 8px', textAlign: 'start', fontSize: 9, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {zoneBins.sort((a, b) => a.code.localeCompare(b.code)).map(bin => (
+                                  <tr key={bin._id} style={{ borderBottom: `1px solid ${t.border}` }}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = t.sunken}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                                    <td style={{ padding: '6px 8px' }}>
+                                      <span style={{
+                                        fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 800,
+                                        backgroundColor: `${primary}14`, color: primary,
+                                        padding: '2px 7px', borderRadius: 3,
+                                      }}>
+                                        {bin.code}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '6px 8px', fontFamily: 'ui-monospace,monospace', fontSize: 11, color: t.fgMuted }}>{bin.aisle || '—'}</td>
+                                    <td style={{ padding: '6px 8px', fontFamily: 'ui-monospace,monospace', fontSize: 11, color: t.fgMuted }}>{bin.level || '—'}</td>
+                                    <td style={{ padding: '6px 8px', fontFamily: 'ui-monospace,monospace', fontSize: 11, color: t.fgMuted }}>{bin.capacity}</td>
+                                    <td style={{ padding: '6px 8px', textAlign: 'end' }}>
+                                      {canManage && (
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                          <button onClick={() => openEditBin(bin)}
+                                            style={{ width: 22, height: 22, border: 'none', background: 'transparent', cursor: 'pointer', color: t.fgSubtle, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3 }}
+                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.sunken; e.currentTarget.style.color = primary; }}
+                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgSubtle; }}>
+                                            <Icon name="edit" size={12} />
+                                          </button>
+                                          <button onClick={() => { setConfirmTarget({ type: 'bin', id: bin._id }); setConfirmOpen(true); }}
+                                            style={{ width: 22, height: 22, border: 'none', background: 'transparent', cursor: 'pointer', color: t.fgSubtle, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 3 }}
+                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; e.currentTarget.style.color = t.neg; }}
+                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgSubtle; }}>
+                                            <Icon name="delete" size={12} />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Items in this warehouse */}

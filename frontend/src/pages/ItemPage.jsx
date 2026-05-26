@@ -33,6 +33,7 @@ const defaultForm = {
   deptId: '', catId: '', description: '',
   currency: '', active: true, isFavorite: false, serialCode: '', publish: true,
   attributes: {},
+  warehouseId: '', binLocation: '',
 };
 
 function fmt(bytes) {
@@ -52,6 +53,35 @@ export default function ItemPage() {
   const { depts, cats, loadData, saveItem, t: tr, isAR, theme, company, user, showToast } = useAppContext();
   const t       = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
+
+  // ── Warehouses & bins (fetched locally) ───────────────────────────────────
+  const [warehouses,   setWarehouses]   = useState([]);
+  const [bins,         setBins]         = useState([]);
+
+  useEffect(() => {
+    api.getWarehouses().then(d => setWarehouses(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  // When warehouse changes, load its bins
+  const handleWarehouseChange = async (whId) => {
+    setForm(prev => ({ ...prev, warehouseId: whId, binLocation: '' }));
+    setBins([]);
+    if (whId) {
+      try {
+        const b = await api.getBins({ warehouseId: whId });
+        setBins(Array.isArray(b) ? b : []);
+      } catch { /* silent */ }
+    }
+  };
+
+  // Load bins for the current warehouseId on edit
+  useEffect(() => {
+    if (form.warehouseId) {
+      api.getBins({ warehouseId: form.warehouseId })
+        .then(b => setBins(Array.isArray(b) ? b : []))
+        .catch(() => {});
+    }
+  }, []); // only on mount — warehouse-change-driven updates handled by handleWarehouseChange
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [form,         setForm]         = useState(defaultForm);
@@ -127,7 +157,14 @@ export default function ItemPage() {
         serialCode:      editItem.serialCode      || '',
         publish:         editItem.publish         ?? true,
         attributes:      editItem.attributes      || {},
+        warehouseId:     editItem.warehouseId?._id || editItem.warehouseId || '',
+        binLocation:     editItem.binLocation     || '',
       });
+      // Load bins for the item's assigned warehouse
+      if (editItem.warehouseId) {
+        const whId = editItem.warehouseId?._id || editItem.warehouseId;
+        api.getBins({ warehouseId: whId }).then(b => setBins(Array.isArray(b) ? b : [])).catch(() => {});
+      }
       setImages(editItem.images || []);
       setAttachments(editItem.attachments || []);
       setPhotoPreview(editItem.photo || '');
@@ -612,10 +649,10 @@ export default function ItemPage() {
           </div>
         </div>
         
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          
+        <div style={{ display: "flex", flexDirection: "row", gap: 16, alignItems: 'flex-start' }}>
+
           {/* PROFILE SIDEBAR */}
-          <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, padding: 16, backgroundColor: t.elev, borderRadius: 6, border: `1px solid ${t.border}` }}>
+          <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, padding: 16, backgroundColor: t.elev, borderRadius: 6, border: `1px solid ${t.border}`, position: 'sticky', top: 16 }}>
             {/* Feature Photo */}
             <div style={{ position: 'relative', width: '100%', aspectRatio: '1', borderRadius: 6, overflow: 'hidden', backgroundColor: t.sunken, border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {photoPreview ? (
@@ -865,6 +902,82 @@ export default function ItemPage() {
                 </select>
               </div>
             </div>
+
+            {/* ── Warehouse & Bin Location ────────────────────────────────── */}
+            {warehouses.length > 0 && (
+              <div style={{ padding: '12px 14px', borderRadius: 4, backgroundColor: t.sunken, border: `1px solid ${t.border}` }}>
+                <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, marginBottom: 10 }}>
+                  📦 {isAR ? 'موقع التخزين' : 'Storage Location'}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {/* Warehouse picker */}
+                  <div>
+                    {lbl(isAR ? 'المستودع' : 'Warehouse')}
+                    <select
+                      value={form.warehouseId}
+                      onChange={e => handleWarehouseChange(e.target.value)}
+                      style={{ ...inp('warehouse'), padding: '0 8px', cursor: 'pointer' }}
+                      onFocus={() => setFocused('warehouse')} onBlur={() => setFocused('')}
+                    >
+                      <option value="">— {isAR ? 'بدون مستودع' : 'No warehouse'} —</option>
+                      {warehouses.map(wh => (
+                        <option key={wh._id} value={wh._id}>
+                          [{wh.code}] {isAR ? wh.name : (wh.nameEn || wh.name)}
+                        </option>
+                      ))}
+                    </select>
+                    {/* Show selected warehouse code badge */}
+                    {form.warehouseId && (() => {
+                      const wh = warehouses.find(w => w._id === form.warehouseId);
+                      return wh ? (
+                        <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 800, backgroundColor: `${primary}18`, color: primary, padding: '1px 6px', borderRadius: 3 }}>
+                            {wh.code}
+                          </span>
+                          {wh.location && <span style={{ fontSize: 10, color: t.fgSubtle }}>📍 {wh.location}</span>}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+
+                  {/* Bin location */}
+                  <div>
+                    {lbl(isAR ? 'كود الرف / الموقع' : 'Bin / Shelf Code')}
+                    {bins.length > 0 ? (
+                      <select
+                        value={form.binLocation}
+                        onChange={e => set('binLocation', e.target.value)}
+                        style={{ ...inp('bin'), padding: '0 8px', cursor: 'pointer' }}
+                        onFocus={() => setFocused('bin')} onBlur={() => setFocused('')}
+                      >
+                        <option value="">— {isAR ? 'اختر موقعاً' : 'Select bin'} —</option>
+                        {bins.map(bin => (
+                          <option key={bin._id} value={bin.code}>
+                            {bin.code}{bin.zone ? ` · Zone ${bin.zone}` : ''}{bin.aisle ? ` · Aisle ${bin.aisle}` : ''}{bin.level ? ` · L${bin.level}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={form.binLocation}
+                        onChange={e => set('binLocation', e.target.value)}
+                        placeholder={form.warehouseId ? (isAR ? 'مثال: A1-01' : 'e.g. A1-01') : (isAR ? 'اختر مستودعاً أولاً' : 'Select a warehouse first')}
+                        disabled={!form.warehouseId}
+                        style={{ ...inp('bin'), fontFamily: 'ui-monospace,monospace' }}
+                        onFocus={() => setFocused('bin')} onBlur={() => setFocused('')}
+                      />
+                    )}
+                    {form.binLocation && (
+                      <div style={{ marginTop: 4 }}>
+                        <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, backgroundColor: `${primary}10`, color: primary, padding: '2px 8px', borderRadius: 3, border: `1px solid ${primary}30` }}>
+                          📍 {form.binLocation}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ── Photo Preview + PDF (add mode) ─────────────────────────── */}
             {!editItem && (
