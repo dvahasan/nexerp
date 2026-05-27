@@ -45,12 +45,10 @@ export default function Categories() {
 
   const handleOpen = (cat = null) => {
     if (cat) {
-      if (user?.isDemo) { showToast(isAR ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error'); return; }
       setEditCat(cat);
       const cDeptId = typeof cat.deptId === 'object' ? cat.deptId?._id : cat.deptId;
       setForm({ name: cat.name, nameEn: cat.nameEn || '', deptId: cDeptId || '', parentId: cat.parentId || '' });
     } else {
-      if (user?.isDemo) { showToast(isAR ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error'); return; }
       setEditCat(null);
       setForm({ name: '', nameEn: '', deptId: depts[0]?._id || '', parentId: '' });
     }

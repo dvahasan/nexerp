@@ -35,7 +35,6 @@ export default function Destinations() {
   useEffect(() => { loadData(); }, []);
 
   const handleOpen = (item = null) => {
-    if (user?.isDemo) { showToast(isAR ? 'غير متاح في وضع التجربة' : 'Disabled in Demo Mode', 'error'); return; }
     if (item) {
       setEditItem(item);
       setForm({ ...item });

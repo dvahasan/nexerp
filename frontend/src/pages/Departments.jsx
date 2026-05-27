@@ -22,11 +22,9 @@ export default function Departments() {
 
   const handleOpen = (dept = null) => {
     if (dept) {
-      if (user?.isDemo) { showToast(isAR ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error'); return; }
       setEditDept(dept);
       setForm({ name: dept.name, nameEn: dept.nameEn || '', color: dept.color || '#3b82f6' });
     } else {
-      if (user?.isDemo) { showToast(isAR ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error'); return; }
       setEditDept(null);
       setForm({ name: '', nameEn: '', color: '#3b82f6' });
     }
