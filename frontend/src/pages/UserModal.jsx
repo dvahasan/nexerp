@@ -155,7 +155,7 @@ export default function UserModal({ open, onClose, editUser = null, onSaved }) {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Name / Username */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <div>
             {lbl(`${isAR ? 'الاسم الكامل' : 'Full Name'} *`)}
             <input required value={form.name} onChange={e => set('name', e.target.value)}
@@ -171,7 +171,7 @@ export default function UserModal({ open, onClose, editUser = null, onSaved }) {
         </div>
 
         {/* Email / Password */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <div>
             {lbl(tr.email)}
             <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
@@ -220,7 +220,7 @@ export default function UserModal({ open, onClose, editUser = null, onSaved }) {
           <div style={{
             backgroundColor: t.sunken, border: `1px solid ${t.border}`,
             borderRadius: 4, padding: '14px 14px',
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10,
           }}>
             {Object.entries(permLabels).map(([key, label]) => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>

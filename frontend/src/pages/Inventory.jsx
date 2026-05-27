@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { T, inputStyle, inputFocus, labelStyle } from '../theme';
@@ -8,18 +8,28 @@ import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 import LazyScroll from '../components/LazyScroll';
 import TxModal from './TxModal';
 import Confirm from '../components/Confirm';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 const LIMIT = 12;
 
 export default function Inventory() {
   const navigate = useNavigate();
-  const { depts, loading: ctxLoading, t: tr, isAR, company, user, removeItem, theme } = useAppContext();
+  const { depts, cats, loading: ctxLoading, t: tr, isAR, company, user, removeItem, theme } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
-  const [search, setSearch] = useState('');
-  const [deptF,  setDeptF]  = useState('all');
-  const [stF,    setStF]    = useState('all');
+  const [search,      setSearch]      = useState('');
+  const [deptF,       setDeptF]       = useState('all');
+  const [catF,        setCatF]        = useState('all');
+  const [stF,         setStF]         = useState('all');
+  const [barcodeF,    setBarcodeF]    = useState('all');
+  const [photoF,      setPhotoF]      = useState('all');
+  const [typeF,       setTypeF]       = useState('all');
+  const [favF,        setFavF]        = useState('');
+  const [descF,       setDescF]       = useState('all');
+  const [priceMin,    setPriceMin]    = useState('');
+  const [priceMax,    setPriceMax]    = useState('');
+  const [moreOpen,    setMoreOpen]    = useState(false);
 
   const [items,    setItems]    = useState([]);
   const [total,    setTotal]    = useState(0);
@@ -37,6 +47,15 @@ export default function Inventory() {
   // Focus tracking for inputs
   const [focused, setFocused] = useState('');
 
+  // ── Barcode scanner ───────────────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleBarcodeScan = useCallback((code) => {
+    setScannerOpen(false);
+    setSearch(code);   // populate search → triggers re-fetch filtering by name/SKU/barcode
+    setPage(1);
+  }, []);
+
   useEffect(() => {
     const f = sessionStorage.getItem('nexinv_inv_filter');
     if (f) { setStF(f); sessionStorage.removeItem('nexinv_inv_filter'); }
@@ -46,9 +65,17 @@ export default function Inventory() {
     let cancelled = false;
     setFetching(true);
     const params = { page, limit: LIMIT };
-    if (search) params.search = search;
-    if (deptF !== 'all') params.dept = deptF;
-    if (stF   !== 'all') params.stock = stF;
+    if (search)            params.search         = search;
+    if (deptF  !== 'all') params.dept            = deptF;
+    if (catF   !== 'all') params.cat             = catF;
+    if (stF    !== 'all') params.stock           = stF;
+    if (barcodeF !== 'all') params.barcode       = barcodeF;
+    if (photoF !== 'all') params.photo           = photoF;
+    if (typeF  !== 'all') params.type            = typeF;
+    if (favF)             params.favorites       = '1';
+    if (descF  !== 'all') params.hasDescription  = descF;
+    if (priceMin)         params.priceMin        = priceMin;
+    if (priceMax)         params.priceMax        = priceMax;
 
     api.getItemsPaged(params)
       .then(res => {
@@ -63,11 +90,19 @@ export default function Inventory() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setFetching(false); });
     return () => { cancelled = true; };
-  }, [page, search, deptF, stF, version]);
+  }, [page, search, deptF, catF, stF, barcodeF, photoF, typeF, favF, descF, priceMin, priceMax, version]);
 
-  useEffect(() => { setPage(1); }, [search, deptF, stF]);
+  useEffect(() => { setPage(1); }, [search, deptF, catF, stF, barcodeF, photoF, typeF, favF, descF, priceMin, priceMax]);
 
   const refresh = () => { setPage(1); setVersion(v => v + 1); };
+
+  const clearFilters = () => {
+    setSearch(''); setDeptF('all'); setCatF('all'); setStF('all');
+    setBarcodeF('all'); setPhotoF('all'); setTypeF('all');
+    setFavF(''); setDescF('all'); setPriceMin(''); setPriceMax('');
+  };
+  const hasActiveFilters = search || deptF !== 'all' || catF !== 'all' || stF !== 'all' ||
+    barcodeF !== 'all' || photoF !== 'all' || typeF !== 'all' || favF || descF !== 'all' || priceMin || priceMax;
 
   const getStatus = (i) => {
     if (i.qty === 0) return { label: isAR ? 'نفذت' : 'Out',    dot: '#ef4444', fg: '#ef4444', bg: t.negTint     };
@@ -156,6 +191,7 @@ export default function Inventory() {
         </div>
         {user?.perms?.canAdd && (
           <button
+            className="tour-add-item"
             onClick={openAdd}
             style={{
               height: 32, padding: '0 14px', borderRadius: 4,
@@ -173,59 +209,278 @@ export default function Inventory() {
       </div>
 
       {/* ── Filters ── */}
-      <div style={{
+      <div className="tour-inventory-filters" style={{
         backgroundColor: t.elev, border: `1px solid ${t.border}`,
         borderRadius: 4, padding: '12px 14px',
-        display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
       }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Icon name="search" size={15} style={{
-            position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
-            color: t.fgSubtle, pointerEvents: 'none',
-          }} />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={isAR ? 'ابحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-            style={{ ...filterInput('search'), paddingLeft: 32 }}
-            onFocus={() => setFocused('search')}
-            onBlur={() => setFocused('')}
-          />
+        {/* ── Row 1: primary filters ── */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+
+          {/* Search + scan */}
+          <div className="tour-inventory-search" style={{ display: 'flex', gap: 6, flex: '1 1 200px', minWidth: 180 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Icon name="search" size={15} style={{
+                position: 'absolute', top: '50%', left: 10, transform: 'translateY(-50%)',
+                color: t.fgSubtle, pointerEvents: 'none',
+              }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={isAR ? 'ابحث بالاسم، SKU، الباركود، أو الوصف...' : 'Search name, SKU, barcode or description…'}
+                style={{ ...filterInput('search'), paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
+                onFocus={() => setFocused('search')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+            {/* Camera barcode scan */}
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              title={isAR ? 'مسح الباركود بالكاميرا' : 'Scan barcode with camera'}
+              style={{
+                width: 34, height: 34, borderRadius: 4, flexShrink: 0,
+                border: `1px solid ${t.border}`,
+                backgroundColor: 'transparent',
+                color: t.fgMuted,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 120ms',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.sunken; e.currentTarget.style.color = primary; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+            >
+              <Icon name="scan" size={16} />
+            </button>
+          </div>
+
+          {/* Department */}
+          <select value={deptF} onChange={e => { setDeptF(e.target.value); setCatF('all'); }}
+            style={{ ...selectStyle('deptF'), flex: '0 1 150px' }}
+            onFocus={() => setFocused('deptF')} onBlur={() => setFocused('')}>
+            <option value="all">{isAR ? 'جميع الأقسام' : 'All Depts'}</option>
+            {depts.map(d => <option key={d._id} value={d._id}>{isAR ? d.name : (d.nameEn || d.name)}</option>)}
+          </select>
+
+          {/* Category — filtered by dept */}
+          <select value={catF} onChange={e => setCatF(e.target.value)}
+            style={{ ...selectStyle('catF'), flex: '0 1 150px' }}
+            onFocus={() => setFocused('catF')} onBlur={() => setFocused('')}>
+            <option value="all">{isAR ? 'جميع التصنيفات' : 'All Categories'}</option>
+            {(deptF === 'all' ? cats : cats.filter(c => {
+              const cDept = typeof c.deptId === 'object' ? c.deptId?._id : c.deptId;
+              return cDept === deptF;
+            })).map(c => <option key={c._id} value={c._id}>{isAR ? c.name : (c.nameEn || c.name)}</option>)}
+          </select>
+
+          {/* Stock */}
+          <select value={stF} onChange={e => setStF(e.target.value)}
+            style={{ ...selectStyle('stF'), flex: '0 1 120px' }}
+            onFocus={() => setFocused('stF')} onBlur={() => setFocused('')}>
+            <option value="all">{isAR ? 'كل المخزون' : 'All Stock'}</option>
+            <option value="ok">✓ {isAR ? 'متوفر' : 'OK'}</option>
+            <option value="low">⚠ {isAR ? 'منخفض' : 'Low'}</option>
+            <option value="out">✕ {isAR ? 'نفد' : 'Out'}</option>
+          </select>
+
+          {/* More / Clear row */}
+          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+            {/* Favorites toggle */}
+            <button
+              onClick={() => setFavF(f => f ? '' : '1')}
+              title={isAR ? 'المفضلة فقط' : 'Favorites only'}
+              style={{
+                height: 36, width: 36, borderRadius: 4, border: `1px solid ${favF ? '#f59e0b' : t.border}`,
+                backgroundColor: favF ? '#f59e0b22' : 'transparent',
+                color: favF ? '#f59e0b' : t.fgSubtle,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 17, transition: 'all 120ms', flexShrink: 0,
+              }}
+            >★</button>
+
+            {/* More filters toggle */}
+            <button
+              onClick={() => setMoreOpen(o => !o)}
+              style={{
+                height: 36, padding: '0 12px', borderRadius: 4,
+                border: `1px solid ${moreOpen ? primary : t.border}`,
+                backgroundColor: moreOpen ? `${primary}18` : 'transparent',
+                color: moreOpen ? primary : t.fgSubtle,
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5,
+                transition: 'all 120ms', flexShrink: 0, fontFamily: 'inherit',
+              }}
+            >
+              <Icon name="filter" size={14} />
+              {isAR ? 'فلاتر إضافية' : 'More filters'}
+              {/* Active-extra-filter count badge */}
+              {(barcodeF !== 'all' || photoF !== 'all' || typeF !== 'all' || descF !== 'all' || priceMin || priceMax) && (
+                <span style={{
+                  backgroundColor: primary, color: '#fff',
+                  borderRadius: 10, fontSize: 10, fontWeight: 700,
+                  padding: '1px 5px', lineHeight: 1.4,
+                }}>
+                  {[barcodeF !== 'all', photoF !== 'all', typeF !== 'all', descF !== 'all', !!priceMin, !!priceMax].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {/* Clear all */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                title={isAR ? 'مسح الفلاتر' : 'Clear filters'}
+                style={{
+                  height: 36, padding: '0 10px', borderRadius: 4,
+                  border: `1px solid ${t.border}`, backgroundColor: 'transparent',
+                  color: t.neg, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  transition: 'all 120ms', flexShrink: 0, fontFamily: 'inherit',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <Icon name="close" size={13} />
+                {isAR ? 'مسح' : 'Clear'}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Dept filter */}
-        <select
-          value={deptF}
-          onChange={e => setDeptF(e.target.value)}
-          style={{ ...selectStyle('deptF'), minWidth: 140 }}
-          onFocus={() => setFocused('deptF')}
-          onBlur={() => setFocused('')}
-        >
-          <option value="all">{isAR ? 'جميع الأقسام' : 'All Depts'}</option>
-          {depts.map(d => (
-            <option key={d._id} value={d._id}>{isAR ? d.name : (d.nameEn || d.name)}</option>
-          ))}
-        </select>
+        {/* ── Row 2: extra filters (collapsible) ── */}
+        {moreOpen && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+            marginTop: 10, paddingTop: 10,
+            borderTop: `1px dashed ${t.border}`,
+          }}>
 
-        {/* Stock status filter */}
-        <select
-          value={stF}
-          onChange={e => setStF(e.target.value)}
-          style={{ ...selectStyle('stF'), minWidth: 110 }}
-          onFocus={() => setFocused('stF')}
-          onBlur={() => setFocused('')}
-        >
-          <option value="all">{isAR ? 'الجميع' : 'All'}</option>
-          <option value="ok">✓ {isAR ? 'متوفر' : 'OK'}</option>
-          <option value="low">⚠ {isAR ? 'منخفض' : 'Low'}</option>
-          <option value="out">✕ {isAR ? 'نفد' : 'Out'}</option>
-        </select>
+            {/* Barcode */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.06em' }}>
+                {isAR ? 'الباركود' : 'Barcode'}
+              </span>
+              <select value={barcodeF} onChange={e => setBarcodeF(e.target.value)}
+                style={{ ...selectStyle('barcodeF'), minWidth: 140 }}
+                onFocus={() => setFocused('barcodeF')} onBlur={() => setFocused('')}>
+                <option value="all">{isAR ? 'الكل' : 'All'}</option>
+                <option value="has">▣ {isAR ? 'لديه باركود' : 'Has barcode'}</option>
+                <option value="none">○ {isAR ? 'بدون باركود' : 'No barcode'}</option>
+              </select>
+            </div>
+
+            {/* Photo */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.06em' }}>
+                {isAR ? 'الصورة' : 'Photo'}
+              </span>
+              <select value={photoF} onChange={e => setPhotoF(e.target.value)}
+                style={{ ...selectStyle('photoF'), minWidth: 140 }}
+                onFocus={() => setFocused('photoF')} onBlur={() => setFocused('')}>
+                <option value="all">{isAR ? 'الكل' : 'All'}</option>
+                <option value="has">🖼 {isAR ? 'لديه صورة' : 'Has photo'}</option>
+                <option value="none">□ {isAR ? 'بدون صورة' : 'No photo'}</option>
+              </select>
+            </div>
+
+            {/* Type */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.06em' }}>
+                {isAR ? 'النوع' : 'Type'}
+              </span>
+              <select value={typeF} onChange={e => setTypeF(e.target.value)}
+                style={{ ...selectStyle('typeF'), minWidth: 130 }}
+                onFocus={() => setFocused('typeF')} onBlur={() => setFocused('')}>
+                <option value="all">{isAR ? 'جميع الأنواع' : 'All Types'}</option>
+                <option value="unit">{isAR ? 'قطعة' : 'Unit'}</option>
+                <option value="package">{isAR ? 'حزمة' : 'Package'}</option>
+                <option value="service">{isAR ? 'خدمة' : 'Service'}</option>
+                <option value="raw">{isAR ? 'مادة خام' : 'Raw Material'}</option>
+              </select>
+            </div>
+
+            {/* Description */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.06em' }}>
+                {isAR ? 'الوصف' : 'Description'}
+              </span>
+              <select value={descF} onChange={e => setDescF(e.target.value)}
+                style={{ ...selectStyle('descF'), minWidth: 140 }}
+                onFocus={() => setFocused('descF')} onBlur={() => setFocused('')}>
+                <option value="all">{isAR ? 'الكل' : 'All'}</option>
+                <option value="yes">✓ {isAR ? 'لديه وصف' : 'Has description'}</option>
+                <option value="no">✕ {isAR ? 'بدون وصف' : 'No description'}</option>
+              </select>
+            </div>
+
+            {/* Price range */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', letterSpacing: '0.06em' }}>
+                {isAR ? 'نطاق السعر' : 'Price range'}
+              </span>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <input
+                  type="number" min="0" value={priceMin}
+                  onChange={e => setPriceMin(e.target.value)}
+                  placeholder={isAR ? 'من' : 'Min'}
+                  style={{ ...filterInput('priceMin'), width: 72, textAlign: 'center' }}
+                  onFocus={() => setFocused('priceMin')} onBlur={() => setFocused('')}
+                />
+                <span style={{ color: t.fgSubtle, fontSize: 11 }}>—</span>
+                <input
+                  type="number" min="0" value={priceMax}
+                  onChange={e => setPriceMax(e.target.value)}
+                  placeholder={isAR ? 'إلى' : 'Max'}
+                  style={{ ...filterInput('priceMax'), width: 72, textAlign: 'center' }}
+                  onFocus={() => setFocused('priceMax')} onBlur={() => setFocused('')}
+                />
+                {company?.baseCurrency && (
+                  <span style={{ fontSize: 11, color: t.fgSubtle, fontFamily: 'ui-monospace, monospace' }}>
+                    {company.baseCurrency}
+                  </span>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* Active filter chips */}
+        {hasActiveFilters && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+            {[
+              search     && { label: `"${search}"`,                           clear: () => setSearch('') },
+              deptF !== 'all' && { label: (isAR ? 'قسم: ' : 'Dept: ') + (depts.find(d => d._id === deptF)?.[isAR ? 'name' : 'nameEn'] || deptF), clear: () => { setDeptF('all'); setCatF('all'); } },
+              catF  !== 'all' && { label: (isAR ? 'تصنيف: ' : 'Cat: ')  + (cats.find(c => c._id === catF)?.[isAR ? 'name' : 'nameEn'] || catF),   clear: () => setCatF('all') },
+              stF   !== 'all' && { label: (isAR ? 'مخزون: ' : 'Stock: ') + stF,   clear: () => setStF('all') },
+              barcodeF !== 'all' && { label: barcodeF === 'has' ? (isAR ? 'لديه باركود' : 'Has barcode') : (isAR ? 'بدون باركود' : 'No barcode'), clear: () => setBarcodeF('all') },
+              photoF !== 'all' && { label: photoF === 'has' ? (isAR ? 'لديه صورة' : 'Has photo') : (isAR ? 'بدون صورة' : 'No photo'), clear: () => setPhotoF('all') },
+              typeF  !== 'all' && { label: (isAR ? 'نوع: ' : 'Type: ') + typeF,   clear: () => setTypeF('all') },
+              descF  !== 'all' && { label: descF === 'yes' ? (isAR ? 'لديه وصف' : 'Has desc') : (isAR ? 'بدون وصف' : 'No desc'), clear: () => setDescF('all') },
+              favF               && { label: isAR ? 'المفضلة' : 'Favorites',         clear: () => setFavF('') },
+              priceMin           && { label: (isAR ? 'من ' : 'Min ') + priceMin,     clear: () => setPriceMin('') },
+              priceMax           && { label: (isAR ? 'إلى ' : 'Max ') + priceMax,    clear: () => setPriceMax('') },
+            ].filter(Boolean).map((chip, i) => (
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                backgroundColor: `${primary}18`, color: primary,
+                border: `1px solid ${primary}44`, borderRadius: 100,
+                fontSize: 11, fontWeight: 600, padding: '2px 8px 2px 10px',
+              }}>
+                {chip.label}
+                <button onClick={chip.clear} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: primary, padding: 0, display: 'flex', alignItems: 'center',
+                  fontSize: 13, lineHeight: 1,
+                }}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Item grid ── */}
-      <div style={{
+      <div className="tour-inventory-table" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
         gap: 12,
@@ -476,6 +731,13 @@ export default function Inventory() {
         message={isAR
           ? `هل تريد حذف "${deleteTarget?.name}"؟ لا يمكن التراجع.`
           : `Delete "${deleteTarget?.nameEn || deleteTarget?.name}"? This cannot be undone.`}
+      />
+
+      {/* ── Barcode scanner overlay (inventory search) ── */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={handleBarcodeScan}
       />
     </div>
   );

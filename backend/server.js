@@ -34,7 +34,14 @@ const fileRoutes         = require("./routes/files");
 const adminRoutes        = require("./routes/admin");
 const barcodeRoutes      = require("./routes/barcode");
 const importRoutes       = require("./routes/import");
-
+const warehouseRoutes    = require("./routes/warehouses");
+const binRoutes          = require("./routes/bins");
+const bomRoutes          = require("./routes/bom");
+const sourceRoutes       = require("./routes/sources");
+const destRoutes         = require("./routes/destinations");
+const projectRoutes      = require("./routes/projects");
+const reasonRoutes       = require("./routes/reasons");
+const publicApiRoutes    = require("./routes/publicApi");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
@@ -82,6 +89,14 @@ app.use("/api/files",        fileRoutes);
 app.use("/api/admin",        adminRoutes);
 app.use("/api/barcode",      barcodeRoutes);
 app.use("/api/import",       importRoutes);
+app.use("/api/warehouses",   warehouseRoutes);
+app.use("/api/bins",         binRoutes);
+app.use("/api/bom",          bomRoutes);
+app.use("/api/sources",      sourceRoutes);
+app.use("/api/destinations", destRoutes);
+app.use("/api/projects",     projectRoutes);
+app.use("/api/reasons",      reasonRoutes);
+app.use("/api/public",       publicApiRoutes);
 
 // ── Database connection & seed ────────────────────────────────────────────────
 connectDB(seedData);

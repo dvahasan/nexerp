@@ -76,7 +76,7 @@ const ODOO_AUTO = {
 };
 
 function autoMap(headers) {
-  return headers.map(h => ODOO_AUTO[h.trim().toLowerCase()] || '_skip');
+  return headers.map(h => ODOO_AUTO[h.trim().toLowerCase()] || '_custom');
 }
 
 function parseCSV(text) {
@@ -170,8 +170,17 @@ export default function Import() {
     const done = (hdrs, data) => {
       setHeaders(hdrs);
       setRows(data);
-      setMapping(autoMap(hdrs));
-      setDefaults({}); setCustomNames({});
+      const mapped = autoMap(hdrs);
+      setMapping(mapped);
+      
+      const initialsCustom = {};
+      mapped.forEach((val, i) => {
+        if (val === '_custom') {
+          initialsCustom[i] = hdrs[i].trim() || `Field_${i}`;
+        }
+      });
+      setCustomNames(initialsCustom);
+      setDefaults({});
       setStep(1);
     };
 
@@ -391,18 +400,18 @@ export default function Import() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <Icon name="import_data" size={20} style={{ color: primary }} />
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: tok.fg }}>
-            {isAR ? 'استيراد البيانات من Odoo' : 'Import Data from Odoo'}
+            {isAR ? 'استيراد البيانات' : 'Data Import'}
           </h1>
         </div>
         <p style={{ margin: 0, fontSize: 13, color: tok.fgMuted }}>
           {isAR
-            ? 'ارفع ملف CSV أو Excel صادر من Odoo، وعيّن الأعمدة، ثم راجع البيانات قبل الاستيراد.'
-            : 'Upload a CSV or Excel file exported from Odoo, map the columns, then review before importing.'}
+            ? 'ارفع ملف CSV أو Excel (من أي نظام مثل Odoo، Zoho، الخ)، وعيّن الأعمدة، ثم راجع البيانات قبل الاستيراد.'
+            : 'Upload a CSV or Excel file from any system (Odoo, Zoho, QuickBooks, etc.), map the columns, then review before importing.'}
         </p>
       </div>
 
       {/* Step breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 24, ...panel, padding: '10px 16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, ...panel, padding: '10px 16px', flexWrap: 'wrap' }}>
         {stepLabels.map((lbl, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -422,7 +431,7 @@ export default function Import() {
               </span>
             </div>
             {i < stepLabels.length - 1 && (
-              <div style={{ width: 24, height: 1, backgroundColor: i < step ? '#10b981' : tok.border, margin: '0 8px' }} />
+              <div className="hidden md:block" style={{ width: 24, height: 1, backgroundColor: i < step ? '#10b981' : tok.border, margin: '0 12px' }} />
             )}
           </div>
         ))}
@@ -479,17 +488,50 @@ export default function Import() {
             </div>
           )}
 
-          <div style={{ ...panel, marginTop: 16, padding: '14px 18px' }}>
-            <div style={{ ...monoLabel, display: 'block', marginBottom: 10 }}>
-              {isAR ? 'كيفية تصدير البيانات من Odoo' : 'How to export from Odoo'}
+          <div style={{ marginTop: 24 }}>
+            <div style={{ ...monoLabel, display: 'block', marginBottom: 12 }}>
+              {isAR ? 'كيفية تصدير البيانات من الأنظمة الشائعة' : 'How to export from common platforms'}
             </div>
-            <ol style={{ margin: 0, paddingInlineStart: 20, color: tok.fgMuted, fontSize: 13, lineHeight: 2 }}>
-              <li>{isAR ? 'افتح Inventory → Products' : 'Open Inventory → Products'}</li>
-              <li>{isAR ? 'اختر الأصناف المطلوبة أو الكل' : 'Select items or all'}</li>
-              <li>{isAR ? 'اضغط Action → Export' : 'Click Action → Export'}</li>
-              <li>{isAR ? 'اختر حقول: Name, Internal Ref, Barcode, Qty On Hand, Sales Price' : 'Choose fields: Name, Internal Ref, Barcode, Qty On Hand, Sales Price'}</li>
-              <li>{isAR ? 'صدّر كـ CSV أو XLSX' : 'Export as CSV or XLSX'}</li>
-            </ol>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {/* Odoo */}
+              <div style={{ ...panel, padding: '14px 16px', backgroundColor: tok.sunken }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: tok.fg }}>Odoo</h4>
+                <ol style={{ margin: 0, paddingInlineStart: 18, color: tok.fgMuted, fontSize: 12, lineHeight: 1.6 }}>
+                  <li>{isAR ? 'افتح Inventory → Products' : 'Go to Inventory → Products'}</li>
+                  <li>{isAR ? 'اضغط Action → Export' : 'Select all, click Action → Export'}</li>
+                  <li>{isAR ? 'اختر Name, Internal Ref, Qty, Price' : 'Choose Name, Internal Ref, Qty, Price'}</li>
+                  <li>{isAR ? 'صدّر كـ CSV أو Excel' : 'Export as CSV or Excel'}</li>
+                </ol>
+              </div>
+              {/* Zoho */}
+              <div style={{ ...panel, padding: '14px 16px', backgroundColor: tok.sunken }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: tok.fg }}>Zoho Inventory / Books</h4>
+                <ol style={{ margin: 0, paddingInlineStart: 18, color: tok.fgMuted, fontSize: 12, lineHeight: 1.6 }}>
+                  <li>{isAR ? 'افتح Items' : 'Navigate to Items module'}</li>
+                  <li>{isAR ? 'اضغط على أيقونة القائمة (الثلاث نقاط) في الأعلى' : 'Click the hamburger menu (top right)'}</li>
+                  <li>{isAR ? 'اختر Export Items' : 'Select Export Items'}</li>
+                  <li>{isAR ? 'حمل الملف بصيغة CSV' : 'Download as CSV'}</li>
+                </ol>
+              </div>
+              {/* QuickBooks */}
+              <div style={{ ...panel, padding: '14px 16px', backgroundColor: tok.sunken }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: tok.fg }}>QuickBooks Online</h4>
+                <ol style={{ margin: 0, paddingInlineStart: 18, color: tok.fgMuted, fontSize: 12, lineHeight: 1.6 }}>
+                  <li>{isAR ? 'اذهب إلى Sales → Products and Services' : 'Go to Sales → Products and Services'}</li>
+                  <li>{isAR ? 'اضغط على أيقونة التصدير (السهم) أعلى الجدول' : 'Click the Export icon above the table'}</li>
+                  <li>{isAR ? 'سيتم تحميل ملف Excel فوراً' : 'An Excel file will download automatically'}</li>
+                </ol>
+              </div>
+              {/* Xero */}
+              <div style={{ ...panel, padding: '14px 16px', backgroundColor: tok.sunken }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: tok.fg }}>Xero</h4>
+                <ol style={{ margin: 0, paddingInlineStart: 18, color: tok.fgMuted, fontSize: 12, lineHeight: 1.6 }}>
+                  <li>{isAR ? 'افتح Business → Products and services' : 'Go to Business → Products and services'}</li>
+                  <li>{isAR ? 'اضغط على زر Export' : 'Click the Export button'}</li>
+                  <li>{isAR ? 'اختر التنسيق المناسب لك (CSV)' : 'Select CSV format'}</li>
+                </ol>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -565,6 +607,8 @@ export default function Import() {
                           setMapping(next);
                           if (e.target.value !== '_custom') {
                             setCustomNames(prev => { const n = { ...prev }; delete n[i]; return n; });
+                          } else {
+                            setCustomNames(prev => ({ ...prev, [i]: headers[i].trim() || `Field_${i}` }));
                           }
                         }}
                         style={{
@@ -701,18 +745,18 @@ export default function Import() {
               </div>
             )}
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 800 }}>
                 <thead>
-                  <tr style={{ backgroundColor: tok.sunken }}>
-                    <th style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel }}>#</th>
+                  <tr>
+                    <th style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel, backgroundColor: tok.sunken, position: 'sticky', top: 0, zIndex: 10 }}>#</th>
                     {activeSystemFields.map(f => (
-                      <th key={f.key} style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel }}>{f.label}</th>
+                      <th key={f.key} style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel, backgroundColor: tok.sunken, position: 'sticky', top: 0, zIndex: 10 }}>{f.label}</th>
                     ))}
                     {activeCustomFields.map(cf => (
-                      <th key={cf.name} style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel, color: primary }}>★ {cf.name}</th>
+                      <th key={cf.name} style={{ padding: '6px 12px', textAlign: 'start', borderBottom: `1px solid ${tok.border}`, ...monoLabel, color: primary, backgroundColor: tok.sunken, position: 'sticky', top: 0, zIndex: 10 }}>★ {cf.name}</th>
                     ))}
-                    <th style={{ padding: '6px 12px', borderBottom: `1px solid ${tok.border}`, ...monoLabel }}>Status</th>
+                    <th style={{ padding: '6px 12px', borderBottom: `1px solid ${tok.border}`, ...monoLabel, backgroundColor: tok.sunken, position: 'sticky', top: 0, zIndex: 10 }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -964,7 +1008,7 @@ export default function Import() {
                     </div>
 
                     {/* Side-by-side comparison */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 0 }}>
                       {/* Importing */}
                       <div style={{ padding: '10px 14px', borderInlineEnd: `1px solid ${tok.border}` }}>
                         <div style={{ ...monoLabel, color: '#10b981', marginBottom: 8 }}>

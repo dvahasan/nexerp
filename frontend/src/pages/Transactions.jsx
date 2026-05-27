@@ -211,27 +211,28 @@ export default function Transactions() {
 
       {/* ── Table ── */}
       <div style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
-              <tr style={{ backgroundColor: t.sunken }}>
+              <tr>
                 {['#', isAR ? 'التاريخ' : 'Date', isAR ? 'النوع' : 'Type', isAR ? 'الصنف' : 'Item', isAR ? 'الكمية' : 'Qty', isAR ? 'المصدر/الوجهة' : 'Source / Dest'].map((h, idx) => (
                   <th key={idx} style={{
                     padding: '10px 14px', textAlign: idx === 0 ? 'center' : 'left',
                     fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle,
                     whiteSpace: 'nowrap', borderBottom: `1px solid ${t.border}`,
+                    backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10,
                   }}>
                     {h}
                   </th>
                 ))}
                 {canSeeAll && (
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10 }}>
                     {isAR ? 'المستخدم' : 'User'}
                   </th>
                 )}
                 {canSeeAll && (
-                  <th style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10 }}>
                     {isAR ? 'إجراءات' : 'Actions'}
                   </th>
                 )}

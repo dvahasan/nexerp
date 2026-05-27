@@ -9,5 +9,16 @@ const Item        = require("./Item");
 const Transaction = require("./Transaction");
 const Setting     = require("./Setting");
 const File        = require("./File");
+const Warehouse   = require("./Warehouse");
+const Bin         = require("./Bin");
+const BomTemplate = require("./BomTemplate");
+const Source      = require("./Source");
+const Destination = require("./Destination");
+const Project     = require("./Project");
+const Reason      = require("./Reason");
 
-module.exports = { Company, Department, Category, User, Item, Transaction, Setting, File };
+module.exports = { 
+  Company, Department, Category, User, Item, Transaction, 
+  Setting, File, Warehouse, Bin, BomTemplate,
+  Source, Destination, Project, Reason
+};

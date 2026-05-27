@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { TourProvider } from './context/TourContext';
 import Layout from './components/Layout';
 import { T } from './theme';
 
@@ -25,7 +26,13 @@ const Import = lazy(() => import('./pages/Import'));
 const ItemPage = lazy(() => import('./pages/ItemPage'));
 const BarcodeLookup = lazy(() => import('./pages/BarcodeLookup'));
 const Departments = lazy(() => import('./pages/Departments'));
-const Categories = lazy(() => import('./pages/Categories'));
+const Categories  = lazy(() => import('./pages/Categories'));
+const Warehouses  = lazy(() => import('./pages/Warehouses'));
+const BOM         = lazy(() => import('./pages/BOM'));
+const Sources     = lazy(() => import('./pages/Sources'));
+const Destinations = lazy(() => import('./pages/Destinations'));
+const Projects    = lazy(() => import('./pages/Projects'));
+const Reasons     = lazy(() => import('./pages/Reasons'));
 
 /* ── Loading spinner ─────────────────────────────────────────────────────── */
 function Spinner() {
@@ -144,6 +151,15 @@ function AppRoutes() {
         <Route path="/transactions" element={<Protected><Layout><Transactions /></Layout></Protected>} />
         <Route path="/stock-in"     element={<Protected><Layout><PermGuard perm="canTxIn"><StockIn /></PermGuard></Layout></Protected>} />
         <Route path="/stock-out"    element={<Protected><Layout><PermGuard perm="canTxOut"><StockOut /></PermGuard></Layout></Protected>} />
+        <Route path="/bom"             element={<Protected><Layout><PermGuard perm="canManageBOM"><BOM /></PermGuard></Layout></Protected>} />
+        
+        {/* Modular Features */}
+        <Route path="/sources"         element={<Protected><Layout><Sources /></Layout></Protected>} />
+        <Route path="/destinations"    element={<Protected><Layout><Destinations /></Layout></Protected>} />
+        <Route path="/projects"        element={<Protected><Layout><Projects /></Layout></Protected>} />
+        <Route path="/reasons"         element={<Protected><Layout><Reasons /></Layout></Protected>} />
+        
+        {/* Settings & Profile */}
         <Route path="/users"        element={<Protected><Layout><PermGuard perm="canManageUsers"><Users /></PermGuard></Layout></Protected>} />
         <Route path="/permissions"  element={<Protected><Layout><PermGuard perm="canManageUsers"><Permissions /></PermGuard></Layout></Protected>} />
         <Route path="/settings"        element={<Protected><Layout><Settings /></Layout></Protected>} />
@@ -154,6 +170,8 @@ function AppRoutes() {
         <Route path="/myprofile"       element={<Protected><Layout><UserProfile /></Layout></Protected>} />
         <Route path="/import"          element={<Protected><Layout><Import /></Layout></Protected>} />
         <Route path="/barcode-lookup"  element={<Protected><Layout><BarcodeLookup /></Layout></Protected>} />
+        <Route path="/warehouses"      element={<Protected><Layout><Warehouses /></Layout></Protected>} />
+        <Route path="/bom"             element={<Protected><Layout><BOM /></Layout></Protected>} />
 
         {/* ── Catch all ───────────────────────────────────────── */}
         <Route path="*" element={authed ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />
@@ -166,7 +184,9 @@ export default function TailwindApp() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <AppRoutes />
+        <TourProvider>
+          <AppRoutes />
+        </TourProvider>
       </AppProvider>
     </BrowserRouter>
   );

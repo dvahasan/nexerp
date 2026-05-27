@@ -1,4 +1,5 @@
 import { useAppContext } from '../context/AppContext';
+import { useTour } from '../hooks/useTour';
 import Icon from './Icon';
 import Toast from './Toast';
 import AiChat from './AiChat';
@@ -6,6 +7,7 @@ import BarcodeScanner from './BarcodeScanner';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../api';
+import { pageTours } from '../config/tourConfig';
 
 // ── Design tokens (DMMAS-inspired) ───────────────────────────────────────────
 const T = {
@@ -42,6 +44,8 @@ export default function Layout({ children }) {
     lastSync, syncing, loginWithToken,
   } = useAppContext();
 
+  const { startSystemTour, startPageTour } = useTour();
+
   const navigate   = useNavigate();
   const { pathname } = useLocation();
 
@@ -55,7 +59,9 @@ export default function Layout({ children }) {
   const [searchItems,     setSearchItems]     = useState([]);  // inventory hits
   const [searchDropdown,  setSearchDropdown]  = useState(false);
   const [searchLoading,   setSearchLoading]   = useState(false);
+  const [tourDropdownOpen, setTourDropdownOpen] = useState(false);
   const searchRef = useRef(null);
+  const tourRef = useRef(null);
   // Transactions group: auto-expand if on a tx route
   const [txOpen, setTxOpen] = useState(() =>
     ['/stock-in', '/stock-out'].includes(window.location.pathname)
@@ -99,15 +105,14 @@ export default function Layout({ children }) {
     return () => clearTimeout(t);
   }, [searchVal]);
 
-  // Close search dropdown when clicking outside
+  // Close search and tour dropdowns
   useEffect(() => {
-    const handler = e => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setSearchDropdown(false);
-      }
+    const handleOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchDropdown(false);
+      if (tourRef.current && !tourRef.current.contains(e.target)) setTourDropdownOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
   const toggleLang  = () => setLang(lang === 'en' ? 'ar' : 'en');
@@ -129,10 +134,12 @@ export default function Layout({ children }) {
   ];
 
   const warehouseItems = [
-    { path: '/inventory', icon: 'inventory', label: t.inventory },
+    { path: '/inventory',  icon: 'inventory',  label: t.inventory },
     // Transactions group (rendered specially in SidebarContent)
     ...(canTx ? [{ type: 'group', id: 'tx', icon: 'transactions', label: isAR ? 'الحركات' : 'Transactions', children: txChildren }] : []),
-    { path: '/files', icon: 'copy', label: isAR ? 'الملفات' : 'Files' },
+    { path: '/warehouses', icon: 'warehouse',  label: isAR ? 'المستودعات' : 'Warehouses' },
+    { path: '/bom',        icon: 'bom',        label: isAR ? 'بيانات المواد' : 'Bill of Materials' },
+    { path: '/files',      icon: 'copy',       label: isAR ? 'الملفات' : 'Files' },
     ...(isOwner ? [{ path: '/import', icon: 'import_data', label: isAR ? 'استيراد البيانات' : 'Import Data' }] : []),
   ];
 
@@ -149,7 +156,11 @@ export default function Layout({ children }) {
   const classificationItems = [
     ...(canManageDepts ? [
       { path: '/departments', icon: 'company', label: isAR ? 'الأقسام' : 'Departments' },
-      { path: '/categories',  icon: 'category', label: isAR ? 'التصنيفات' : 'Categories' }
+      { path: '/categories',  icon: 'category', label: isAR ? 'التصنيفات' : 'Categories' },
+      { path: '/sources',     icon: 'users',    label: isAR ? 'المصادر' : 'Sources' },
+      { path: '/destinations',icon: 'users',    label: isAR ? 'الوجهات' : 'Destinations' },
+      ...(company?.features?.projects ? [{ path: '/projects', icon: 'company', label: isAR ? 'المشاريع' : 'Projects' }] : []),
+      ...(company?.features?.reasons ? [{ path: '/reasons',  icon: 'chat', label: isAR ? 'الأسباب' : 'Reasons' }] : []),
     ] : [])
   ];
 
@@ -175,19 +186,11 @@ export default function Layout({ children }) {
     ? (currentPage.children?.find(c => c.path === pathname)?.label || currentPage.label)
     : currentPage?.label;
 
-  // ── Sidebar content (shared desktop + mobile) ────────────────────────────
-  const SidebarContent = ({ mobile = false }) => {
-    const wide = !collapsed || mobile;
-    const activeLinkRef = useRef(null);
+  // Disabled active link auto-scroll to prevent annoying scroll resets
 
-    useEffect(() => {
-      const t = setTimeout(() => {
-        if (activeLinkRef.current) {
-          activeLinkRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 50);
-      return () => clearTimeout(t);
-    }, [pathname, drawerOpen, wide]);
+  // ── Sidebar content (shared desktop + mobile) ────────────────────────────
+  const renderSidebar = (mobile = false) => {
+    const wide = !collapsed || mobile;
 
     // Render a single nav item (link or group)
     const renderItem = (item) => {
@@ -201,6 +204,7 @@ export default function Layout({ children }) {
           return (
             <li key={item.id}>
               <button
+                className={`tour-${item.id}-link`}
                 onClick={() => setTxOpen(o => !o)}
                 title={item.label}
                 style={{
@@ -224,6 +228,7 @@ export default function Layout({ children }) {
           <li key={item.id}>
             {/* Group header */}
             <button
+              className={`tour-${item.id}-link`}
               onClick={() => setTxOpen(o => !o)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center',
@@ -253,7 +258,7 @@ export default function Layout({ children }) {
                     <li key={child.path}>
                       <Link
                         to={child.path}
-                        ref={active ? activeLinkRef : null}
+                        className={`tour-${child.path.replace('/', '')}-link tour-sidebar-item`}
                         onClick={() => setDrawerOpen(false)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
@@ -286,7 +291,7 @@ export default function Layout({ children }) {
         <li key={item.path}>
           <Link
             to={item.path}
-            ref={active ? activeLinkRef : null}
+            className={`tour-${item.path.replace('/', '')}-link tour-sidebar-item`}
             onClick={() => setDrawerOpen(false)}
             title={!wide ? item.label : undefined}
             style={{
@@ -500,6 +505,7 @@ export default function Layout({ children }) {
       >
         {/* Sidebar toggle — collapses on desktop, opens drawer on mobile */}
         <button
+          className="tour-sidebar-toggle"
           onClick={() => window.innerWidth >= 768 ? setCollapsed(c => !c) : setDrawerOpen(true)}
           style={iconBtn(tok)}
           title={collapsed ? (isAR ? 'توسيع' : 'Expand') : (isAR ? 'طي' : 'Collapse')}
@@ -696,17 +702,87 @@ export default function Layout({ children }) {
         <div className="flex items-center gap-1.5">
 
           {/* Live indicator */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2"
-            style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {syncing
-              ? <div className="w-2.5 h-2.5 rounded-full border border-blue-400 border-t-transparent animate-spin" />
-              : <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16774A' }} />
-            }
-            {syncing ? 'SYNC' : 'LIVE'}
-          </div>
+          {(company?.liveSync ?? true) && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2"
+              style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {syncing
+                ? <div className="w-2.5 h-2.5 rounded-full border border-blue-400 border-t-transparent animate-spin" />
+                : <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16774A' }} />
+              }
+              {syncing ? 'SYNC' : 'LIVE'}
+            </div>
+          )}
+
+          {/* Tour Dropdown */}
+          {!!pageTours[location.pathname] && (
+            <div ref={tourRef} style={{ position: 'relative' }} className="tour-navbar">
+              <button
+                onClick={() => setTourDropdownOpen(prev => !prev)}
+                style={{
+                  ...iconBtn(tok),
+                  color: tourDropdownOpen ? primaryColor : tok.fgMuted,
+                  position: 'relative',
+                }}
+                title={isAR ? 'بدء جولة إرشادية' : 'Start Tour'}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = primaryColor;
+                  e.currentTarget.style.backgroundColor = tok.sunken;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = tourDropdownOpen ? primaryColor : tok.fgMuted;
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Icon name="info" size={17} />
+              </button>
+              {tourDropdownOpen && (
+                <div 
+                  ref={el => {
+                    if (el && tourRef.current) {
+                      const buttonRect = tourRef.current.children[0].getBoundingClientRect();
+                      let newLeft = buttonRect.left + (buttonRect.width / 2) - 90;
+                      if (newLeft < 8) newLeft = 8;
+                      if (newLeft + 180 > window.innerWidth - 8) newLeft = window.innerWidth - 180 - 8;
+                      el.style.top = `${buttonRect.bottom + 4}px`;
+                      el.style.left = `${newLeft}px`;
+                    }
+                  }}
+                  style={{
+                    position: 'fixed',
+                    width: 180,
+                    backgroundColor: tok.elev, border: `1px solid ${tok.border}`,
+                    borderRadius: 4, padding: 4, zIndex: 50,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}>
+                  <button
+                    onClick={() => { setTourDropdownOpen(false); startPageTour(); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                      fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {isAR ? 'جولة في هذه الصفحة' : 'Tour Current Page'}
+                  </button>
+                  <button
+                    onClick={() => { setTourDropdownOpen(false); startSystemTour(); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                      fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {isAR ? 'جولة في النظام بأكمله' : 'Tour Whole System'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Theme toggle */}
-          <button onClick={toggleTheme} style={iconBtn(tok)} title="Toggle theme">
+          <button className="tour-theme-toggle" onClick={toggleTheme} style={iconBtn(tok)} title="Toggle theme">
             <Icon name={theme === 'dark' ? 'light' : 'dark'} size={14} />
           </button>
 
@@ -789,7 +865,7 @@ export default function Layout({ children }) {
             overflow: 'hidden',
           }}
         >
-          <SidebarContent />
+          {renderSidebar(false)}
         </aside>
 
         {/* Mobile drawer backdrop */}
@@ -812,7 +888,7 @@ export default function Layout({ children }) {
             transition: 'transform 120ms ease-out',
           }}
         >
-          <SidebarContent mobile />
+          {renderSidebar(true)}
         </aside>
 
         {/* Page content */}

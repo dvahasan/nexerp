@@ -54,7 +54,7 @@ export default function UserProfile() {
   const avatarColor = avatarColors[user?.role] || primary;
 
   return (
-    <div className="animate-in fade-in duration-300" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="tour-profile-page animate-in fade-in duration-300" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Header card ── */}
       <div style={{
@@ -79,7 +79,7 @@ export default function UserProfile() {
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: t.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: t.fg, wordBreak: 'break-word' }}>
             {user?.name}
           </div>
           <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -107,7 +107,7 @@ export default function UserProfile() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <div>
               {label(isAR ? 'الاسم بالكامل' : 'Full Name')}
               <input

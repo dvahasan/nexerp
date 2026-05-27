@@ -138,7 +138,7 @@ export default function Users() {
   }
 
   return (
-    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="tour-users-page animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>

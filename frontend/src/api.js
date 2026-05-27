@@ -52,16 +52,40 @@ export const api = {
   updateProfile: (data)         => req("PUT", "/auth/profile", data),
 
   // Departments
-  getDepts:   ()      => req("GET",    "/departments"),
-  addDept:    (d)     => req("POST",   "/departments", d),
-  updateDept: (id, d) => req("PUT",    `/departments/${id}`, d),
-  deleteDept: (id)    => req("DELETE", `/departments/${id}`),
+  getDepts: () => req("GET", "/departments"),
+  addDept: (data) => req("POST", "/departments", data),
+  updateDept: (id, data) => req("PUT", `/departments/${id}`, data),
+  deleteDept: (id) => req("DELETE", `/departments/${id}`),
 
   // Categories
-  getCats:   ()      => req("GET",    "/categories"),
-  addCat:    (c)     => req("POST",   "/categories", c),
-  updateCat: (id, c) => req("PUT",    `/categories/${id}`, c),
-  deleteCat: (id)    => req("DELETE", `/categories/${id}`),
+  getCats: () => req("GET", "/categories"),
+  addCat: (data) => req("POST", "/categories", data),
+  updateCat: (id, data) => req("PUT", `/categories/${id}`, data),
+  deleteCat: (id) => req("DELETE", `/categories/${id}`),
+
+  // Sources
+  getSources: () => req("GET", "/sources"),
+  addSource: (data) => req("POST", "/sources", data),
+  updateSource: (id, data) => req("PUT", `/sources/${id}`, data),
+  deleteSource: (id) => req("DELETE", `/sources/${id}`),
+
+  // Destinations
+  getDestinations: () => req("GET", "/destinations"),
+  addDestination: (data) => req("POST", "/destinations", data),
+  updateDestination: (id, data) => req("PUT", `/destinations/${id}`, data),
+  deleteDestination: (id) => req("DELETE", `/destinations/${id}`),
+
+  // Projects
+  getProjects: () => req("GET", "/projects"),
+  addProject: (data) => req("POST", "/projects", data),
+  updateProject: (id, data) => req("PUT", `/projects/${id}`, data),
+  deleteProject: (id) => req("DELETE", `/projects/${id}`),
+
+  // Reasons
+  getReasons: () => req("GET", "/reasons"),
+  addReason: (data) => req("POST", "/reasons", data),
+  updateReason: (id, data) => req("PUT", `/reasons/${id}`, data),
+  deleteReason: (id) => req("DELETE", `/reasons/${id}`),
 
   // Items
   getItems:       (params = {}) => req("GET", "/items?" + new URLSearchParams({ all: "1", ...params })),
@@ -126,4 +150,26 @@ export const api = {
 
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),
+
+  // Warehouses
+  getWarehouses:    ()          => req("GET",    "/warehouses"),
+  getWarehouse:     (id)        => req("GET",    `/warehouses/${id}`),
+  addWarehouse:     (d)         => req("POST",   "/warehouses", d),
+  updateWarehouse:  (id, d)     => req("PUT",    `/warehouses/${id}`, d),
+  deleteWarehouse:  (id)        => req("DELETE", `/warehouses/${id}`),
+
+  // Bins
+  getBins:     (params = {}) => req("GET",    "/bins?" + new URLSearchParams(params)),
+  addBin:      (d)           => req("POST",   "/bins", d),
+  updateBin:   (id, d)       => req("PUT",    `/bins/${id}`, d),
+  deleteBin:   (id)          => req("DELETE", `/bins/${id}`),
+
+  // BOM (Bill of Materials)
+  getBoms:     ()        => req("GET",    "/bom"),
+  getBom:      (id)      => req("GET",    `/bom/${id}`),
+  addBom:      (d)       => req("POST",   "/bom", d),
+  updateBom:   (id, d)   => req("PUT",    `/bom/${id}`, d),
+  deleteBom:   (id)      => req("DELETE", `/bom/${id}`),
+  produceBom:  (id, d)   => req("POST",   `/bom/${id}/produce`, d),
+  getBomHistory: (id)    => req("GET",    `/bom/${id}/production-history`),
 };

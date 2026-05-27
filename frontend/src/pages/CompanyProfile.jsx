@@ -22,9 +22,12 @@ const CURRENCIES = [
 ];
 
 const INDUSTRIES = [
-  'Retail', 'Manufacturing', 'Logistics & Warehousing', 'Healthcare',
-  'Food & Beverage', 'Construction', 'Technology', 'Education',
-  'Real Estate', 'Automotive', 'Fashion & Apparel', 'Other',
+  'Retail', 'Wholesale & Distribution', 'Manufacturing', 'Logistics & Warehousing', 
+  'Healthcare & Pharmaceuticals', 'Food & Beverage', 'Hospitality', 'Construction', 
+  'Engineering', 'Technology & Software', 'Telecommunications', 'Education',
+  'Real Estate', 'Automotive', 'Aviation & Aerospace', 'Fashion & Apparel', 
+  'Agriculture & Farming', 'Energy & Mining', 'Financial Services', 
+  'Media & Entertainment', 'Government & Public Sector', 'Other',
 ];
 
 const COLOR_PRESETS = [
@@ -104,7 +107,7 @@ export default function CompanyProfile() {
   ];
 
   return (
-    <div className="animate-in fade-in duration-300" style={{ maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="tour-company-page animate-in fade-in duration-300" style={{ maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Hero banner ── */}
       <div style={{
@@ -264,7 +267,18 @@ export default function CompanyProfile() {
               {label(isAR ? 'القطاع' : 'Industry')}
               <select
                 value={form.industry}
-                onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}
+                onChange={e => {
+                  const newInd = e.target.value;
+                  setForm(f => ({ ...f, industry: newInd }));
+                  // Smart Auto-Toggle Logic
+                  const projectIndustries = ['Construction', 'Engineering', 'Real Estate', 'Technology & Software', 'Aviation & Aerospace'];
+                  if (projectIndustries.includes(newInd) && !company?.features?.projects) {
+                    doUpdateCompany({ features: { ...company?.features, projects: true } });
+                    showToast(isAR 
+                      ? `تم تفعيل وحدة المشاريع تلقائياً بناءً على قطاع ${newInd}. يمكنك تعطيلها من الإعدادات.` 
+                      : `Projects module auto-enabled for ${newInd} industry. You can disable it in Settings.`, 'success');
+                  }
+                }}
                 style={fieldInput('industry')}
                 onFocus={() => setFocused('industry')}
                 onBlur={() => setFocused('')}

@@ -29,6 +29,22 @@ const ItemSchema = new mongoose.Schema(
     attachments:    [{ url: String, publicId: String, name: String, size: Number }],
     attributes:     { type: Map, of: String, default: {} },
     customAttributes: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+
+    // ── Warehouse & bin location ───────────────────────────────────────────
+    warehouseId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', default: null },
+    binLocation:  { type: String, trim: true, default: '' },  // alphanumeric bin code
+
+    // ── Costing ───────────────────────────────────────────────────────────
+    costingMethod: { type: String, enum: ['fifo', 'avg'], default: 'avg' },
+    avgCost:       { type: Number, default: 0, min: 0 },  // running moving-average cost
+
+    // ── Warehouse dimensions (how much space item takes) ──────────────────
+    palletQty:    { type: Number, default: 1, min: 1 },   // units per pallet
+    stackHeight:  { type: Number, default: 1, min: 1 },   // max pallet stack height
+
+    // ── Reorder automation ────────────────────────────────────────────────
+    reorderPoint: { type: Number, default: 0, min: 0 },   // trigger reorder when qty ≤ this
+    reorderQty:   { type: Number, default: 0, min: 0 },   // suggested purchase quantity
   },
   { timestamps: true }
 );

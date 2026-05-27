@@ -63,6 +63,62 @@ const TRANSACTIONS = [
 
 const FILES = [];
 
+const WAREHOUSES = [
+  {
+    _id: 'wh1', code: 'WH-A', name: 'المستودع الرئيسي', nameEn: 'Main Warehouse',
+    location: 'Industrial Zone, Building 1', active: true,
+    length: 40, width: 25, height: 8,
+    usableAreaPct: 0.85, palletFootprint: 0.96,
+    usableArea: 850, maxPallets: 885, totalVolume: 6800,
+    occupancyPct: 62, usedPallets: 550, itemCount: 4, alert85: false,
+  },
+  {
+    _id: 'wh2', code: 'WH-B', name: 'مستودع القطع الإلكترونية', nameEn: 'Electronics Warehouse',
+    location: 'Tech Park, Unit 5', active: true,
+    length: 20, width: 15, height: 6,
+    usableAreaPct: 0.85, palletFootprint: 0.96,
+    usableArea: 255, maxPallets: 265, totalVolume: 1530,
+    occupancyPct: 88, usedPallets: 233, itemCount: 1, alert85: true,
+  },
+];
+
+const BINS = [
+  { _id: 'b1', warehouseId: 'wh1', code: 'A1-01', zone: 'A', aisle: '1', level: '01', capacity: 10, active: true },
+  { _id: 'b2', warehouseId: 'wh1', code: 'A1-02', zone: 'A', aisle: '1', level: '02', capacity: 10, active: true },
+  { _id: 'b3', warehouseId: 'wh1', code: 'B2-01', zone: 'B', aisle: '2', level: '01', capacity: 8,  active: true },
+  { _id: 'b4', warehouseId: 'wh2', code: 'E1-01', zone: 'E', aisle: '1', level: '01', capacity: 5,  active: true },
+];
+
+const BOMS = [
+  {
+    _id: 'bom1',
+    name: 'وحدة ضخ هيدروليكية',
+    nameEn: 'Hydraulic Pump Assembly',
+    outputItemId: { _id: 'i2', name: 'مضخة هيدروليكية', nameEn: 'Hydraulic Pump', qty: 3 },
+    outputQty: 1,
+    components: [
+      { itemId: { _id: 'i1', name: 'محرك كهربائي 5HP', nameEn: 'Electric Motor 5HP', qty: 24 }, qty: 1, unit: 'unit' },
+      { itemId: { _id: 'i5', name: 'علبة تروس', nameEn: 'Industrial Gearbox', qty: 0 },          qty: 1, unit: 'unit' },
+    ],
+    notes: 'Standard hydraulic pump assembly',
+    active: true,
+    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+  },
+  {
+    _id: 'bom2',
+    name: 'حزمة الكابلات',
+    nameEn: 'Cable Bundle Kit',
+    outputItemId: { _id: 'i4', name: 'خادم شبكي 2U', nameEn: 'Rack Server 2U', qty: 12 },
+    outputQty: 1,
+    components: [
+      { itemId: { _id: 'i3', name: 'كابل نحاسي 16مم', nameEn: 'Copper Cable 16mm', qty: 800 }, qty: 50, unit: 'meter' },
+    ],
+    notes: 'Server installation cable kit',
+    active: true,
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+];
+
 const ENTERPRISE_COMPANIES = [
   { _id: 'e1', code: 'E-TECH', name: 'ElectroTech Industries', description: 'Main hardware division', industry: 'Technology', primaryColor: '#3b82f6' },
   { _id: 'e2', code: 'A-BUILD', name: 'Alpha Builders', description: 'Construction materials', industry: 'Construction', primaryColor: '#f97316' },
@@ -146,6 +202,7 @@ export const getMockDataForPath = async (path, isEnterprise) => {
   if (route === '/stats') {
     const totalValue = ITEMS.reduce((acc, i) => acc + (i.price * i.qty), 0);
     const lowStock = ITEMS.filter(i => i.qty <= i.minThreshold).length;
+    const stockoutItems = ITEMS.filter(i => i.qty === 0).length;
     return {
       totalItems: ITEMS.length,
       totalValue,
@@ -156,8 +213,40 @@ export const getMockDataForPath = async (path, isEnterprise) => {
         { name: 'Pumps', value: 1 },
         { name: 'Cables', value: 1 },
         { name: 'Servers', value: 1 }
-      ]
+      ],
+      // KPI fields
+      inventoryTurnover: 4.2,
+      dsi: 87,
+      stockoutRate: +((stockoutItems / ITEMS.length) * 100).toFixed(1),
+      cogs30: 42800,
+      cogsTrend: 12.5,
+      reorderAlerts: [
+        { _id: 'i2', name: 'مضخة هيدروليكية', nameEn: 'Hydraulic Pump', qty: 3, reorderPoint: 5, reorderQty: 10 },
+        { _id: 'i5', name: 'علبة تروس',        nameEn: 'Industrial Gearbox', qty: 0, reorderPoint: 10, reorderQty: 20 },
+      ],
     };
+  }
+
+  // ── Warehouses ──
+  if (route === '/warehouses') return WAREHOUSES;
+  if (route.match(/^\/warehouses\/[^/]+$/)) {
+    const id = route.split('/').pop();
+    const wh = WAREHOUSES.find(w => w._id === id);
+    if (!wh) throw new Error('Warehouse not found');
+    return { ...wh, items: ITEMS.slice(0, 3), bins: BINS.filter(b => b.warehouseId === id) };
+  }
+
+  // ── Bins ──
+  if (route === '/bins') {
+    const { warehouseId } = params;
+    return warehouseId ? BINS.filter(b => b.warehouseId === warehouseId) : BINS;
+  }
+
+  // ── BOM ──
+  if (route === '/bom') return BOMS;
+  if (route.match(/^\/bom\/[^/]+$/)) {
+    const id = route.split('/').pop();
+    return BOMS.find(b => b._id === id) || null;
   }
 
   // ── Items ──

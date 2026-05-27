@@ -96,11 +96,12 @@ export const AppProvider = ({ children }) => {
   const [lang,  setLang]  = useState(() => localStorage.getItem('nexinv_lang')  || 'en');
   const [theme, setTheme] = useState(() => localStorage.getItem('nexinv_theme') || 'dark');
 
-  const [items, setItems] = useState([]);
-  const [depts, setDepts] = useState([]);
-  const [cats,  setCats]  = useState([]);
-  const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [items,      setItems]      = useState([]);
+  const [depts,      setDepts]      = useState([]);
+  const [cats,       setCats]       = useState([]);
+  const [users,      setUsers]      = useState([]);
+  const [stats,      setStats]      = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
 
   // ── Toast system ──────────────────────────────────────────────────────────
   const [toasts, setToasts] = useState([]);
@@ -232,7 +233,7 @@ export const AppProvider = ({ children }) => {
     setAuthed(false);
     setUser(null);
     setCompany(null);
-    setItems([]); setDepts([]); setCats([]); setUsers([]); setStats(null);
+    setItems([]); setDepts([]); setCats([]); setUsers([]); setStats(null); setWarehouses([]);
     // Navigation handled by Layout.jsx logout button
   };
 
@@ -245,15 +246,17 @@ export const AppProvider = ({ children }) => {
     if (!silent) return;
     setSyncing(true);
     try {
-      const [iData, d, c, u, s] = await Promise.all([
+      const [iData, d, c, u, s, wh] = await Promise.all([
         api.getItems(),
         api.getDepts(),
         api.getCats(),
         user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
         api.getStats(),
+        api.getWarehouses().catch(() => []),
       ]);
       setItems(Array.isArray(iData) ? iData : (iData.items || []));
       setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setWarehouses(Array.isArray(wh) ? wh : []);
       setLastSync(new Date());
     } catch (e) {
       console.error('Live sync failed', e);
@@ -266,16 +269,18 @@ export const AppProvider = ({ children }) => {
   const reloadData = useCallback(async () => {
     if (!authed) return;
     try {
-      const [iData, d, c, u, s] = await Promise.all([
+      const [iData, d, c, u, s, wh] = await Promise.all([
         api.getItems(),
         api.getDepts(),
         api.getCats(),
         user?.perms?.canManageUsers ? api.getUsers() : Promise.resolve(users),
         api.getStats(),
+        api.getWarehouses().catch(() => []),
       ]);
       // getItems returns plain array (all=1 flag)
       setItems(Array.isArray(iData) ? iData : (iData.items || []));
       setDepts(d); setCats(c); setUsers(u); setStats(s);
+      setWarehouses(Array.isArray(wh) ? wh : []);
       setLastSync(new Date());
     } catch (e) {
       console.error('Failed to reload data', e);
@@ -284,39 +289,39 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => { if (authed) reloadData();  }, [authed]);
 
-  const socketRef = useRef(null);
+  // const socketRef = useRef(null);
 
-  useEffect(() => {
-    if (authed) {
-      const token = localStorage.getItem('nexinv_token');
-      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      
-      socketRef.current = io(url, { auth: { token } });
-      
-      const reload = () => loadData(true);
-      
-      const events = [
-        'dept_added', 'dept_updated', 'dept_deleted',
-        'cat_added', 'cat_updated', 'cat_deleted',
-        'item_added', 'item_updated', 'item_deleted',
-        'tx_added', 'tx_updated', 'tx_deleted',
-        'user_added', 'user_updated', 'user_deleted'
-      ];
-      
-      events.forEach(e => socketRef.current.on(e, reload));
-
-      return () => {
-        socketRef.current.disconnect();
-      };
-    }
-  }, [authed, loadData]);
+  // useEffect(() => {
+  //   if (authed && (company?.liveSync ?? true)) {
+  //     const token = localStorage.getItem('nexinv_token');
+  //     const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  //     
+  //     socketRef.current = io(url, { auth: { token } });
+  //     
+  //     const reload = () => loadData(true);
+  //     
+  //     const events = [
+  //       'dept_added', 'dept_updated', 'dept_deleted',
+  //       'cat_added', 'cat_updated', 'cat_deleted',
+  //       'item_added', 'item_updated', 'item_deleted',
+  //       'tx_added', 'tx_updated', 'tx_deleted',
+  //       'user_added', 'user_updated', 'user_deleted'
+  //     ];
+  //     
+  //     events.forEach(e => socketRef.current.on(e, reload));
+  //
+  //     return () => {
+  //       socketRef.current.disconnect();
+  //     };
+  //   }
+  // }, [authed, loadData]);
 
   // ── Live polling — refresh every 30 s silently ────────────────────────────
-  useEffect(() => {
-    if (!authed) return;
-    const id = setInterval(() => loadData(true), 30_000);
-    return () => clearInterval(id);
-  }, [authed, loadData]);
+  // useEffect(() => {
+  //   if (!authed || !(company?.fastRefresh ?? true)) return;
+  //   const id = setInterval(() => loadData(true), 30_000);
+  //   return () => clearInterval(id);
+  // }, [authed, loadData, company?.fastRefresh]);
 
   // ── CRUD — Items ──────────────────────────────────────────────────────────
   const saveItem = async (data, id = null) => {
@@ -472,7 +477,7 @@ export const AppProvider = ({ children }) => {
   const value = {
     user, company, authed, loading,
     lang, setLang, theme, setTheme,
-    items, depts, cats, users, stats,
+    items, depts, cats, users, stats, warehouses,
     lastSync, syncing,
     login, loginDemo, loginWithToken, logout, loadData: reloadData,
     toasts, showToast, removeToast,
