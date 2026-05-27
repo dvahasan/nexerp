@@ -27,7 +27,7 @@ const PERM_LABELS = {
 };
 
 export default function Users() {
-  const { loading: ctxLoading, t: tr, isAR, user: me, removeUser, theme, company } = useAppContext();
+  const { loading: ctxLoading, t: tr, isAR, user: me, removeUser, theme, company, liveTx, socketStatus } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -50,10 +50,11 @@ export default function Users() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
   const [version,      setVersion]      = useState(0);
+  const [silentRefresh, setSilentRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setFetching(true);
+    if (silentRefresh === 0) setFetching(true);
     const params = { page, limit: LIMIT };
     if (search)     params.search = search;
     if (roleFilter) params.role   = roleFilter;
@@ -68,9 +69,23 @@ export default function Users() {
         setHasMore(page < (res.pages || 1));
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setFetching(false); });
+      .finally(() => { if (!cancelled && silentRefresh === 0) setFetching(false); });
     return () => { cancelled = true; };
-  }, [page, search, roleFilter, version]);
+  }, [page, search, roleFilter, version, silentRefresh]);
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
+
+  // ── Live Sync Refetch ──
+  useEffect(() => {
+    if (liveTx?.type === 'refresh_users') {
+      setSilentRefresh(p => p + 1);
+    }
+  }, [liveTx]);
 
   useEffect(() => { setPage(1); }, [search, roleFilter]);
 

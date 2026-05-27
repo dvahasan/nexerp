@@ -257,7 +257,10 @@ router.put("/:id", protect, need("canEdit"), async (req, res) => {
 // ── DELETE /api/items/:id ────────────────────────────────────────────────────
 router.delete("/:id", protect, need("canDelete"), async (req, res) => {
   try {
+    const item = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId });
+    if (!item) return res.status(404).json({ message: "Not found" });
     await Item.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
+    broadcast(req, "item_deleted", { _id: item._id });
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });

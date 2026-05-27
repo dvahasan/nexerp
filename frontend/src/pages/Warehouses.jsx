@@ -21,7 +21,7 @@ const defaultBinForm = {
 };
 
 export default function Warehouses() {
-  const { theme, company, isAR, showToast, user } = useAppContext();
+  const { theme, company, isAR, showToast, user, socketStatus, liveTx } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -33,6 +33,7 @@ export default function Warehouses() {
   const [selected,      setSelected]      = useState(null); // warehouse detail
   const [loading,       setLoading]       = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [silentRefresh, setSilentRefresh] = useState(0);
 
   // Warehouse modal
   const [whModal,   setWhModal]   = useState(false);
@@ -52,15 +53,34 @@ export default function Warehouses() {
   const [deleting,       setDeleting]       = useState(false);
 
   // ── Fetch warehouses list ─────────────────────────────────────────────────
-  const loadWarehouses = useCallback(async () => {
+  const loadWarehouses = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await api.getWarehouses();
       setWarehouses(Array.isArray(data) ? data : []);
     } catch { /* silent */ }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, []);
 
-  useEffect(() => { loadWarehouses(); }, [loadWarehouses]);
+  useEffect(() => { loadWarehouses(silentRefresh > 0); }, [loadWarehouses, silentRefresh]);
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
+
+  // ── Live Sync Refetch ──
+  useEffect(() => {
+    if (liveTx?.type === 'refresh_warehouses') {
+      setSilentRefresh(p => p + 1);
+      // also reload detail if currently selected
+      if (selected) {
+        loadDetail(selected._id);
+      }
+    }
+  }, [liveTx, selected, loadDetail]);
 
   // ── Fetch selected warehouse detail ───────────────────────────────────────
   const loadDetail = useCallback(async (id) => {

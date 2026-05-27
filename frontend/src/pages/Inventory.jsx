@@ -14,7 +14,7 @@ const LIMIT = 12;
 
 export default function Inventory() {
   const navigate = useNavigate();
-  const { depts, cats, loading: ctxLoading, t: tr, isAR, company, user, removeItem, theme } = useAppContext();
+  const { depts, cats, loading: ctxLoading, t: tr, isAR, company, user, removeItem, theme, liveItem, socketStatus } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -37,6 +37,7 @@ export default function Inventory() {
   const [page,     setPage]     = useState(1);
   const [fetching, setFetching] = useState(true);
   const [version,  setVersion]  = useState(0);
+  const [silentRefresh, setSilentRefresh] = useState(0);
 
   const [txModal,      setTxModal]      = useState(false);
   const [txItem,       setTxItem]       = useState(null);
@@ -63,7 +64,7 @@ export default function Inventory() {
 
   useEffect(() => {
     let cancelled = false;
-    setFetching(true);
+    if (silentRefresh === 0) setFetching(true);
     const params = { page, limit: LIMIT };
     if (search)            params.search         = search;
     if (deptF  !== 'all') params.dept            = deptF;
@@ -88,11 +89,36 @@ export default function Inventory() {
         }
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setFetching(false); });
+      .finally(() => { if (!cancelled && silentRefresh === 0) setFetching(false); });
     return () => { cancelled = true; };
-  }, [page, search, deptF, catF, stF, barcodeF, photoF, typeF, favF, descF, priceMin, priceMax, version]);
+  }, [page, search, deptF, catF, stF, barcodeF, photoF, typeF, favF, descF, priceMin, priceMax, version, silentRefresh]);
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
 
   useEffect(() => { setPage(1); }, [search, deptF, catF, stF, barcodeF, photoF, typeF, favF, descF, priceMin, priceMax]);
+
+  // ── Live injection without HTTP refetch ───────────────────────────────────
+  useEffect(() => {
+    if (!liveItem) return;
+    setItems(prev => {
+      if (liveItem.type === 'update') {
+        return prev.map(i => i._id === liveItem.item._id ? liveItem.item : i);
+      } else if (liveItem.type === 'add') {
+        if (prev.some(i => i._id === liveItem.item._id)) return prev;
+        setTotal(t => t + 1);
+        return [liveItem.item, ...prev];
+      } else if (liveItem.type === 'delete') {
+        setTotal(t => Math.max(0, t - 1));
+        return prev.filter(i => i._id !== liveItem.itemId);
+      }
+      return prev;
+    });
+  }, [liveItem]);
 
   const refresh = () => { setPage(1); setVersion(v => v + 1); };
 

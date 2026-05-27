@@ -37,7 +37,7 @@ const COLOR_PRESETS = [
 ];
 
 export default function CompanyProfile() {
-  const { company, users, items, stats, doUpdateCompany, uploadCompanyLogo, isAR, user: me, theme, showToast } = useAppContext();
+  const { company, users, items, stats, doUpdateCompany, uploadCompanyLogo, uploadCompanyStamp, isAR, user: me, theme, showToast } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -45,10 +45,14 @@ export default function CompanyProfile() {
 
   const [form, setForm] = useState({
     name:         company?.name         || '',
+    slogan:       company?.slogan       || '',
     description:  company?.description  || '',
     industry:     company?.industry     || '',
     baseCurrency: company?.baseCurrency || 'USD',
     primaryColor: company?.primaryColor || '#3b82f6',
+    phone:        company?.phone        || '',
+    email:        company?.email        || '',
+    address:      company?.address      || '',
   });
   const [saving,   setSaving]   = useState(false);
   const [copied,   setCopied]   = useState(false);
@@ -246,6 +250,19 @@ export default function CompanyProfile() {
               />
             </div>
 
+            {/* Slogan — full width */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              {label(isAR ? 'الشعار اللفظي (Slogan)' : 'Company Slogan')}
+              <input
+                value={form.slogan}
+                onChange={e => setForm(f => ({ ...f, slogan: e.target.value }))}
+                style={fieldInput('cslogan')}
+                placeholder={isAR ? 'شعار شركتك اللفظي...' : 'Your company slogan...'}
+                onFocus={() => setFocused('cslogan')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+
             {/* Description — full width */}
             <div style={{ gridColumn: '1 / -1' }}>
               {label(isAR ? 'وصف الشركة' : 'Description')}
@@ -258,6 +275,48 @@ export default function CompanyProfile() {
                   ...fieldInput('desc', { height: 'auto', padding: '8px 10px', resize: 'vertical' }),
                 }}
                 onFocus={() => setFocused('desc')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+
+            {/* Phone */}
+            <div>
+              {label(isAR ? 'رقم هاتف الشركة' : 'Company Phone')}
+              <input
+                type="text"
+                value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                style={fieldInput('phone')}
+                placeholder="+1 234 567 890"
+                onFocus={() => setFocused('phone')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              {label(isAR ? 'البريد الإلكتروني' : 'Company Email')}
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                style={fieldInput('email')}
+                placeholder="contact@company.com"
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+
+            {/* Address */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              {label(isAR ? 'العنوان' : 'Company Address')}
+              <input
+                type="text"
+                value={form.address}
+                onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                style={fieldInput('address')}
+                placeholder="123 Business St, City"
+                onFocus={() => setFocused('address')}
                 onBlur={() => setFocused('')}
               />
             </div>
@@ -307,6 +366,11 @@ export default function CompanyProfile() {
             {/* Logo upload */}
             <div>
               {label(isAR ? 'شعار الشركة' : 'Company Logo')}
+              {company?.logo && (
+                <div style={{ marginBottom: 10, padding: 10, border: `1px solid ${t.border}`, borderRadius: 4, backgroundColor: '#fff', textAlign: 'center' }}>
+                  <img src={company.logo} alt="Logo" style={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} />
+                </div>
+              )}
               <label onClick={e => { if (me?.isDemo) { e.preventDefault(); showToast(isAR ? 'رفع الملفات غير متاح في وضع التجربة' : 'File uploads are disabled in Demo Mode', 'error'); } }} style={{
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 height: 36, borderRadius: 4, border: `1px dashed ${t.border}`,
@@ -331,6 +395,41 @@ export default function CompanyProfile() {
                 />
                 <Icon name="upload" size={14} />
                 {isAR ? 'اختر صورة...' : 'Upload new logo...'}
+              </label>
+            </div>
+
+            {/* Stamp upload */}
+            <div>
+              {label(isAR ? 'ختم الشركة' : 'Company Stamp')}
+              {company?.stamp && (
+                <div style={{ marginBottom: 10, padding: 10, border: `1px solid ${t.border}`, borderRadius: 4, backgroundColor: '#fff', textAlign: 'center' }}>
+                  <img src={company.stamp} alt="Stamp" style={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }} />
+                </div>
+              )}
+              <label onClick={e => { if (me?.isDemo) { e.preventDefault(); showToast(isAR ? 'رفع الملفات غير متاح في وضع التجربة' : 'File uploads are disabled in Demo Mode', 'error'); } }} style={{
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: 36, borderRadius: 4, border: `1px dashed ${t.border}`,
+                backgroundColor: t.canvas, color: t.fgMuted, fontSize: 12,
+                transition: 'border-color 120ms, color 120ms', gap: 6,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = primary; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.fgMuted; }}
+              >
+                <input type="file" style={{ display: 'none' }} accept="image/*"
+                  onChange={async e => {
+                    if (me?.isDemo) {
+                      alert(isAR ? 'رفع الملفات غير متاح في وضع التجربة' : 'Action disabled in Demo Mode');
+                      return;
+                    }
+                    if (e.target.files?.[0]) {
+                      setSaving(true);
+                      try { await uploadCompanyStamp(e.target.files[0]); }
+                      finally { setSaving(false); }
+                    }
+                  }}
+                />
+                <Icon name="upload" size={14} />
+                {isAR ? 'رفع الختم...' : 'Upload company stamp...'}
               </label>
             </div>
 
@@ -417,6 +516,7 @@ export default function CompanyProfile() {
           <dl style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { label: isAR ? 'الاسم'    : 'Name',     value: company?.name },
+              { label: isAR ? 'الشعار اللفظي' : 'Slogan',   value: company?.slogan || '—' },
               { label: isAR ? 'القطاع'   : 'Industry', value: company?.industry || '—' },
               { label: isAR ? 'الوصف'    : 'About',    value: company?.description || '—' },
               { label: isAR ? 'العملة'   : 'Currency', value: `${currency.symbol} ${currency.code} — ${currency.name}` },

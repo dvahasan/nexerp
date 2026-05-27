@@ -12,6 +12,7 @@ export default function UserProfile() {
     name:     user?.name     || '',
     username: user?.username || '',
     email:    user?.email    || '',
+    phone:    user?.phone    || '',
     password: '',
   });
   const [saving,  setSaving]  = useState(false);
@@ -128,19 +129,30 @@ export default function UserProfile() {
                 onBlur={() => setFocused('')}
               />
             </div>
-          </div>
-
-          <div>
-            {label(isAR ? 'البريد الإلكتروني' : 'Email Address')}
-            <input
-              type="email"
-              value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              placeholder="user@company.com"
-              style={fieldInput('email')}
-              onFocus={() => setFocused('email')}
-              onBlur={() => setFocused('')}
-            />
+            <div>
+              {label(isAR ? 'البريد الإلكتروني' : 'Email Address')}
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="user@company.com"
+                style={fieldInput('email')}
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
+            <div>
+              {label(isAR ? 'رقم الهاتف' : 'Phone Number')}
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="+1 234 567 890"
+                style={fieldInput('phone')}
+                onFocus={() => setFocused('phone')}
+                onBlur={() => setFocused('')}
+              />
+            </div>
           </div>
 
           <div>
@@ -169,10 +181,17 @@ export default function UserProfile() {
                 opacity: saving ? 0.65 : 1, transition: 'opacity 120ms',
               }}
             >
-              {saving
-                ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 600ms linear infinite' }} /> {isAR ? 'جارٍ الحفظ...' : 'Saving...'}</>
-                : <><Icon name="save" size={14} /> {isAR ? 'حفظ التغييرات' : 'Save Changes'}</>
-              }
+              {saving ? (
+                <>
+                  <div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 600ms linear infinite' }} />
+                  {isAR ? 'جارٍ الحفظ...' : 'Saving...'}
+                </>
+              ) : (
+                <>
+                  <Icon name="save" size={14} />
+                  {isAR ? 'حفظ التغييرات' : 'Save Changes'}
+                </>
+              )}
             </button>
           </div>
         </div>

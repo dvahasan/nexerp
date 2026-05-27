@@ -132,7 +132,8 @@ const MOCK_COMPANY = {
   baseCurrency: 'USD',
   theme: 'dark',
   primaryColor: '#3b82f6',
-  activeIconPack: 'lucide'
+  activeIconPack: 'lucide',
+  features: { projects: true, reasons: true }
 };
 
 const MOCK_PERMS = {
@@ -305,6 +306,11 @@ export const getMockDataForPath = async (path, isEnterprise) => {
       usage: { credits: { usage: 1.5, limit: 25 } },
       folders: [{ name: 'nexinv', storage_bytes: 1024 * 1024 * 15 }]
     };
+  }
+
+  // ── Reference Data (Sources, Destinations, Projects, Reasons) ──
+  if (['/sources', '/destinations', '/projects', '/reasons'].includes(route)) {
+    return [];
   }
 
   // Fallback

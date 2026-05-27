@@ -45,10 +45,18 @@ const ItemSchema = new mongoose.Schema(
     // ── Reorder automation ────────────────────────────────────────────────
     reorderPoint: { type: Number, default: 0, min: 0 },   // trigger reorder when qty ≤ this
     reorderQty:   { type: Number, default: 0, min: 0 },   // suggested purchase quantity
+
+    // ── Reservations ──────────────────────────────────────────────────────
+    reservedQty:  { type: Number, default: 0, min: 0 },   // soft allocated stock
   },
   { timestamps: true }
 );
 
 ItemSchema.index({ companyId: 1, name: "text", nameEn: "text", sku: "text", barcode: "text" });
+ItemSchema.index({ companyId: 1, sku: 1 });
+ItemSchema.index({ companyId: 1, barcode: 1 });
+ItemSchema.index({ companyId: 1, status: 1 });
+ItemSchema.index({ companyId: 1, qty: 1 });
+ItemSchema.index({ companyId: 1, warehouseId: 1 });
 
 module.exports = mongoose.model("Item", ItemSchema);

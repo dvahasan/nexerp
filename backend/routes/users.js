@@ -77,7 +77,7 @@ router.get("/", protect, need("canManageUsers"), async (req, res) => {
 // ── POST /api/users ───────────────────────────────────────────────────────────
 router.post("/", protect, need("canManageUsers"), async (req, res) => {
   try {
-    const { name, nameEn, username, email, password, role, permissions, preferredLanguage } = req.body;
+    const { name, nameEn, username, email, phone, password, role, permissions, preferredLanguage } = req.body;
     if (!name || !username || !password)
       return res.status(400).json({ message: "Missing fields" });
 
@@ -92,7 +92,7 @@ router.post("/", protect, need("canManageUsers"), async (req, res) => {
     const user = await User.create({
       companyId: req.user.companyId, name, nameEn,
       username: username.toLowerCase().trim(),
-      email: email || "", passwordHash,
+      email: email || "", phone: phone || "", passwordHash,
       role: safeRole, permissions: safePerms, preferredLanguage,
     });
 

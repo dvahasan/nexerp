@@ -18,8 +18,11 @@ const setBroadcastIO = (io) => {
 
 const broadcast = (req, event, data) => {
   if (_io && req.user?.companyId) {
-    _io.to(req.user.companyId.toString()).emit(event, data);
+    const cid = req.user.companyId._id ? req.user.companyId._id.toString() : req.user.companyId.toString();
+    _io.to(cid).emit(event, data);
   }
 };
 
-module.exports = { setBroadcastIO, broadcast };
+const getIO = () => _io;
+
+module.exports = { setBroadcastIO, broadcast, getIO };

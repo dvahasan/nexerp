@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { T } from '../theme';
 import { api } from '../api';
@@ -7,6 +7,7 @@ import BarcodeScanner from '../components/BarcodeScanner';
 import TxModal from './TxModal';
 import Confirm from '../components/Confirm';
 import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
+import InvoicePrint from '../components/InvoicePrint';
 
 const LIMIT = 20;
 
@@ -15,7 +16,7 @@ const LIMIT = 20;
  * The `type` prop locks the page to one transaction direction.
  */
 export default function TxPage({ type }) {
-  const { t: tr, isAR, user, users, removeTx, theme, company } = useAppContext();
+  const { t: tr, isAR, user, users, removeTx, theme, company, liveTx, socketStatus } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -53,8 +54,10 @@ export default function TxPage({ type }) {
 
   // ── paging + data ─────────────────────────────────────────────────────────
   const [page,     setPage]     = useState(1);
-  const [data,     setData]     = useState({ txs: [], total: 0, pages: 1 });
-  const [fetching, setFetching] = useState(true);
+  const [data,         setData]         = useState({ txs: [], total: 0, pages: 1 });
+  const [fetching,     setFetching]     = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [silentRefresh, setSilentRefresh] = useState(0);
 
   // ── modals ────────────────────────────────────────────────────────────────
   const [txModal,      setTxModal]      = useState(false);
@@ -62,6 +65,13 @@ export default function TxPage({ type }) {
   const [confirmOpen,  setConfirmOpen]  = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
+  
+  // ── printing ──────────────────────────────────────────────────────────────
+  const [printTxs,     setPrintTxs]     = useState([]);
+  const [printModal,   setPrintModal]   = useState(false);
+  const [showUserPhoneInPrint, setShowUserPhoneInPrint] = useState(false);
+  const [showCompanyStampInPrint, setShowCompanyStampInPrint] = useState(true);
+  const printRef = useRef(null);
 
   // ── barcode scanner ───────────────────────────────────────────────────────
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -72,7 +82,7 @@ export default function TxPage({ type }) {
   // ── fetch ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    setFetching(true);
+    if (silentRefresh === 0) setFetching(true);
     const params = { page, limit: LIMIT, type };
     if (search.trim()) params.search = search.trim();
     if (userF)         params.user   = userF;
@@ -92,23 +102,79 @@ export default function TxPage({ type }) {
         }
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setFetching(false); });
+      .finally(() => { if (!cancelled && silentRefresh === 0) setFetching(false); });
 
     return () => { cancelled = true; };
-  }, [page, type, search, userF, fromF, toF]);
+  }, [page, type, search, userF, fromF, toF, refreshTrigger, silentRefresh]);
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
+
+  // ── Live injection without HTTP refetch ───────────────────────────────────
+  useEffect(() => {
+    if (!liveTx) return;
+    if (liveTx.type === 'add' && liveTx.tx.type === type) {
+      const newTx = { ...liveTx.tx };
+      if (newTx.userId && typeof newTx.userId === 'object') {
+        newTx.userName = newTx.userId.name;
+      }
+      setData(prev => {
+        const pTxs = prev.txs || [];
+        if (pTxs.some(t => t._id === newTx._id)) return prev;
+        return {
+          ...prev,
+          total: (prev.total || 0) + 1,
+          txs: [newTx, ...pTxs]
+        };
+      });
+    } else if (liveTx.type === 'delete') {
+      setData(prev => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        txs: (prev.txs || []).filter(t => t._id !== liveTx.txId)
+      }));
+    } else if (liveTx.type === 'update') {
+      setData(prev => ({
+        ...prev,
+        txs: (prev.txs || []).map(t => t._id === liveTx.tx._id ? liveTx.tx : t)
+      }));
+    }
+  }, [liveTx, type]);
 
   // reset to page 1 on any filter change
   useEffect(() => { setPage(1); }, [type, search, userF, fromF, toF]);
 
   const refetch = useCallback(() => {
     setPage(1);
-    setData({ txs: [], total: 0, pages: 1 });
+    setRefreshTrigger(p => p + 1);
   }, []);
 
   // ── handlers ──────────────────────────────────────────────────────────────
   const openRecord = ()    => { setEditTx(null); setTxModal(true); };
   const openEdit   = (tx)  => { setEditTx(tx);   setTxModal(true); };
   const confirmDel = (tx)  => { setDeleteTarget(tx); setConfirmOpen(true); };
+  
+  const openPrint = async (tx) => {
+    try {
+      const txs = await api.getInvoiceTxs(tx.invoiceNo);
+      setPrintTxs(txs);
+      setPrintModal(true);
+    } catch {
+      showToast(isAR ? 'خطأ في تحميل بيانات الفاتورة' : 'Error loading invoice', 'error');
+    }
+  };
+  const handlePrint = () => {
+    if (!printTxs || printTxs.length === 0) return;
+    setTimeout(() => {
+      if (printRef.current) {
+        window.print();
+      }
+    }, 100);
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -149,7 +215,7 @@ export default function TxPage({ type }) {
 
   const hasProjects = company?.features?.projects;
   const hasReasons = company?.features?.reasons;
-  const colCount = 5 + (canSeeAll ? 2 : 0) + (hasProjects && !isIN ? 1 : 0) + (hasReasons ? 1 : 0);
+  const colCount = 6 + (canSeeAll ? 1 : 0) + (hasProjects && !isIN ? 1 : 0) + (hasReasons ? 1 : 0);
 
   // ── style helpers ─────────────────────────────────────────────────────────
   const filterInput = (name, extra = {}) => ({
@@ -442,8 +508,9 @@ export default function TxPage({ type }) {
         <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
-              <tr>
-                {th('#', 'center')}
+              <tr style={{ backgroundColor: t.tableHead, borderBottom: `2px solid ${t.border}` }}>
+                {th('#')}
+                {th(isAR ? 'الفاتورة' : 'Invoice')}
                 {th(isAR ? 'التاريخ' : 'Date')}
                 {th(isAR ? 'الصنف' : 'Item')}
                 {th(isAR ? 'الكمية' : 'Qty')}
@@ -451,7 +518,7 @@ export default function TxPage({ type }) {
                 {hasProjects && !isIN && th(isAR ? 'المشروع' : 'Project')}
                 {hasReasons && th(isAR ? 'السبب' : 'Reason')}
                 {canSeeAll && th(isAR ? 'المستخدم' : 'User')}
-                {canSeeAll && th(isAR ? 'إجراءات' : 'Actions', 'right')}
+                {th(isAR ? 'إجراءات' : 'Actions', 'right')}
               </tr>
             </thead>
 
@@ -489,6 +556,7 @@ export default function TxPage({ type }) {
                   hasProjects={hasProjects} hasReasons={hasReasons}
                   onEdit={() => openEdit(tx)}
                   onDelete={() => confirmDel(tx)}
+                  onPrint={() => openPrint(tx)}
                   tr={tr}
                 />
               ))}
@@ -533,6 +601,92 @@ export default function TxPage({ type }) {
           : 'Delete this transaction? Stock levels will be reversed.'}
       />
 
+      {/* ── Invoice Print Preview Modal ── */}
+      {printModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div className="animate-in zoom-in-95 duration-200" style={{
+            backgroundColor: '#f3f4f6', borderRadius: 8, width: '100%', maxWidth: 840,
+            maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 20px', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name="document" size={18} style={{ color: primary }} />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                  {isAR ? 'معاينة الفاتورة' : 'Invoice Preview'}
+                </h3>
+              </div>
+              
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                {/* Print Options */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#4b5563', fontWeight: 600 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={showUserPhoneInPrint} 
+                    onChange={e => setShowUserPhoneInPrint(e.target.checked)} 
+                    style={{ accentColor: primary, cursor: 'pointer', width: 14, height: 14 }}
+                  />
+                  {isAR ? 'إظهار رقم التواصل' : 'Show Contact No'}
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#4b5563', fontWeight: 600 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={showCompanyStampInPrint} 
+                    onChange={e => setShowCompanyStampInPrint(e.target.checked)} 
+                    style={{ accentColor: primary, cursor: 'pointer', width: 14, height: 14 }}
+                  />
+                  {isAR ? 'إظهار الختم' : 'Show Stamp'}
+                </label>
+
+                <div style={{ height: 24, width: 1, backgroundColor: '#e5e7eb' }}></div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={handlePrint}
+                    style={{
+                      height: 34, padding: '0 16px', borderRadius: 4, border: 'none',
+                      backgroundColor: primary, color: '#fff', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
+                    }}
+                  >
+                    <Icon name="print" size={15} /> {isAR ? 'طباعة / حفظ PDF' : 'Print / Save PDF'}
+                  </button>
+                  <button
+                    onClick={() => { setPrintModal(false); setPrintTx(null); }}
+                    style={{
+                      width: 34, height: 34, borderRadius: 4, border: 'none',
+                      backgroundColor: '#e5e7eb', color: '#4b5563', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <Icon name="close" size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }} className="slim-scroll">
+              <div style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: 4, overflow: 'hidden', backgroundColor: '#fff' }}>
+                <InvoicePrint ref={printRef} txs={printTxs} showUserPhone={showUserPhoneInPrint} showCompanyStamp={showCompanyStampInPrint} company={company} isAR={isAR} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hidden Print Layout (Used for window.print) ── */}
+      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+        <InvoicePrint txs={printTxs} showUserPhone={showUserPhoneInPrint} showCompanyStamp={showCompanyStampInPrint} company={company} isAR={isAR} />
+      </div>
+
       {/* ── Barcode scanner overlay ── */}
       <BarcodeScanner
         open={scannerOpen}
@@ -544,7 +698,7 @@ export default function TxPage({ type }) {
 }
 
 // ── Row sub-component ──────────────────────────────────────────────────────────
-function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, primary, canSeeAll, hasProjects, hasReasons, onEdit, onDelete, tr }) {
+function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, primary, canSeeAll, hasProjects, hasReasons, onEdit, onDelete, onPrint, tr }) {
   const [hovered, setHovered] = useState(false);
   const locationField = isIN ? tx.sourceId?.name : tx.destId?.name;
 
@@ -564,6 +718,20 @@ function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, 
         fontFamily: 'ui-monospace, monospace', fontSize: 10, color: t.fgSubtle,
       }}>
         {(page - 1) * LIMIT + idx + 1}
+      </td>
+
+      {/* Invoice */}
+      <td style={{ padding: '10px 14px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fg, fontWeight: 600 }}>
+        <button
+          onClick={onPrint}
+          style={{
+            background: 'none', border: 'none', padding: 0, margin: 0,
+            color: primary, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 'inherit',
+            fontSize: 'inherit', textDecoration: hovered ? 'underline' : 'none',
+          }}
+        >
+          {tx.invoiceNo || `TX-${tx._id?.slice(-6).toUpperCase()}`}
+        </button>
       </td>
 
       {/* Date */}
@@ -654,42 +822,60 @@ function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, 
       )}
 
       {/* Actions */}
-      {canSeeAll && (
-        <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-            <button
-              onClick={onEdit}
-              title={tr.edit}
-              style={{
-                width: 26, height: 26, borderRadius: 4, border: 'none',
-                background: 'transparent', cursor: 'pointer',
-                color: hovered ? primary : t.fgSubtle,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 120ms',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.backgroundColor = primary + '1a'; e.currentTarget.style.color = primary; }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
-            >
-              <Icon name="edit" size={13} />
-            </button>
-            <button
-              onClick={onDelete}
-              title={tr.delete}
-              style={{
-                width: 26, height: 26, borderRadius: 4, border: 'none',
-                background: 'transparent', cursor: 'pointer',
-                color: t.fgMuted,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'all 120ms',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; e.currentTarget.style.color = t.neg; }}
-              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
-            >
-              <Icon name="delete" size={13} />
-            </button>
-          </div>
-        </td>
-      )}
+      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+          <button
+            onClick={onPrint}
+            title={isAR ? 'طباعة الفاتورة' : 'Print Invoice'}
+            style={{
+              width: 26, height: 26, borderRadius: 4, border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              color: hovered ? primary : t.fgSubtle,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 120ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = primary + '1a'; e.currentTarget.style.color = primary; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+          >
+            <Icon name="print" size={13} />
+          </button>
+          
+          {canSeeAll && (
+            <>
+              <button
+                onClick={onEdit}
+                title={tr.edit}
+                style={{
+                  width: 26, height: 26, borderRadius: 4, border: 'none',
+                  background: 'transparent', cursor: 'pointer',
+                  color: hovered ? primary : t.fgSubtle,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 120ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = primary + '1a'; e.currentTarget.style.color = primary; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+              >
+                <Icon name="edit" size={13} />
+              </button>
+              <button
+                onClick={onDelete}
+                title={tr.delete}
+                style={{
+                  width: 26, height: 26, borderRadius: 4, border: 'none',
+                  background: 'transparent', cursor: 'pointer',
+                  color: t.fgMuted,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 120ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.negTint; e.currentTarget.style.color = t.neg; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgMuted; }}
+              >
+                <Icon name="delete" size={13} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
     </tr>
   );
 }

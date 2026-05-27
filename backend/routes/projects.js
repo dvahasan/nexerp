@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
   try {
     const project = new Project({ ...req.body, companyId: req.user.companyId });
     await project.save();
-    broadcast(req.user.companyId, "refresh_projects");
+    broadcast(req, "refresh_projects");
     res.status(201).json(project);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -30,7 +30,7 @@ router.put("/:id", async (req, res) => {
       req.body,
       { new: true }
     );
-    broadcast(req.user.companyId, "refresh_projects");
+    broadcast(req, "refresh_projects");
     res.json(project);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -38,7 +38,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Project.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
-    broadcast(req.user.companyId, "refresh_projects");
+    broadcast(req, "refresh_projects");
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });

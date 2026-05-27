@@ -47,6 +47,7 @@ export function TourProvider({ children }) {
     tourRunIdRef.current += 1;
     clearTimer();
     setRun(false);
+    window.dispatchEvent(new Event('tourStopped'));
     setStepIndex(0);
     setSteps([]);
     if (markComplete) localStorage.setItem('nexerp_tour_completed', 'true');
@@ -69,6 +70,7 @@ export function TourProvider({ children }) {
 
     clearTimer();
     setRun(false);
+    window.dispatchEvent(new Event('tourStopped'));
     setSteps(nextSteps);
     setStepIndex(0);
 
@@ -76,6 +78,7 @@ export function TourProvider({ children }) {
       await waitForTarget(nextSteps[0]?.target);
       if (tourRunIdRef.current !== runId) return;
       setRun(true);
+      window.dispatchEvent(new Event('tourStarted'));
       resumeTimerRef.current = null;
     }, 100);
   }, [clearTimer]);
@@ -93,6 +96,7 @@ export function TourProvider({ children }) {
 
     clearTimer();
     setRun(false);
+    window.dispatchEvent(new Event('tourStopped'));
     setStepIndex(targetIndex);
 
     if (needNav) navigate(step.route);
@@ -101,6 +105,7 @@ export function TourProvider({ children }) {
       await waitForTarget(step?.target, 3000);
       if (tourRunIdRef.current !== runId) return;
       setRun(true);
+      window.dispatchEvent(new Event('tourStarted'));
       resumeTimerRef.current = null;
     }, needNav ? 600 : 80);
   }, [clearTimer, location.pathname, navigate, steps, stopTour]);
