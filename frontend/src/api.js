@@ -88,8 +88,8 @@ export const api = {
   deleteReason: (id) => req("DELETE", `/reasons/${id}`),
 
   // Items
-  getItems:       (params = {}) => req("GET", "/items?" + new URLSearchParams({ all: "1", ...params })),
-  getItemsPaged:  (params = {}) => req("GET", "/items?" + new URLSearchParams(params)),
+  getItems:       (params = {}) => req("GET", "/items?" + new URLSearchParams({ all: "1", _t: Date.now(), ...params })),
+  getItemsPaged:  (params = {}) => req("GET", "/items?" + new URLSearchParams({ _t: Date.now(), ...params })),
   getItem:        (id)          => req("GET",  `/items/${id}`),
   getByBarcode:   (code)        => req("GET",  `/items/barcode/${code}`),
   addItem:        (d)           => req("POST",   "/items", d),
@@ -104,7 +104,11 @@ export const api = {
   deleteAttachment:(id, publicId) => req("DELETE", `/items/${id}/attachments/${encodeURIComponent(publicId)}`),
 
   // Transactions
-  getTxs:      (params = {}) => req("GET", "/transactions?" + new URLSearchParams(params)),
+  getTxs: (params) => {
+    const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString();
+    return req("GET", `/transactions?${qs}`);
+  },
+  getInvoiceTxs: (invoiceNo) => req("GET", `/transactions/invoice/${invoiceNo}`),
   addTx:    (d)           => req("POST",   "/transactions", d),
   updateTx: (id, d)       => req("PUT",    `/transactions/${id}`, d),
   deleteTx: (id)          => req("DELETE", `/transactions/${id}`),
@@ -135,6 +139,7 @@ export const api = {
   updateSettings: (d) => req("PUT", "/settings", d),
   updateCompany:  (d) => req("PUT", "/company", d),
   uploadCompanyLogo:(file)=> { const fd = new FormData(); fd.append("logo", file); return req("POST", `/company/logo`, fd, true); },
+  uploadCompanyStamp:(file)=> { const fd = new FormData(); fd.append("stamp", file); return req("POST", `/company/stamp`, fd, true); },
 
   // Enterprise
   getEnterpriseCompanies: () => req("GET", "/enterprise/companies"),

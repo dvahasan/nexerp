@@ -19,7 +19,7 @@ const roleColors = {
 };
 
 const defaultForm = {
-  name: '', username: '', email: '', password: '',
+  name: '', username: '', email: '', phone: '', password: '',
   role: 'warehouse', active: true,
   perms: { ...roleDefaults.warehouse },
 };
@@ -39,6 +39,7 @@ export default function UserModal({ open, onClose, editUser = null, onSaved }) {
         name:     editUser.name     || '',
         username: editUser.username || '',
         email:    editUser.email    || '',
+        phone:    editUser.phone    || '',
         password: '',
         role:     editUser.role     || 'warehouse',
         active:   editUser.active   ?? true,
@@ -170,12 +171,17 @@ export default function UserModal({ open, onClose, editUser = null, onSaved }) {
           </div>
         </div>
 
-        {/* Email / Password */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        {/* Email / Phone / Password */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
           <div>
             {lbl(tr.email)}
             <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
               style={inp('email')} onFocus={() => setFocused('email')} onBlur={() => setFocused('')} />
+          </div>
+          <div>
+            {lbl(isAR ? 'رقم الهاتف' : 'Phone')}
+            <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)}
+              style={inp('phone')} onFocus={() => setFocused('phone')} onBlur={() => setFocused('')} />
           </div>
           <div>
             {lbl(`${tr.password}${editUser ? (isAR ? ' (اتركه فارغاً)' : ' (leave blank)') : ' *'}`)}

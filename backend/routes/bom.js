@@ -3,6 +3,7 @@ const mongoose  = require('mongoose');
 const { BomTemplate, Item, Transaction, BomProduction } = require('../models');
 const { protect, need }       = require('../middleware/auth');
 const { friendly, statusFor } = require('../errors');
+const { broadcast } = require('../utils/broadcast');
 
 const router = express.Router();
 
@@ -35,6 +36,7 @@ router.post('/', protect, need('canAdd'), async (req, res) => {
     const populated = await BomTemplate.findById(doc._id)
       .populate('outputItemId', 'name nameEn sku qty')
       .populate('components.itemId', 'name nameEn sku qty');
+    broadcast(req, 'refresh_boms');
     res.status(201).json(populated);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -49,6 +51,7 @@ router.put('/:id', protect, need('canEdit'), async (req, res) => {
     ).populate('outputItemId', 'name nameEn sku qty')
      .populate('components.itemId', 'name nameEn sku qty');
     if (!bom) return res.status(404).json({ message: 'BOM not found' });
+    broadcast(req, 'refresh_boms');
     res.json(bom);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -57,6 +60,7 @@ router.put('/:id', protect, need('canEdit'), async (req, res) => {
 router.delete('/:id', protect, need('canDelete'), async (req, res) => {
   try {
     await BomTemplate.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
+    broadcast(req, 'refresh_boms');
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -73,6 +77,10 @@ router.get('/:id/production-history', protect, async (req, res) => {
     res.json(history);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
+
+const { Ledger, ItemStockLocation } = require('../models');
+const { getIO } = require('../utils/broadcast');
+const AlertService = require('../services/AlertService');
 
 // ── POST /api/bom/:id/produce ─────────────────────────────────────────────────
 // Execute production: consume components (StockOut) → create output (StockIn).
@@ -95,38 +103,97 @@ router.post('/:id/produce', protect, need('canTxIn'), async (req, res) => {
     const txDate = new Date();
     const txBase = { companyId: cid, userId: req.user._id, userName: req.user.name, date: txDate, notes: notes || `Production run — BOM: ${bom.name}` };
 
-    // 1. Consume each component (StockOut)
     const outTxs = [];
+    const ledgers = [];
+
+    // 1. Consume each component (StockOut)
     for (const comp of bom.components) {
       const needed = comp.qty * runQty;
-      const item   = await Item.findOne({ _id: comp.itemId._id, companyId: cid }).session(dbSession);
-      if (!item) throw new Error(`Component item not found: ${comp.itemId.name}`);
-      if (item.qty < needed)
-        throw new Error(`Insufficient stock for "${item.name || item.nameEn}" — need ${needed}, have ${item.qty}`);
+      
+      const itemUpdate = await Item.findOneAndUpdate(
+        { _id: comp.itemId._id, companyId: cid, qty: { $gte: needed } },
+        { $inc: { qty: -needed } },
+        { new: true, session: dbSession }
+      );
+      
+      if (!itemUpdate) {
+        // Find current qty to give a good error message
+        const currentItem = await Item.findOne({ _id: comp.itemId._id, companyId: cid }).session(dbSession);
+        throw new Error(`Insufficient stock for "${currentItem?.name || currentItem?.nameEn}" — need ${needed}, have ${currentItem?.qty || 0}`);
+      }
 
-      item.qty -= needed;
-      await item.save({ session: dbSession });
+      // Update location stock if warehouse provided
+      if (warehouseId) {
+        await ItemStockLocation.findOneAndUpdate(
+          { companyId: cid, itemId: itemUpdate._id, warehouseId, binId: null },
+          { $inc: { qty: -needed } },
+          { upsert: true, new: true, session: dbSession }
+        );
+      }
 
       const [tx] = await Transaction.create([{
-        ...txBase, type: 'OUT', itemId: item._id, qty: needed,
+        ...txBase, type: 'OUT', itemId: itemUpdate._id, qty: needed,
         dest: 'Production',
+        unitCost: itemUpdate.avgCost || itemUpdate.price || 0,
         ...(warehouseId ? { warehouseId } : {}),
       }], { session: dbSession });
       outTxs.push(tx);
+
+      ledgers.push({
+        companyId: cid,
+        itemId: itemUpdate._id,
+        transactionId: tx._id,
+        type: 'OUT',
+        qtyChange: -needed,
+        qtyBefore: itemUpdate.qty + needed,
+        qtyAfter: itemUpdate.qty,
+        warehouseId: warehouseId || undefined,
+        destId: undefined, // Internal production
+        userId: req.user._id,
+        notes: txBase.notes
+      });
     }
 
     // 2. Create output (StockIn)
-    const outputItem = await Item.findOne({ _id: bom.outputItemId._id, companyId: cid }).session(dbSession);
-    if (!outputItem) throw new Error('Output item not found');
     const outputQtyTotal = bom.outputQty * runQty;
-    outputItem.qty += outputQtyTotal;
-    await outputItem.save({ session: dbSession });
+    const outputItemUpdate = await Item.findOneAndUpdate(
+      { _id: bom.outputItemId._id, companyId: cid },
+      { $inc: { qty: outputQtyTotal } },
+      { new: true, session: dbSession }
+    );
+    if (!outputItemUpdate) throw new Error('Output item not found');
+
+    if (warehouseId) {
+      await ItemStockLocation.findOneAndUpdate(
+        { companyId: cid, itemId: outputItemUpdate._id, warehouseId, binId: null },
+        { $inc: { qty: outputQtyTotal } },
+        { upsert: true, new: true, session: dbSession }
+      );
+    }
 
     const [inTx] = await Transaction.create([{
-      ...txBase, type: 'IN', itemId: outputItem._id, qty: outputQtyTotal,
+      ...txBase, type: 'IN', itemId: outputItemUpdate._id, qty: outputQtyTotal,
       source: 'Production',
+      unitCost: outputItemUpdate.avgCost || outputItemUpdate.price || 0,
       ...(warehouseId ? { warehouseId } : {}),
     }], { session: dbSession });
+
+    ledgers.push({
+      companyId: cid,
+      itemId: outputItemUpdate._id,
+      transactionId: inTx._id,
+      type: 'IN',
+      qtyChange: outputQtyTotal,
+      qtyBefore: outputItemUpdate.qty - outputQtyTotal,
+      qtyAfter: outputItemUpdate.qty,
+      warehouseId: warehouseId || undefined,
+      sourceId: undefined,
+      userId: req.user._id,
+      notes: txBase.notes
+    });
+
+    // Write all ledgers
+    await Ledger.insertMany(ledgers, { session: dbSession });
 
     // 3. Log to BomProduction History
     const prodLog = await BomProduction.create([{
@@ -135,17 +202,48 @@ router.post('/:id/produce', protect, need('canTxIn'), async (req, res) => {
       userId: req.user._id,
       projectId: bom.projectId, // Inherit project from BOM if assigned
       qtyProduced: outputQtyTotal,
-      outputItemId: outputItem._id,
+      outputItemId: outputItemUpdate._id,
       componentsUsed: bom.components.map(c => ({ itemId: c.itemId._id, qty: c.qty * runQty })),
       notes: notes
     }], { session: dbSession });
 
     await dbSession.commitTransaction();
+    dbSession.endSession();
+    
+    // Broadcasts and Alerts
+    const io = getIO();
+    if (io) {
+      const room = cid._id ? cid._id.toString() : cid.toString();
+      io.to(room).emit('tx_added', inTx);
+      io.to(room).emit('item_updated', outputItemUpdate);
+      AlertService.checkStockAndAlert(outputItemUpdate).catch(console.error);
+      
+      for (const tx of outTxs) {
+        io.to(room).emit('tx_added', tx);
+      }
+      
+      // We need to re-fetch or keep track of all updated components to emit them
+      for (const comp of bom.components) {
+        const updatedComponent = await Item.findOne({ _id: comp.itemId._id, companyId: cid });
+        if (updatedComponent) {
+          io.to(room).emit('item_updated', updatedComponent);
+          AlertService.checkStockAndAlert(updatedComponent).catch(console.error);
+        }
+      }
+    } else {
+      AlertService.checkStockAndAlert(outputItemUpdate).catch(console.error);
+      for (const comp of bom.components) {
+        const updatedComponent = await Item.findOne({ _id: comp.itemId._id, companyId: cid });
+        if (updatedComponent) AlertService.checkStockAndAlert(updatedComponent).catch(console.error);
+      }
+    }
+
     res.status(201).json({ success: true, produced: outputQtyTotal, prodLog: prodLog[0], inTx, outTxs });
   } catch (e) {
     await dbSession.abortTransaction();
+    dbSession.endSession();
     res.status(statusFor(e)).json({ message: friendly(e) });
-  } finally { dbSession.endSession(); }
+  }
 });
 
 // ── GET /api/bom/:id/production-history ──────────────────────────────────────

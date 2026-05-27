@@ -11,6 +11,7 @@ const CompanySchema = new mongoose.Schema(
     activeIconPack: { type: String, default: "material" },
     primaryColor:   { type: String, default: "#3b82f6" },
     logo:           { type: String, default: "" },
+    stamp:          { type: String, default: "" },
     active:         { type: Boolean, default: true },
     skuConfig:      { type: mongoose.Schema.Types.Mixed, default: {} },
     liveSync:       { type: Boolean, default: true },
@@ -20,10 +21,17 @@ const CompanySchema = new mongoose.Schema(
       reasons:      { type: Boolean, default: false },
     },
     googleMapsApiKey: { type: String, default: "" },
+    slogan:       { type: String, default: "" },
+    phone:        { type: String, default: "" },
+    email:        { type: String, default: "" },
+    address:      { type: String, default: "" },
     printSettings: {
       headerText: { type: String, default: "" },
       footerText: { type: String, default: "" },
+      invoiceHeader: { type: String, default: "" },
+      invoiceFooter: { type: String, default: "" },
       paperSize:  { type: String, enum: ['A4', 'A5', 'Letter', 'Legal'], default: 'A4' },
+      showUserPhoneOnInvoices: { type: Boolean, default: false },
     },
     apiKeys: [
       {

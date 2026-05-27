@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
   try {
     const dest = new Destination({ ...req.body, companyId: req.user.companyId });
     await dest.save();
-    broadcast(req.user.companyId, "refresh_destinations");
+    broadcast(req, "refresh_destinations");
     res.status(201).json(dest);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -30,7 +30,7 @@ router.put("/:id", async (req, res) => {
       req.body,
       { new: true }
     );
-    broadcast(req.user.companyId, "refresh_destinations");
+    broadcast(req, "refresh_destinations");
     res.json(dest);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -38,7 +38,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     await Destination.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
-    broadcast(req.user.companyId, "refresh_destinations");
+    broadcast(req, "refresh_destinations");
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });

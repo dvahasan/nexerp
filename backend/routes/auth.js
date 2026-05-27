@@ -118,8 +118,8 @@ router.get("/me", protect, async (req, res) => {
 // ── PUT /api/auth/profile ────────────────────────────────────────────────────
 router.put("/profile", protect, async (req, res) => {
   try {
-    const { name, username, email, password, preferredLanguage } = req.body;
-    const update = { name, username: username.toLowerCase().trim(), email };
+    const { name, username, email, phone, password, preferredLanguage } = req.body;
+    const update = { name, username: username.toLowerCase().trim(), email, phone };
     if (password) update.passwordHash = await bcrypt.hash(password, 10);
     if (preferredLanguage) update.preferredLanguage = preferredLanguage;
 

@@ -7,12 +7,13 @@ import Modal from '../components/Modal';
 import Confirm from '../components/Confirm';
 
 export default function Destinations() {
-  const { isAR, theme, company, showToast, user } = useAppContext();
+  const { isAR, theme, company, showToast, user, socketStatus, liveTx } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [silentRefresh, setSilentRefresh] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   
@@ -24,15 +25,28 @@ export default function Destinations() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getDestinations();
       setItems(res);
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(silentRefresh > 0); }, [silentRefresh]);
+
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
+
+  useEffect(() => {
+    if (liveTx?.type === 'refresh_destinations') {
+      setSilentRefresh(p => p + 1);
+    }
+  }, [liveTx]);
 
   const handleOpen = (item = null) => {
     if (item) {

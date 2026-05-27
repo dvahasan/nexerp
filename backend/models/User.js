@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     nameEn:            String,
     username:          { type: String, required: true, lowercase: true, trim: true },
     email:             { type: String, trim: true, lowercase: true, default: "" },
+    phone:             { type: String, trim: true, default: "" },
     passwordHash:      { type: String, required: true },
     role:              { type: String, enum: ["owner","admin","manager","warehouse","viewer"], default: "viewer" },
     permissions:       { type: mongoose.Schema.Types.Mixed, default: null },

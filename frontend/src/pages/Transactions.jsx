@@ -10,7 +10,7 @@ import InfiniteScrollTrigger from '../components/InfiniteScrollTrigger';
 const LIMIT = 20;
 
 export default function Transactions() {
-  const { t: tr, isAR, user, users, removeTx, theme, company } = useAppContext();
+  const { t: tr, isAR, user, users, removeTx, theme, company, liveTx, socketStatus } = useAppContext();
   const t = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -61,8 +61,54 @@ export default function Transactions() {
 
   useEffect(() => { setPage(1); }, [typeF, userF, fromF, toF]);
 
-  const refetch = () => {
-    setFetching(true);
+  // ── Live sync for transactions ──
+  useEffect(() => {
+    if (!liveTx) return;
+    
+    setData(prev => {
+      const prevArr = Array.isArray(prev) ? prev : (prev.txs || []);
+      
+      if (liveTx.type === 'delete') {
+        return {
+          ...prev,
+          total: Math.max(0, (prev.total || 0) - 1),
+          txs: prevArr.filter(t => t._id !== liveTx.txId)
+        };
+      }
+      
+      const newTx = { ...liveTx.tx };
+      if (!newTx) return prev;
+      
+      if (newTx.userId && typeof newTx.userId === 'object') {
+        newTx.userName = newTx.userId.name;
+      }
+      
+      // Check filters
+      if (typeF !== 'all' && newTx.type !== typeF) return prev;
+      if (userF && newTx.userId?._id !== userF && newTx.userId !== userF) return prev;
+      
+      if (liveTx.type === 'add') {
+        if (prevArr.some(t => t._id === newTx._id)) return prev;
+        return {
+          ...prev,
+          total: (prev.total || 0) + 1,
+          txs: [newTx, ...prevArr]
+        };
+      }
+      
+      if (liveTx.type === 'update') {
+        return {
+          ...prev,
+          txs: prevArr.map(t => t._id === newTx._id ? newTx : t)
+        };
+      }
+      
+      return prev;
+    });
+  }, [liveTx, typeF, userF]);
+
+  const refetch = (silent = false) => {
+    if (!silent) setFetching(true);
     const params = { page, limit: LIMIT };
     if (typeF !== 'all') params.type = typeF;
     if (userF) params.user = userF;
@@ -71,8 +117,15 @@ export default function Transactions() {
     api.getTxs(params)
       .then(res => setData(res))
       .catch(() => {})
-      .finally(() => setFetching(false));
+      .finally(() => { if (!silent) setFetching(false); });
   };
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => refetch(true), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh, page, typeF, userF, fromF, toF]);
 
   const openRecord = ()    => { setEditTx(null); setTxModal(true); };
   const openEdit   = (tx)  => { setEditTx(tx);   setTxModal(true); };

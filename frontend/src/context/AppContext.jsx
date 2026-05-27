@@ -238,7 +238,21 @@ export const AppProvider = ({ children }) => {
   };
 
   const [lastSync, setLastSync] = useState(null);
+  const [liveTx, setLiveTx] = useState(null);
+  const [liveItem, setLiveItem] = useState(null);
   const [syncing,  setSyncing]  = useState(false);
+  const [isTourActive, setIsTourActive] = useState(false);
+
+  useEffect(() => {
+    const onStart = () => setIsTourActive(true);
+    const onStop = () => setIsTourActive(false);
+    window.addEventListener('tourStarted', onStart);
+    window.addEventListener('tourStopped', onStop);
+    return () => {
+      window.removeEventListener('tourStarted', onStart);
+      window.removeEventListener('tourStopped', onStop);
+    };
+  }, []);
 
   // ── Load all data ─────────────────────────────────────────────────────────
   const loadData = useCallback(async (silent = false) => {
@@ -289,39 +303,103 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => { if (authed) reloadData();  }, [authed]);
 
-  // const socketRef = useRef(null);
+  const socketRef = useRef(null);
+  const [socketStatus, setSocketStatus] = useState('offline');
 
-  // useEffect(() => {
-  //   if (authed && (company?.liveSync ?? true)) {
-  //     const token = localStorage.getItem('nexinv_token');
-  //     const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  //     
-  //     socketRef.current = io(url, { auth: { token } });
-  //     
-  //     const reload = () => loadData(true);
-  //     
-  //     const events = [
-  //       'dept_added', 'dept_updated', 'dept_deleted',
-  //       'cat_added', 'cat_updated', 'cat_deleted',
-  //       'item_added', 'item_updated', 'item_deleted',
-  //       'tx_added', 'tx_updated', 'tx_deleted',
-  //       'user_added', 'user_updated', 'user_deleted'
-  //     ];
-  //     
-  //     events.forEach(e => socketRef.current.on(e, reload));
-  //
-  //     return () => {
-  //       socketRef.current.disconnect();
-  //     };
-  //   }
-  // }, [authed, loadData]);
+  useEffect(() => {
+    if (authed && (company?.liveSync ?? true) && !user?.isDemo && !isTourActive) {
+      setSocketStatus('connecting');
+      const token = localStorage.getItem('nexinv_token');
+      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const socket = io(url, { auth: { token } });
+      socketRef.current = socket;
+      
+      socket.on('connect', () => setSocketStatus('online'));
+      socket.on('disconnect', () => setSocketStatus('offline'));
 
-  // ── Live polling — refresh every 30 s silently ────────────────────────────
-  // useEffect(() => {
-  //   if (!authed || !(company?.fastRefresh ?? true)) return;
-  //   const id = setInterval(() => loadData(true), 30_000);
-  //   return () => clearInterval(id);
-  // }, [authed, loadData, company?.fastRefresh]);
+      // Granular patchers
+      socket.on('item_added', (newItem) => {
+        setItems(prev => [newItem, ...prev]);
+        api.getStats().then(setStats).catch(()=>{});
+        setLiveItem({ type: 'add', item: newItem });
+      });
+      socket.on('item_updated', (updatedItem) => {
+        setItems(prev => prev.map(i => i._id === updatedItem._id ? updatedItem : i));
+        setLiveItem({ type: 'update', item: updatedItem });
+      });
+      socket.on('item_deleted', ({ _id }) => {
+        setItems(prev => prev.filter(i => i._id !== _id));
+        api.getStats().then(setStats).catch(()=>{});
+        setLiveItem({ type: 'delete', itemId: _id });
+      });
+
+      socket.on('user_added', (u) => {
+        setUsers(p => [...p, u]);
+        setLiveTx({ type: 'refresh_users', ts: Date.now() });
+      });
+      socket.on('user_updated', (u) => {
+        setUsers(p => p.map(x => x._id === u._id ? u : x));
+        setLiveTx({ type: 'refresh_users', ts: Date.now() });
+      });
+      socket.on('user_deleted', ({ _id }) => {
+        setUsers(p => p.filter(u => u._id !== _id));
+        setLiveTx({ type: 'refresh_users', ts: Date.now() });
+      });
+
+      socket.on('refresh_sources', () => setLiveTx({ type: 'refresh_sources', ts: Date.now() }));
+      socket.on('refresh_destinations', () => setLiveTx({ type: 'refresh_destinations', ts: Date.now() }));
+      socket.on('refresh_projects', () => setLiveTx({ type: 'refresh_projects', ts: Date.now() }));
+      socket.on('refresh_reasons', () => setLiveTx({ type: 'refresh_reasons', ts: Date.now() }));
+      socket.on('refresh_boms', () => setLiveTx({ type: 'refresh_boms', ts: Date.now() }));
+      socket.on('refresh_warehouses', () => {
+        api.getWarehouses().then(wh => setWarehouses(Array.isArray(wh) ? wh : [])).catch(()=>{});
+        setLiveTx({ type: 'refresh_warehouses', ts: Date.now() });
+      });
+
+      socket.on('tx_added', (tx) => {
+        api.getStats().then(setStats).catch(()=>{});
+        setLastSync(new Date());
+        setLiveTx({ type: 'add', tx });
+      });
+      socket.on('tx_updated', (tx) => {
+        api.getStats().then(setStats).catch(()=>{});
+        setLastSync(new Date());
+        setLiveTx({ type: 'update', tx });
+      });
+      socket.on('tx_deleted', (txId) => {
+        api.getStats().then(setStats).catch(()=>{});
+        setLastSync(new Date());
+        setLiveTx({ type: 'delete', txId });
+      });
+
+      // For less frequent events, just reload specific data
+      const reloadDeptsCats = () => {
+        api.getDepts().then(setDepts).catch(()=>{});
+        api.getCats().then(setCats).catch(()=>{});
+      };
+      
+      ['dept_added', 'dept_updated', 'dept_deleted', 'cat_added', 'cat_updated', 'cat_deleted'].forEach(e => socket.on(e, reloadDeptsCats));
+
+      if (user?.perms?.canManageUsers) {
+        const reloadUsers = () => api.getUsers().then(setUsers).catch(()=>{});
+        ['user_added', 'user_updated', 'user_deleted'].forEach(e => socket.on(e, reloadUsers));
+      }
+
+      return () => {
+        socket.disconnect();
+      };
+    } else {
+      setSocketStatus('offline');
+    }
+  }, [authed, company?.liveSync, user?.perms?.canManageUsers, user?.isDemo, isTourActive]);
+
+  // ── Live polling — fallback refresh every 30 s if socket is offline ───────
+  useEffect(() => {
+    if (!authed || !(company?.fastRefresh ?? true) || socketStatus === 'online' || isTourActive) return;
+    const id = setInterval(() => loadData(true), 30_000);
+    return () => clearInterval(id);
+  }, [authed, loadData, company?.fastRefresh, socketStatus, isTourActive]);
 
   // ── CRUD — Items ──────────────────────────────────────────────────────────
   const saveItem = async (data, id = null) => {
@@ -458,6 +536,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const uploadCompanyStamp = async (file) => {
+    try {
+      const res = await api.uploadCompanyStamp(file);
+      setCompany(prev => ({ ...prev, stamp: res.stamp }));
+      showToast(lang === 'ar' ? 'تم تحديث الختم' : 'Stamp updated successfully', 'success');
+      return res;
+    } catch (err) {
+      showToast(err.message, 'error');
+      throw err;
+    }
+  };
+
   const doUpdateProfile = async (data) => {
     if (user?.isDemo) {
       showToast(lang === 'ar' ? 'غير متاح في وضع التجربة' : 'Action disabled in Demo Mode', 'error');
@@ -478,13 +568,13 @@ export const AppProvider = ({ children }) => {
     user, company, authed, loading,
     lang, setLang, theme, setTheme,
     items, depts, cats, users, stats, warehouses,
-    lastSync, syncing,
+    lastSync, liveTx, liveItem, syncing, socketStatus,
     login, loginDemo, loginWithToken, logout, loadData: reloadData,
     toasts, showToast, removeToast,
     saveItem, removeItem,
     saveTx, removeTx,
     saveUser, removeUser,
-    doUpdateCompany, uploadCompanyLogo, doUpdateProfile,
+    doUpdateCompany, uploadCompanyLogo, uploadCompanyStamp, doUpdateProfile,
     t: T[lang] || T.en,
     isAR: lang === 'ar',
   };

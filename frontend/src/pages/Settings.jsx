@@ -32,6 +32,8 @@ export default function Settings() {
   // Print Settings
   const [headerText, setHeaderText] = useState(company?.printSettings?.headerText || '');
   const [footerText, setFooterText] = useState(company?.printSettings?.footerText || '');
+  const [invoiceHeader, setInvoiceHeader] = useState(company?.printSettings?.invoiceHeader || '');
+  const [invoiceFooter, setInvoiceFooter] = useState(company?.printSettings?.invoiceFooter || '');
   const [paperSize, setPaperSize] = useState(company?.printSettings?.paperSize || 'A4');
   
   const [apiKeys, setApiKeys] = useState(company?.apiKeys || []);
@@ -70,7 +72,7 @@ export default function Settings() {
           },
           googleMapsApiKey,
           apiKeys,
-          printSettings: { headerText, footerText, paperSize }
+          printSettings: { headerText, footerText, invoiceHeader, invoiceFooter, paperSize }
         });
       }
     } catch { /* toast shown */ }
@@ -361,7 +363,6 @@ export default function Settings() {
         {/* --- MODULES & SYNC TAB --- */}
         {activeTab === 'modules' && user?.perms?.canManageUsers && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
-            {/* 
             <div style={{ ...panel, marginTop: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${tok.border}` }}>
                 <Icon name="history" size={16} style={{ color: primary }} />
@@ -386,7 +387,6 @@ export default function Settings() {
                 </label>
               </div>
             </div>
-            */}
 
             <div style={{ ...panel, marginTop: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${tok.border}` }}>
@@ -435,19 +435,40 @@ export default function Settings() {
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  {label(isAR ? 'رأس الصفحة (Header)' : 'Document Header')}
+                  {label(isAR ? 'رأس صفحة التقارير العامة (General Header)' : 'General Document Header')}
                   <div style={{ backgroundColor: '#fff', color: '#000' }}>
                     <ReactQuill theme="snow" value={headerText} onChange={setHeaderText} />
                   </div>
                 </div>
                 
                 <div>
-                  {label(isAR ? 'تذييل الصفحة (Footer)' : 'Document Footer')}
+                  {label(isAR ? 'تذييل التقارير العامة (General Footer)' : 'General Document Footer')}
                   <div style={{ backgroundColor: '#fff', color: '#000' }}>
                     <ReactQuill theme="snow" value={footerText} onChange={setFooterText} />
                   </div>
+                </div>
+
+                <div>
+                  {label(isAR ? 'رأس الفواتير (Invoice Header)' : 'Invoice Header Text (Max 150 chars)')}
+                  <textarea 
+                    value={invoiceHeader} 
+                    onChange={e => setInvoiceHeader(e.target.value)} 
+                    maxLength={150}
+                    style={{ ...fieldInput('ihead'), height: 60, resize: 'vertical' }}
+                    placeholder={isAR ? 'نص بسيط يظهر تحت رقم الفاتورة...' : 'Simple text below invoice number...'}
+                  />
+                </div>
+                
+                <div>
+                  {label(isAR ? 'تذييل الفواتير (Invoice Footer)' : 'Invoice Footer Text (Max 250 chars)')}
+                  <textarea 
+                    value={invoiceFooter} 
+                    onChange={e => setInvoiceFooter(e.target.value)} 
+                    maxLength={250}
+                    style={{ ...fieldInput('ifoot'), height: 60, resize: 'vertical' }}
+                    placeholder={isAR ? 'نص بسيط يظهر في أسفل الفاتورة...' : 'Simple text at the bottom of the invoice...'}
+                  />
                 </div>
               </div>
 

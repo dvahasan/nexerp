@@ -41,7 +41,7 @@ export default function Layout({ children }) {
   const {
     user, company, logout, lang, setLang,
     theme, setTheme, t, isAR,
-    lastSync, syncing, loginWithToken,
+    lastSync, syncing, loginWithToken, socketStatus
   } = useAppContext();
 
   const { startSystemTour, startPageTour } = useTour();
@@ -518,6 +518,28 @@ export default function Layout({ children }) {
           {currentLabel || ''}
         </span>
 
+        {/* Socket Status */}
+        {socketStatus && socketStatus !== 'offline' && (
+          <div
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-sm ml-2"
+            style={{
+              backgroundColor: socketStatus === 'online' ? (theme === 'dark' ? '#064e3b' : '#dcfce7') : (theme === 'dark' ? '#7f1d1d' : '#fee2e2'),
+              borderColor: socketStatus === 'online' ? (theme === 'dark' ? '#047857' : '#bbf7d0') : (theme === 'dark' ? '#b91c1c' : '#fecaca'),
+              color: socketStatus === 'online' ? (theme === 'dark' ? '#a7f3d0' : '#166534') : (theme === 'dark' ? '#fecaca' : '#991b1b'),
+              fontSize: '10px',
+              fontWeight: 600,
+            }}
+          >
+            <div
+              style={{
+                width: 6, height: 6, borderRadius: '50%',
+                backgroundColor: socketStatus === 'online' ? '#22c55e' : '#ef4444',
+                animation: socketStatus === 'connecting' ? 'pulse 1.5s infinite' : 'none'
+              }}
+            />
+            {socketStatus === 'online' ? (isAR ? 'متصل' : 'LIVE') : (isAR ? 'جاري الاتصال...' : 'CONNECTING...')}
+          </div>
+        )}
         {/* ── Smart search bar with dropdown ── */}
         <div
           ref={searchRef}

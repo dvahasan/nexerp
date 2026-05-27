@@ -18,7 +18,7 @@ const defaultBomForm = {
 
 /* ── Main component ───────────────────────────────────────────────────────── */
 export default function BOM() {
-  const { theme, company, isAR, showToast, user, warehouses } = useAppContext();
+  const { theme, company, isAR, showToast, user, warehouses, socketStatus, liveTx, liveItem } = useAppContext();
   const t       = T[theme] || T.light;
   const primary = company?.primaryColor || '#3b82f6';
 
@@ -51,18 +51,41 @@ export default function BOM() {
   const [boms,       setBoms]       = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [fetchError, setFetchError] = useState('');
+  const [silentRefresh, setSilentRefresh] = useState(0);
 
-  const loadBoms = useCallback(async () => {
+  const loadBoms = useCallback(async (silent = false) => {
     setFetchError('');
+    if (!silent) setLoading(true);
     try {
       const data = await api.getBoms();
       setBoms(Array.isArray(data) ? data : []);
     } catch (err) {
-      setFetchError(err.message || 'Failed to load BOMs');
-    } finally { setLoading(false); }
+      setFetchError(err.message || 'Error fetching BOMs');
+    } finally { if (!silent) setLoading(false); }
   }, []);
 
-  useEffect(() => { loadBoms(); }, [loadBoms]);
+  useEffect(() => { loadBoms(silentRefresh > 0); }, [loadBoms, silentRefresh]);
+
+  // ── Polling fallback for fastRefresh ──
+  useEffect(() => {
+    if (socketStatus === 'online' || !(company?.fastRefresh ?? true)) return;
+    const id = setInterval(() => setSilentRefresh(p => p + 1), 30000);
+    return () => clearInterval(id);
+  }, [socketStatus, company?.fastRefresh]);
+
+  // ── Live Sync Refetch ──
+  useEffect(() => {
+    if (liveTx?.type === 'refresh_boms') {
+      setSilentRefresh(p => p + 1);
+    }
+  }, [liveTx]);
+
+  useEffect(() => {
+    if (liveItem) {
+      // Refresh items list when items change globally
+      fetchItems();
+    }
+  }, [liveItem, fetchItems]);
 
   // ── BOM modal state ───────────────────────────────────────────────────────
   const [bomModal, setBomModal] = useState(false);

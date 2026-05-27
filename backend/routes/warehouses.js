@@ -2,6 +2,7 @@ const express  = require('express');
 const { Warehouse, Bin, Item, Transaction } = require('../models');
 const { protect, need }     = require('../middleware/auth');
 const { friendly, statusFor } = require('../errors');
+const { broadcast } = require('../utils/broadcast');
 
 const router = express.Router();
 
@@ -83,6 +84,7 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, need('canManageDepts'), async (req, res) => {
   try {
     const doc = await Warehouse.create({ ...req.body, companyId: req.user.companyId });
+    broadcast(req, 'refresh_warehouses');
     res.status(201).json(doc.toObject({ virtuals: true }));
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -96,6 +98,7 @@ router.put('/:id', protect, need('canManageDepts'), async (req, res) => {
       { returnDocument: 'after', runValidators: true, new: true }
     );
     if (!wh) return res.status(404).json({ message: 'Warehouse not found' });
+    broadcast(req, 'refresh_warehouses');
     res.json(wh.toObject({ virtuals: true }));
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
@@ -107,6 +110,7 @@ router.delete('/:id', protect, need('canManageDepts'), async (req, res) => {
     await Item.updateMany({ warehouseId: req.params.id }, { $unset: { warehouseId: '' } });
     await Bin.deleteMany({ warehouseId: req.params.id, companyId: req.user.companyId });
     await Warehouse.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
+    broadcast(req, 'refresh_warehouses');
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
