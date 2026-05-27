@@ -98,7 +98,7 @@ export default function Categories() {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
+    <div className="tour-categories-page" style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: t.fg }}>
@@ -149,13 +149,13 @@ export default function Categories() {
                 <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: dept.color || primary }} />
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.fg }}>{isAR ? dept.name : (dept.nameEn || dept.name)}</h3>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isAR ? 'right' : 'left' }}>
+              <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isAR ? 'right' : 'left', minWidth: 600 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${t.border}`, backgroundColor: `${t.fg}06` }}>
-                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{isAR ? tr.name : tr.nameEn}</th>
-                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{isAR ? 'الاسم الإنجليزي' : 'Arabic Name'}</th>
-                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', width: 100 }}>{isAR ? 'إجراءات' : 'Actions'}</th>
+                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? tr.name : tr.nameEn}</th>
+                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? 'الاسم الإنجليزي' : 'Arabic Name'}</th>
+                    <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', width: 100, position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? 'إجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>

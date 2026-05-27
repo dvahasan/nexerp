@@ -7,7 +7,8 @@ import { api } from '../api';
 import { T } from '../theme';
 
 const defaultForm = {
-  itemId: '', type: 'IN', qty: '', source: '', dest: '',
+  itemId: '', type: 'IN', qty: '', sourceId: '', destId: '',
+  projectId: '', reasonId: '',
   notes: '', date: new Date().toISOString().slice(0, 16),
   warehouseId: '', binId: '', unitCost: '', landedCost: '',
 };
@@ -26,6 +27,20 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
   const [binsForWh,     setBinsForWh]     = useState([]);
   const [scanLoading,   setScanLoading]   = useState(false);
 
+  const [sources, setSources] = useState([]);
+  const [destinations, setDestinations] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [reasons, setReasons] = useState([]);
+
+  useEffect(() => {
+    if (open) {
+      api.getSources().then(setSources).catch(()=>{});
+      api.getDestinations().then(setDestinations).catch(()=>{});
+      if (company?.features?.projects) api.getProjects().then(setProjects).catch(()=>{});
+      if (company?.features?.reasons) api.getReasons().then(setReasons).catch(()=>{});
+    }
+  }, [open, company?.features]);
+
   // ── Load bins when warehouse selected ─────────────────────────────────────
   useEffect(() => {
     if (!form.warehouseId) { setBinsForWh([]); return; }
@@ -39,8 +54,10 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
         itemId:      editTx.itemId?._id || editTx.itemId || '',
         type:        forcedType || editTx.type || 'IN',
         qty:         editTx.qty    ?? '',
-        source:      editTx.source || '',
-        dest:        editTx.dest   || '',
+        sourceId:    editTx.sourceId?._id || editTx.sourceId || '',
+        destId:      editTx.destId?._id || editTx.destId || '',
+        projectId:   editTx.projectId?._id || editTx.projectId || '',
+        reasonId:    editTx.reasonId?._id || editTx.reasonId || '',
         notes:       editTx.notes  || '',
         date:        editTx.date
           ? new Date(editTx.date).toISOString().slice(0, 16)
@@ -315,27 +332,51 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
             </div>
           </div>
 
-          {/* ── Source / Destination ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              {lbl(tr.source)}
-              <input value={form.source} onChange={e => set('source', e.target.value)}
-                placeholder={isAR ? 'المورد، المستودع...' : 'Supplier, warehouse...'}
-                style={inp('source')} onFocus={() => setFocused('source')} onBlur={() => setFocused('')} />
-            </div>
-            <div>
-              {lbl(tr.destination)}
-              <input value={form.dest} onChange={e => set('dest', e.target.value)}
-                placeholder={isAR ? 'العميل، الفرع...' : 'Customer, branch...'}
-                style={inp('dest')} onFocus={() => setFocused('dest')} onBlur={() => setFocused('')} />
-            </div>
+          {/* ── Source / Destination / Projects / Reasons ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            {(form.type === 'IN' || !forcedType) && (
+              <div>
+                {lbl(tr.source)}
+                <select value={form.sourceId} onChange={e => set('sourceId', e.target.value)} style={inp('sourceId')} onFocus={() => setFocused('sourceId')} onBlur={() => setFocused('')}>
+                  <option value="">{isAR ? '— اختر المصدر —' : '— Select Source —'}</option>
+                  {sources.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+            {(form.type === 'OUT' || !forcedType) && (
+              <div>
+                {lbl(tr.destination)}
+                <select value={form.destId} onChange={e => set('destId', e.target.value)} style={inp('destId')} onFocus={() => setFocused('destId')} onBlur={() => setFocused('')}>
+                  <option value="">{isAR ? '— اختر الوجهة —' : '— Select Destination —'}</option>
+                  {destinations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+                </select>
+              </div>
+            )}
+            {company?.features?.projects && (form.type === 'OUT' || !forcedType) && (
+              <div>
+                {lbl(isAR ? 'المشروع' : 'Project')}
+                <select value={form.projectId} onChange={e => set('projectId', e.target.value)} style={inp('projectId')} onFocus={() => setFocused('projectId')} onBlur={() => setFocused('')}>
+                  <option value="">{isAR ? '— اختر المشروع —' : '— Select Project —'}</option>
+                  {projects.filter(p => p.status === 'ACTIVE').map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
+            {company?.features?.reasons && (
+              <div>
+                {lbl(isAR ? 'سبب الحركة' : 'Reason')}
+                <select value={form.reasonId} onChange={e => set('reasonId', e.target.value)} style={inp('reasonId')} onFocus={() => setFocused('reasonId')} onBlur={() => setFocused('')}>
+                  <option value="">{isAR ? '— اختر السبب —' : '— Select Reason —'}</option>
+                  {reasons.filter(r => r.type === 'BOTH' || r.type === form.type).map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* ── Warehouse & Bin ── */}
           {warehouses.length > 0 && (
             <>
               {sectionDivider(isAR ? 'الموقع' : 'Location')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                 <div>
                   {lbl(isAR ? 'المستودع' : 'Warehouse')}
                   <select
@@ -376,7 +417,7 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
           {(form.type === 'IN' || !forcedType) && (
             <>
               {sectionDivider(isAR ? 'التكلفة' : 'Costing')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                 <div>
                   {lbl(isAR ? 'تكلفة الوحدة' : 'Unit Cost')}
                   <input

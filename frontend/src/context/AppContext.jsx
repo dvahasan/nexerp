@@ -289,39 +289,39 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => { if (authed) reloadData();  }, [authed]);
 
-  const socketRef = useRef(null);
+  // const socketRef = useRef(null);
 
-  useEffect(() => {
-    if (authed) {
-      const token = localStorage.getItem('nexinv_token');
-      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      
-      socketRef.current = io(url, { auth: { token } });
-      
-      const reload = () => loadData(true);
-      
-      const events = [
-        'dept_added', 'dept_updated', 'dept_deleted',
-        'cat_added', 'cat_updated', 'cat_deleted',
-        'item_added', 'item_updated', 'item_deleted',
-        'tx_added', 'tx_updated', 'tx_deleted',
-        'user_added', 'user_updated', 'user_deleted'
-      ];
-      
-      events.forEach(e => socketRef.current.on(e, reload));
-
-      return () => {
-        socketRef.current.disconnect();
-      };
-    }
-  }, [authed, loadData]);
+  // useEffect(() => {
+  //   if (authed && (company?.liveSync ?? true)) {
+  //     const token = localStorage.getItem('nexinv_token');
+  //     const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  //     
+  //     socketRef.current = io(url, { auth: { token } });
+  //     
+  //     const reload = () => loadData(true);
+  //     
+  //     const events = [
+  //       'dept_added', 'dept_updated', 'dept_deleted',
+  //       'cat_added', 'cat_updated', 'cat_deleted',
+  //       'item_added', 'item_updated', 'item_deleted',
+  //       'tx_added', 'tx_updated', 'tx_deleted',
+  //       'user_added', 'user_updated', 'user_deleted'
+  //     ];
+  //     
+  //     events.forEach(e => socketRef.current.on(e, reload));
+  //
+  //     return () => {
+  //       socketRef.current.disconnect();
+  //     };
+  //   }
+  // }, [authed, loadData]);
 
   // ── Live polling — refresh every 30 s silently ────────────────────────────
-  useEffect(() => {
-    if (!authed) return;
-    const id = setInterval(() => loadData(true), 30_000);
-    return () => clearInterval(id);
-  }, [authed, loadData]);
+  // useEffect(() => {
+  //   if (!authed || !(company?.fastRefresh ?? true)) return;
+  //   const id = setInterval(() => loadData(true), 30_000);
+  //   return () => clearInterval(id);
+  // }, [authed, loadData, company?.fastRefresh]);
 
   // ── CRUD — Items ──────────────────────────────────────────────────────────
   const saveItem = async (data, id = null) => {

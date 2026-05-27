@@ -147,7 +147,9 @@ export default function TxPage({ type }) {
     return list;
   })();
 
-  const colCount = canSeeAll ? 7 : 5;
+  const hasProjects = company?.features?.projects;
+  const hasReasons = company?.features?.reasons;
+  const colCount = 5 + (canSeeAll ? 2 : 0) + (hasProjects && !isIN ? 1 : 0) + (hasReasons ? 1 : 0);
 
   // ── style helpers ─────────────────────────────────────────────────────────
   const filterInput = (name, extra = {}) => ({
@@ -167,13 +169,14 @@ export default function TxPage({ type }) {
       fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
       color: t.fgSubtle, textAlign: align, whiteSpace: 'nowrap',
       backgroundColor: t.sunken, borderBottom: `1px solid ${t.border}`,
+      position: 'sticky', top: 0, zIndex: 10,
     }}>
       {label}
     </th>
   );
 
   return (
-    <div className="animate-in fade-in duration-300"
+    <div className="tour-tx-page animate-in fade-in duration-300"
       style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Header ── */}
@@ -436,8 +439,8 @@ export default function TxPage({ type }) {
         backgroundColor: t.elev, border: `1px solid ${t.border}`,
         borderRadius: 4, overflow: 'hidden',
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
               <tr>
                 {th('#', 'center')}
@@ -445,6 +448,8 @@ export default function TxPage({ type }) {
                 {th(isAR ? 'الصنف' : 'Item')}
                 {th(isAR ? 'الكمية' : 'Qty')}
                 {th(isAR ? (isIN ? 'المصدر' : 'الوجهة') : (isIN ? 'Source' : 'Destination'))}
+                {hasProjects && !isIN && th(isAR ? 'المشروع' : 'Project')}
+                {hasReasons && th(isAR ? 'السبب' : 'Reason')}
                 {canSeeAll && th(isAR ? 'المستخدم' : 'User')}
                 {canSeeAll && th(isAR ? 'إجراءات' : 'Actions', 'right')}
               </tr>
@@ -481,6 +486,7 @@ export default function TxPage({ type }) {
                   t={t} isAR={isAR} isIN={isIN}
                   typeColor={typeColor} typeTint={typeTint} typeBorder={typeBorder}
                   primary={primary} canSeeAll={canSeeAll}
+                  hasProjects={hasProjects} hasReasons={hasReasons}
                   onEdit={() => openEdit(tx)}
                   onDelete={() => confirmDel(tx)}
                   tr={tr}
@@ -538,9 +544,9 @@ export default function TxPage({ type }) {
 }
 
 // ── Row sub-component ──────────────────────────────────────────────────────────
-function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, primary, canSeeAll, onEdit, onDelete, tr }) {
+function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, primary, canSeeAll, hasProjects, hasReasons, onEdit, onDelete, tr }) {
   const [hovered, setHovered] = useState(false);
-  const locationField = isIN ? tx.source : tx.dest;
+  const locationField = isIN ? tx.sourceId?.name : tx.destId?.name;
 
   return (
     <tr
@@ -612,6 +618,20 @@ function TxRow({ tx, idx, page, t, isAR, isIN, typeColor, typeTint, typeBorder, 
           </div>
         )}
       </td>
+
+      {/* Project */}
+      {hasProjects && !isIN && (
+        <td style={{ padding: '10px 14px', fontSize: 12, color: t.fg, fontFamily: 'ui-monospace, monospace' }}>
+          {tx.projectId?.name || <span style={{ color: t.fgSubtle }}>—</span>}
+        </td>
+      )}
+
+      {/* Reason */}
+      {hasReasons && (
+        <td style={{ padding: '10px 14px', fontSize: 12, color: t.fg, fontFamily: 'ui-monospace, monospace' }}>
+          {tx.reasonId?.name || <span style={{ color: t.fgSubtle }}>—</span>}
+        </td>
+      )}
 
       {/* User */}
       {canSeeAll && (

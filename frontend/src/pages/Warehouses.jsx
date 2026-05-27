@@ -10,6 +10,7 @@ import Confirm from '../components/Confirm';
 
 const defaultWhForm = {
   code: '', name: '', nameEn: '', location: '',
+  type: 'PHYSICAL', latitude: '', longitude: '', mapLink: '',
   length: '', width: '', height: '',
   usableAreaPct: '0.85', palletFootprint: '0.96',
   capacityUnit: 'pallets', notes: '',
@@ -77,10 +78,17 @@ export default function Warehouses() {
 
   const handleWhSubmit = async (e) => {
     e.preventDefault();
+    if (whForm.mapLink && !whForm.mapLink.includes('<iframe')) {
+      showToast(isAR ? 'الرابط غير صالح. يرجى إدخال كود التضمين (iframe) الصحيح.' : 'Invalid link. Please provide a valid embed iframe HTML.', 'error');
+      return;
+    }
     setWhSaving(true);
     try {
       const payload = {
         ...whForm,
+        latitude:     parseFloat(whForm.latitude)     || undefined,
+        longitude:    parseFloat(whForm.longitude)    || undefined,
+        mapLink:      whForm.mapLink || '',
         length:       parseFloat(whForm.length)       || 0,
         width:        parseFloat(whForm.width)        || 0,
         height:       parseFloat(whForm.height)       || 0,
@@ -176,7 +184,7 @@ export default function Warehouses() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="tour-warehouse-page animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -207,7 +215,7 @@ export default function Warehouses() {
       </div>
 
       {/* ── Content: master list + detail panel ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '320px 1fr' : '1fr', gap: 12 }}>
+      <div className={`grid gap-3 ${selected ? 'grid-cols-1 md:grid-cols-[320px_1fr]' : 'grid-cols-1'}`}>
 
         {/* ── Warehouse list ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -340,7 +348,7 @@ export default function Warehouses() {
 
         {/* ── Detail panel ── */}
         {selected && (
-          <div style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="detail-modal" style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {detailLoading ? (
               <div style={{ padding: '48px 0', textAlign: 'center' }}>
                 <div style={{ width: 22, height: 22, margin: '0 auto', borderRadius: '50%', border: `2px solid ${t.border}`, borderTopColor: primary, animation: 'spin 600ms linear infinite' }} />
@@ -363,6 +371,59 @@ export default function Warehouses() {
                     <Icon name="close" size={14} />
                   </button>
                 </div>
+
+                {/* Map Viewer */}
+                {selected.type === 'PHYSICAL' && (selected.latitude || selected.mapLink) && (
+                  <div style={{ marginTop: 10, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.fg }}>{isAR ? 'الموقع على الخريطة' : 'Map Location'}</div>
+                      <button onClick={() => {
+                        let url = `https://www.google.com/maps/search/?api=1&query=${selected.latitude || 0},${selected.longitude || 0}`;
+                        if (selected.mapLink && selected.mapLink.includes('src=')) {
+                          const match = selected.mapLink.match(/src="([^"]+)"/);
+                          if (match) url = match[1];
+                        } else if (selected.mapLink && !selected.mapLink.includes('<iframe')) {
+                          url = selected.mapLink;
+                        }
+                        if (navigator.share) {
+                          navigator.share({ title: selected.name, url }).catch(()=>{});
+                        } else {
+                          window.open(url, '_blank');
+                        }
+                      }} style={{ height: 26, padding: '0 10px', borderRadius: 4, backgroundColor: 'transparent', color: primary, border: `1px solid ${primary}40`, cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="share" size={12} />
+                        {isAR ? 'مشاركة الموقع' : 'Share Location'}
+                      </button>
+                    </div>
+                    <div style={{ width: '100%', height: 200, borderRadius: 6, overflow: 'hidden', border: `1px solid ${t.border}` }}>
+                      {selected.mapLink && selected.mapLink.includes('embed') ? (
+                         <iframe
+                          width="100%" height="100%" frameBorder="0" style={{ border: 0 }}
+                          src={selected.mapLink.match(/src="([^"]+)"/) ? selected.mapLink.match(/src="([^"]+)"/)[1] : selected.mapLink}
+                          allowFullScreen
+                         />
+                      ) : selected.latitude && selected.longitude ? (
+                        company?.googleMapsApiKey ? (
+                          <iframe
+                            width="100%" height="100%" frameBorder="0" style={{ border: 0 }}
+                            src={`https://www.google.com/maps/embed/v1/place?key=${company.googleMapsApiKey}&q=${selected.latitude},${selected.longitude}`}
+                            allowFullScreen
+                          />
+                        ) : (
+                          <iframe
+                            width="100%" height="100%" frameBorder="0" style={{ border: 0 }}
+                            src={`https://maps.google.com/maps?q=${selected.latitude},${selected.longitude}&z=15&output=embed`}
+                            allowFullScreen
+                          />
+                        )
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: t.sunken, color: t.fgMuted, fontSize: 12, padding: 20, textAlign: 'center' }}>
+                          {isAR ? 'معاينة الخريطة غير متاحة لهذا الرابط. استخدم زر المشاركة أو أدخل إحداثيات خط الطول والعرض.' : 'Map preview not available for this link. Click Share or provide Latitude/Longitude.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Capacity stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -463,23 +524,23 @@ export default function Warehouses() {
                               </span>
                               <span style={{ fontSize: 10, color: t.fgSubtle }}>{zoneBins.length} {isAR ? 'موقع' : 'bins'}</span>
                             </div>
-                            {/* Bins table */}
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                              <thead>
-                                <tr style={{ backgroundColor: t.sunken }}>
-                                  {[
-                                    isAR ? 'الكود'    : 'Code',
-                                    isAR ? 'الممر'    : 'Aisle',
-                                    isAR ? 'المستوى'  : 'Level',
-                                    isAR ? 'السعة'    : 'Cap.',
-                                    '',
-                                  ].map((h, i) => (
-                                    <th key={i} style={{ padding: '4px 8px', textAlign: 'start', fontSize: 9, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}` }}>
-                                      {h}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
+                            <div style={{ overflow: 'auto', maxHeight: 400 }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 400 }}>
+                                <thead>
+                                  <tr>
+                                    {[
+                                      isAR ? 'الكود'    : 'Code',
+                                      isAR ? 'الممر'    : 'Aisle',
+                                      isAR ? 'المستوى'  : 'Level',
+                                      isAR ? 'السعة'    : 'Cap.',
+                                      '',
+                                    ].map((h, i) => (
+                                      <th key={i} style={{ padding: '4px 8px', textAlign: 'start', fontSize: 9, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10 }}>
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
                               <tbody>
                                 {zoneBins.sort((a, b) => a.code.localeCompare(b.code)).map(bin => (
                                   <tr key={bin._id} style={{ borderBottom: `1px solid ${t.border}` }}
@@ -518,7 +579,8 @@ export default function Warehouses() {
                                   </tr>
                                 ))}
                               </tbody>
-                            </table>
+                              </table>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -532,8 +594,8 @@ export default function Warehouses() {
                     <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, marginBottom: 8 }}>
                       {isAR ? 'الأصناف' : 'Items'} ({selected.items.length})
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div style={{ overflow: 'auto', maxHeight: 400 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
                         <thead>
                           <tr>
                             {[
@@ -542,7 +604,7 @@ export default function Warehouses() {
                               isAR ? 'البليت المستخدمة' : 'Pallets',
                               isAR ? 'الموقع' : 'Bin',
                             ].map(h => (
-                              <th key={h} style={{ padding: '6px 10px', textAlign: 'start', fontSize: 10, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken }}>
+                              <th key={h} style={{ padding: '6px 10px', textAlign: 'start', fontSize: 10, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10 }}>
                                 {h}
                               </th>
                             ))}
@@ -582,7 +644,7 @@ export default function Warehouses() {
       {/* ── Warehouse modal ── */}
       <Modal open={whModal} onClose={() => setWhModal(false)} title={editWh ? (isAR ? 'تعديل المستودع' : 'Edit Warehouse') : (isAR ? 'إضافة مستودع' : 'Add Warehouse')}>
         <form onSubmit={handleWhSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             <div>
               {lbl(isAR ? 'الكود' : 'Code', true)}
               <input required value={whForm.code} onChange={e => setWh('code', e.target.value)} placeholder="WH-01" style={inp()} />
@@ -596,10 +658,41 @@ export default function Warehouses() {
             {lbl(isAR ? 'الاسم (إنجليزي)' : 'Name (EN)')}
             <input value={whForm.nameEn} onChange={e => setWh('nameEn', e.target.value)} style={inp()} />
           </div>
-          <div>
-            {lbl(isAR ? 'الموقع' : 'Location')}
-            <input value={whForm.location} onChange={e => setWh('location', e.target.value)} placeholder="Dubai, UAE" style={inp()} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+            <div>
+              {lbl(isAR ? 'الموقع الجغرافي' : 'Location')}
+              <input value={whForm.location} onChange={e => setWh('location', e.target.value)} placeholder="Dubai, UAE" style={inp()} />
+            </div>
+            <div>
+              {lbl(isAR ? 'النوع' : 'Type')}
+              <select value={whForm.type} onChange={e => setWh('type', e.target.value)} style={inp()}>
+                <option value="PHYSICAL">{isAR ? 'فيزيائي (مادي)' : 'PHYSICAL'}</option>
+                <option value="VIRTUAL">{isAR ? 'افتراضي' : 'VIRTUAL'}</option>
+              </select>
+            </div>
           </div>
+
+          {whForm.type === 'PHYSICAL' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+                <div>
+                  {lbl(isAR ? 'خط العرض (Latitude)' : 'Latitude')}
+                  <input type="number" step="any" value={whForm.latitude} onChange={e => setWh('latitude', e.target.value)} placeholder="25.2048" style={inp()} />
+                </div>
+                <div>
+                  {lbl(isAR ? 'خط الطول (Longitude)' : 'Longitude')}
+                  <input type="number" step="any" value={whForm.longitude} onChange={e => setWh('longitude', e.target.value)} placeholder="55.2708" style={inp()} />
+                </div>
+              </div>
+              <div>
+                {lbl(isAR ? 'أو كود تضمين خرائط جوجل (Google Maps Embed)' : 'Or Google Maps Embed HTML')}
+                <input value={whForm.mapLink || ''} onChange={e => setWh('mapLink', e.target.value)} placeholder={isAR ? '<iframe src="...">' : '<iframe src="...">'} style={inp()} />
+                <div style={{ fontSize: 10, color: t.fgMuted, marginTop: 4 }}>
+                  {isAR ? 'طريقة الاستخراج: افتح خريطة جوجل > شارك > تضمين خريطة > انسخ المحتوى والصقه هنا.' : 'How to get: Open Google Maps > Share > Embed a map > Copy HTML and paste here.'}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Dimensions */}
           <div style={{ padding: '10px', backgroundColor: t.sunken, borderRadius: 4 }}>
@@ -618,7 +711,7 @@ export default function Warehouses() {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, marginTop: 8 }}>
               <div>
                 {lbl(isAR ? 'نسبة المساحة الصالحة (%)' : 'Usable Area %')}
                 <input type="number" min="50" max="100" step="1" value={whForm.usableAreaPct} onChange={e => setWh('usableAreaPct', e.target.value)} style={inp()} placeholder="85" />
@@ -663,7 +756,7 @@ export default function Warehouses() {
       {/* ── Bin modal ── */}
       <Modal open={binModal} onClose={() => setBinModal(false)} title={editBin ? (isAR ? 'تعديل الموقع' : 'Edit Bin') : (isAR ? 'إضافة موقع' : 'Add Bin')}>
         <form onSubmit={handleBinSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             <div>
               {lbl(isAR ? 'كود الموقع' : 'Bin Code', true)}
               <input required value={binForm.code} onChange={e => setBin('code', e.target.value)} placeholder="A1-01" style={inp()} />

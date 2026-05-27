@@ -24,6 +24,7 @@ const BomTemplateSchema = new mongoose.Schema(
     // Output (produced) item
     outputItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
     outputQty:    { type: Number, default: 1, min: 0.0001 },
+    projectId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
 
     // Component / input items
     components:   [ComponentSchema],

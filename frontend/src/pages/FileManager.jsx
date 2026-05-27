@@ -110,6 +110,7 @@ export default function FileManager() {
       color: t.fgSubtle, textAlign: 'start',
       borderBottom: `1px solid ${t.border}`,
       backgroundColor: t.sunken, whiteSpace: 'nowrap',
+      position: 'sticky', top: 0, zIndex: 10,
     }}>
       {label}
     </th>
@@ -208,8 +209,8 @@ export default function FileManager() {
         borderRadius: 4,
         overflow: 'hidden',
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
             <thead>
               <tr>
                 {th(isAR ? 'الملف' : 'File')}
@@ -221,6 +222,7 @@ export default function FileManager() {
                   padding: '0 16px', height: 36, width: 44,
                   backgroundColor: t.sunken,
                   borderBottom: `1px solid ${t.border}`,
+                  position: 'sticky', top: 0, zIndex: 10,
                 }} />
               </tr>
             </thead>

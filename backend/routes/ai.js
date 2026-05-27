@@ -12,7 +12,7 @@ router.post("/chat", protect, async (req, res) => {
     if (!prompt) return res.status(400).json({ message: "No prompt provided" });
 
     const cid     = req.user.companyId;
-    const company = await Company.findById(cid).select("name baseCurrency");
+    const company = await Company.findById(cid).select("name baseCurrency industry features");
 
     const [items, txs] = await Promise.all([
       Item.find({ companyId: cid })
@@ -28,6 +28,8 @@ router.post("/chat", protect, async (req, res) => {
 
     const systemPrompt = `You are an intelligent inventory assistant for "${company?.name || "this company"}".
 Currency: ${company?.baseCurrency || "USD"}.
+Industry: ${company?.industry || "Unknown"}.
+Features Enabled: Projects: ${company?.features?.projects ? 'Yes' : 'No'}, Reasons: ${company?.features?.reasons ? 'Yes' : 'No'}.
 Today: ${new Date().toISOString().split("T")[0]}.
 
 CURRENT INVENTORY SNAPSHOT:
@@ -44,6 +46,7 @@ ${items.sort((a, b) => (b.price * b.qty) - (a.price * a.qty)).slice(0, 10).map(i
   `${i.nameEn || i.name}: ${i.qty} units @ ${i.price || 0} = ${((i.price || 0) * (i.qty || 0)).toFixed(2)}`
 ).join("\n")}
 
+You have access to Google Search. You can use it to find the best solutions, trends, or recommendations specific to the company's industry. If the user asks for advice or solutions, search the internet to provide up-to-date and highly relevant business solutions.
 Be concise, helpful, and data-driven. Answer in the same language the user writes in. Use bullet points when listing items.`;
 
     // ── Try Gemini if API key is present ──────────────────────────────────────
@@ -54,6 +57,7 @@ Be concise, helpful, and data-driven. Answer in the same language the user write
 
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
+          tools: [{ googleSearch: {} }],
           contents: systemPrompt + "\n\nConversation history:\n" +
             history.map(m => `User: ${m.user}\nAssistant: ${m.bot}`).join("\n") +
             `\n\nUser: ${prompt}`,

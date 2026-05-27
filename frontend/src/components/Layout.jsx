@@ -7,6 +7,7 @@ import BarcodeScanner from './BarcodeScanner';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../api';
+import { pageTours } from '../config/tourConfig';
 
 // ── Design tokens (DMMAS-inspired) ───────────────────────────────────────────
 const T = {
@@ -155,7 +156,11 @@ export default function Layout({ children }) {
   const classificationItems = [
     ...(canManageDepts ? [
       { path: '/departments', icon: 'company', label: isAR ? 'الأقسام' : 'Departments' },
-      { path: '/categories',  icon: 'category', label: isAR ? 'التصنيفات' : 'Categories' }
+      { path: '/categories',  icon: 'category', label: isAR ? 'التصنيفات' : 'Categories' },
+      { path: '/sources',     icon: 'users',    label: isAR ? 'المصادر' : 'Sources' },
+      { path: '/destinations',icon: 'users',    label: isAR ? 'الوجهات' : 'Destinations' },
+      ...(company?.features?.projects ? [{ path: '/projects', icon: 'company', label: isAR ? 'المشاريع' : 'Projects' }] : []),
+      ...(company?.features?.reasons ? [{ path: '/reasons',  icon: 'chat', label: isAR ? 'الأسباب' : 'Reasons' }] : []),
     ] : [])
   ];
 
@@ -181,19 +186,11 @@ export default function Layout({ children }) {
     ? (currentPage.children?.find(c => c.path === pathname)?.label || currentPage.label)
     : currentPage?.label;
 
-  // ── Sidebar content (shared desktop + mobile) ────────────────────────────
-  const SidebarContent = ({ mobile = false }) => {
-    const wide = !collapsed || mobile;
-    const activeLinkRef = useRef(null);
+  // Disabled active link auto-scroll to prevent annoying scroll resets
 
-    useEffect(() => {
-      const t = setTimeout(() => {
-        if (activeLinkRef.current) {
-          activeLinkRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 50);
-      return () => clearTimeout(t);
-    }, [pathname, drawerOpen, wide]);
+  // ── Sidebar content (shared desktop + mobile) ────────────────────────────
+  const renderSidebar = (mobile = false) => {
+    const wide = !collapsed || mobile;
 
     // Render a single nav item (link or group)
     const renderItem = (item) => {
@@ -261,8 +258,7 @@ export default function Layout({ children }) {
                     <li key={child.path}>
                       <Link
                         to={child.path}
-                        className={`tour-${child.path.replace('/', '')}-link`}
-                        ref={active ? activeLinkRef : null}
+                        className={`tour-${child.path.replace('/', '')}-link tour-sidebar-item`}
                         onClick={() => setDrawerOpen(false)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
@@ -295,8 +291,7 @@ export default function Layout({ children }) {
         <li key={item.path}>
           <Link
             to={item.path}
-            className={`tour-${item.path.replace('/', '')}-link`}
-            ref={active ? activeLinkRef : null}
+            className={`tour-${item.path.replace('/', '')}-link tour-sidebar-item`}
             onClick={() => setDrawerOpen(false)}
             title={!wide ? item.label : undefined}
             style={{
@@ -707,68 +702,84 @@ export default function Layout({ children }) {
         <div className="flex items-center gap-1.5">
 
           {/* Live indicator */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2"
-            style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {syncing
-              ? <div className="w-2.5 h-2.5 rounded-full border border-blue-400 border-t-transparent animate-spin" />
-              : <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16774A' }} />
-            }
-            {syncing ? 'SYNC' : 'LIVE'}
-          </div>
+          {(company?.liveSync ?? true) && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2"
+              style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {syncing
+                ? <div className="w-2.5 h-2.5 rounded-full border border-blue-400 border-t-transparent animate-spin" />
+                : <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: '#16774A' }} />
+              }
+              {syncing ? 'SYNC' : 'LIVE'}
+            </div>
+          )}
 
           {/* Tour Dropdown */}
-          <div ref={tourRef} style={{ position: 'relative' }} className="tour-navbar">
-            <button
-              onClick={() => setTourDropdownOpen(prev => !prev)}
-              style={{
-                ...iconBtn(tok),
-                color: tourDropdownOpen ? primaryColor : tok.fgMuted,
-                position: 'relative',
-              }}
-              title={isAR ? 'بدء جولة إرشادية' : 'Start Tour'}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = primaryColor;
-                e.currentTarget.style.backgroundColor = tok.sunken;
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = tourDropdownOpen ? primaryColor : tok.fgMuted;
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <Icon name="info" size={17} />
-            </button>
-            {tourDropdownOpen && (
-              <div style={{
-                position: 'absolute', top: 32, right: 0, width: 180,
-                backgroundColor: tok.elev, border: `1px solid ${tok.border}`,
-                borderRadius: 4, padding: 4, zIndex: 50,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              }}>
-                <button
-                  onClick={() => { setTourDropdownOpen(false); startPageTour(); }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
-                    fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+          {!!pageTours[location.pathname] && (
+            <div ref={tourRef} style={{ position: 'relative' }} className="tour-navbar">
+              <button
+                onClick={() => setTourDropdownOpen(prev => !prev)}
+                style={{
+                  ...iconBtn(tok),
+                  color: tourDropdownOpen ? primaryColor : tok.fgMuted,
+                  position: 'relative',
+                }}
+                title={isAR ? 'بدء جولة إرشادية' : 'Start Tour'}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = primaryColor;
+                  e.currentTarget.style.backgroundColor = tok.sunken;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = tourDropdownOpen ? primaryColor : tok.fgMuted;
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Icon name="info" size={17} />
+              </button>
+              {tourDropdownOpen && (
+                <div 
+                  ref={el => {
+                    if (el && tourRef.current) {
+                      const buttonRect = tourRef.current.children[0].getBoundingClientRect();
+                      let newLeft = buttonRect.left + (buttonRect.width / 2) - 90;
+                      if (newLeft < 8) newLeft = 8;
+                      if (newLeft + 180 > window.innerWidth - 8) newLeft = window.innerWidth - 180 - 8;
+                      el.style.top = `${buttonRect.bottom + 4}px`;
+                      el.style.left = `${newLeft}px`;
+                    }
                   }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {isAR ? 'جولة في هذه الصفحة' : 'Tour Current Page'}
-                </button>
-                <button
-                  onClick={() => { setTourDropdownOpen(false); startSystemTour(); }}
                   style={{
-                    display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
-                    fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {isAR ? 'جولة في النظام بأكمله' : 'Tour Whole System'}
-                </button>
-              </div>
-            )}
-          </div>
+                    position: 'fixed',
+                    width: 180,
+                    backgroundColor: tok.elev, border: `1px solid ${tok.border}`,
+                    borderRadius: 4, padding: 4, zIndex: 50,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}>
+                  <button
+                    onClick={() => { setTourDropdownOpen(false); startPageTour(); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                      fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {isAR ? 'جولة في هذه الصفحة' : 'Tour Current Page'}
+                  </button>
+                  <button
+                    onClick={() => { setTourDropdownOpen(false); startSystemTour(); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'start', padding: '8px 12px',
+                      fontSize: 12, color: tok.fg, background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = tok.sunken}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {isAR ? 'جولة في النظام بأكمله' : 'Tour Whole System'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Theme toggle */}
           <button className="tour-theme-toggle" onClick={toggleTheme} style={iconBtn(tok)} title="Toggle theme">
@@ -854,7 +865,7 @@ export default function Layout({ children }) {
             overflow: 'hidden',
           }}
         >
-          <SidebarContent />
+          {renderSidebar(false)}
         </aside>
 
         {/* Mobile drawer backdrop */}
@@ -877,7 +888,7 @@ export default function Layout({ children }) {
             transition: 'transform 120ms ease-out',
           }}
         >
-          <SidebarContent mobile />
+          {renderSidebar(true)}
         </aside>
 
         {/* Page content */}

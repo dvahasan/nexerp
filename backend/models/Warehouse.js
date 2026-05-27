@@ -13,6 +13,12 @@ const WarehouseSchema = new mongoose.Schema(
     name:         { type: String, required: true, trim: true },
     nameEn:       { type: String, trim: true },
     location:     { type: String, trim: true },                   // "Dubai, UAE"
+    
+    // ── Location Details ──────────────────────────────────────────────────
+    type:         { type: String, enum: ['PHYSICAL', 'VIRTUAL'], default: 'PHYSICAL' },
+    latitude:     { type: Number },
+    longitude:    { type: Number },
+    mapLink:      { type: String, trim: true },
 
     // ── Dimensional data (all in meters) ──────────────────────────────────
     length:       { type: Number, default: 0, min: 0 },           // m

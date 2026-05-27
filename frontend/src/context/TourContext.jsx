@@ -42,14 +42,6 @@ export function TourProvider({ children }) {
     }
   }, []);
 
-  const removeJoyrideArtifacts = useCallback(() => {
-    document
-      .querySelectorAll('#react-joyride-portal, .react-joyride__overlay, .react-joyride__spotlight')
-      .forEach(el => el.remove());
-    document.body.style.overflow  = '';
-    document.body.style.pointerEvents = '';
-  }, []);
-
   // ── Stop tour ──────────────────────────────────────────────────────────────
   const stopTour = useCallback((markComplete = true) => {
     tourRunIdRef.current += 1;
@@ -58,8 +50,15 @@ export function TourProvider({ children }) {
     setStepIndex(0);
     setSteps([]);
     if (markComplete) localStorage.setItem('nexerp_tour_completed', 'true');
-    setTimeout(removeJoyrideArtifacts, 200);
-  }, [clearTimer, removeJoyrideArtifacts]);
+    
+    // Safety fallback for stuck overlay (CSS only, don't remove DOM nodes)
+    setTimeout(() => {
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+      const overlays = document.querySelectorAll('.react-joyride__overlay');
+      overlays.forEach(el => { el.style.display = 'none'; });
+    }, 200);
+  }, [clearTimer]);
 
   // ── Begin a tour sequence ──────────────────────────────────────────────────
   const beginTour = useCallback((nextSteps, _type) => {
@@ -70,7 +69,6 @@ export function TourProvider({ children }) {
 
     clearTimer();
     setRun(false);
-    removeJoyrideArtifacts();
     setSteps(nextSteps);
     setStepIndex(0);
 
@@ -80,7 +78,7 @@ export function TourProvider({ children }) {
       setRun(true);
       resumeTimerRef.current = null;
     }, 100);
-  }, [clearTimer, removeJoyrideArtifacts]);
+  }, [clearTimer]);
 
   // ── Navigate to a specific step (handles route changes) ───────────────────
   const goToStep = useCallback((targetIndex) => {
@@ -161,8 +159,7 @@ export function TourProvider({ children }) {
   useEffect(() => () => {
     tourRunIdRef.current += 1;
     clearTimer();
-    removeJoyrideArtifacts();
-  }, [clearTimer, removeJoyrideArtifacts]);
+  }, [clearTimer]);
 
   return (
     <TourContext.Provider value={{ startSystemTour, startPageTour, stopTour }}>
@@ -171,29 +168,34 @@ export function TourProvider({ children }) {
         run={run}
         stepIndex={stepIndex}
         continuous
-        onEvent={handleEvent}
-        options={{
-          arrowColor:         tok.elev,
-          backgroundColor:    tok.elev,
-          overlayColor:       'rgba(0,0,0,0.45)',
-          primaryColor,
-          textColor:          tok.fg,
-          zIndex:             10000,
-          overlayClickAction: false,   /* don't close tour on overlay click */
-          targetWaitTimeout:  3000,
-          showProgress:       true,
-          spotlightPadding:   4,
-          skipScroll:         true,    /* v3: was disableScrolling in v2 */
-          skipBeacon:         true,    /* v3: was disableBeacon per-step in v2 */
-          buttons:            ['back', 'primary', 'skip'],
+        showProgress
+        showSkipButton
+        disableOverlayClose
+        disableScrolling={false}
+        disableScrollParentFix
+        floaterProps={{
+          disableAnimation: true,
+          styles: {
+            floater: { filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.1))' }
+          }
         }}
+        onEvent={handleEvent}
         styles={{
+          options: {
+            arrowColor:         tok.elev,
+            backgroundColor:    tok.elev,
+            overlayColor:       'rgba(0,0,0,0.5)',
+            primaryColor:       primaryColor,
+            textColor:          tok.fg,
+            zIndex:             10000,
+          },
           tooltip: {
             fontFamily: 'ui-sans-serif, system-ui, sans-serif',
             borderRadius: 8,
             border: `1px solid ${tok.border}`,
+            maxWidth: 'calc(100vw - 32px)',
           },
-          tooltipContainer: { textAlign: 'left' },
+          tooltipContainer: { textAlign: 'start' },
           buttonNext: { borderRadius: 4, fontWeight: 600 },
           buttonBack: { marginRight: 10, color: tok.fgMuted },
           buttonSkip: { color: tok.fgMuted },

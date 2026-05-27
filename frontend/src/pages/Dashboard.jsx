@@ -156,7 +156,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="tour-global-analytics grid grid-cols-2 lg:grid-cols-5 gap-3">
         {cards.map((c, i) => {
           const Tag      = c.filter ? Link : 'div';
           const linkProps = c.filter

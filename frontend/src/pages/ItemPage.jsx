@@ -684,6 +684,51 @@ export default function ItemPage() {
               {!form.active && <span style={{ padding: '2px 8px', borderRadius: 4, backgroundColor: '#f43f5e22', color: '#f43f5e', fontSize: 11, fontWeight: 700 }}>{tr.discontinued}</span>}
               {form.publish && <span style={{ padding: '2px 8px', borderRadius: 4, backgroundColor: `${primary}22`, color: primary, fontSize: 11, fontWeight: 700 }}>{isAR ? 'منشور' : 'Published'}</span>}
             </div>
+            
+            {/* Gallery (Sidebar) */}
+            {!isNew && images.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: t.fgMuted }}>{isAR ? 'الصور' : 'Gallery'}</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                  {images.map((img, idx) => (
+                    <div key={img.publicId || img.url} style={{
+                      position: 'relative', aspectRatio: '1', borderRadius: 4,
+                      overflow: 'hidden', backgroundColor: t.sunken, border: `1px solid ${t.border}`
+                    }}>
+                      <img src={img.url} alt={`photo-${idx}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attachments (Sidebar) */}
+            {!isNew && attachments.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: t.fgMuted }}>{isAR ? 'الملفات المرفقة' : 'Attachments'}</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {attachments.map(att => (
+                    <a key={att.publicId} href={att.url} target="_blank" rel="noreferrer" style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 8px', borderRadius: 4, textDecoration: 'none',
+                      border: `1px solid ${t.border}`, backgroundColor: t.sunken,
+                    }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>📄</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: t.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {att.name || 'document.pdf'}
+                        </div>
+                        {att.size > 0 && (
+                          <div style={{ fontSize: 9, color: t.fgSubtle, fontFamily: 'ui-monospace, monospace' }}>
+                            {fmt(att.size)}
+                          </div>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* MAIN TABS AREA */}
@@ -909,7 +954,7 @@ export default function ItemPage() {
                 <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: t.fgSubtle, marginBottom: 10 }}>
                   📦 {isAR ? 'موقع التخزين' : 'Storage Location'}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
                   {/* Warehouse picker */}
                   <div>
                     {lbl(isAR ? 'المستودع' : 'Warehouse')}
@@ -1311,7 +1356,7 @@ export default function ItemPage() {
             </div>
 
             {/* Extra standard fields */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
               <div>
                 {lbl(isAR ? 'العملة' : 'Currency')}
                 <input value={form.currency} onChange={e => set('currency', e.target.value)}

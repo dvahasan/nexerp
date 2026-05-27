@@ -11,7 +11,7 @@ import ItemPicker from '../components/ItemPicker';
 /* ── Default form ─────────────────────────────────────────────────────────── */
 const defaultBomForm = {
   name: '', nameEn: '',
-  outputItemId: '', outputQty: '1',
+  outputItemId: '', outputQty: '1', projectId: '',
   components: [],
   notes: '',
 };
@@ -39,6 +39,13 @@ export default function BOM() {
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  const [projects, setProjects] = useState([]);
+  useEffect(() => {
+    if (company?.features?.projects) {
+      api.getProjects().then(setProjects).catch(() => {});
+    }
+  }, [company?.features?.projects]);
 
   // ── BOMs ──────────────────────────────────────────────────────────────────
   const [boms,       setBoms]       = useState([]);
@@ -75,6 +82,12 @@ export default function BOM() {
   const [produceWh,   setProduceWh]   = useState('');
   const [producing,   setProducing]   = useState(false);
 
+  // ── History state ─────────────────────────────────────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyBom,  setHistoryBom]  = useState(null);
+  const [bomHistory,  setBomHistory]  = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   // ── Open / close modal ────────────────────────────────────────────────────
   const openAdd = () => {
     setEditBom(null);
@@ -89,6 +102,7 @@ export default function BOM() {
       nameEn:       bom.nameEn || '',
       outputItemId: bom.outputItemId?._id || '',
       outputQty:    String(bom.outputQty || 1),
+      projectId:    bom.projectId?._id || bom.projectId || '',
       components:   (bom.components || []).map(c => ({
         itemId: c.itemId?._id || '',
         qty:    String(c.qty || 1),
@@ -130,6 +144,7 @@ export default function BOM() {
     try {
       const payload = {
         ...bomForm,
+        projectId:  bomForm.projectId || undefined,
         outputQty:  parseFloat(bomForm.outputQty) || 1,
         components: validComps.map(c => ({
           itemId: c.itemId,
@@ -150,6 +165,87 @@ export default function BOM() {
     } catch (err) {
       showToast(err.message || 'Error', 'error');
     } finally { setSaving(false); }
+  };
+
+  // ── History & Print ───────────────────────────────────────────────────────
+  const openHistory = async (bom) => {
+    setHistoryBom(bom);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const data = await api.getBomHistory(bom._id);
+      setBomHistory(Array.isArray(data) ? data : []);
+    } catch {
+      setBomHistory([]); // If it fails to fetch, just show "No history yet"
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const printBom = (bom) => {
+    const printWindow = window.open('', '_blank');
+    const header = company?.printSettings?.headerText || company?.name || 'NexERP';
+    const footer = company?.printSettings?.footerText || '';
+    const logoUrl = company?.logoUrl || '';
+
+    const content = `
+      <html>
+        <head>
+          <title>${bom.name || bom.nameEn}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; }
+            .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo { max-height: 60px; margin-bottom: 10px; }
+            .title { font-size: 24px; font-weight: bold; margin: 0; }
+            .subtitle { font-size: 14px; color: #6b7280; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #d1d5db; padding: 10px; text-align: ${isAR ? 'right' : 'left'}; }
+            th { background-color: #f3f4f6; }
+            .footer { position: fixed; bottom: 20px; left: 0; width: 100%; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+          </style>
+        </head>
+        <body dir="${isAR ? 'rtl' : 'ltr'}">
+          <div class="header">
+            ${logoUrl ? `<img src="${logoUrl}" class="logo" />` : ''}
+            <div class="title">${header}</div>
+            <div class="subtitle">${isAR ? 'وصفة إنتاج' : 'Bill of Materials'}: ${bom.name}</div>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <strong>${isAR ? 'المنتج النهائي:' : 'Finished Product:'}</strong> ${bom.outputQty} × ${bom.outputItemId?.name || ''}
+            ${bom.projectId ? `<br><strong>${isAR ? 'المشروع:' : 'Project:'}</strong> ${bom.projectId.name}` : ''}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>${isAR ? 'المكون' : 'Component'}</th>
+                <th>${isAR ? 'الكمية المطلوبة' : 'Required Qty'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bom.components.map(c => `
+                <tr>
+                  <td>${c.itemId?.name || ''}</td>
+                  <td>${c.qty}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            ${footer}<br>
+            Printed on: ${new Date().toLocaleString()}
+          </div>
+          <script>
+            window.onload = () => { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.open();
+    printWindow.document.write(content);
+    printWindow.document.close();
   };
 
   // ── Delete ────────────────────────────────────────────────────────────────
@@ -214,7 +310,7 @@ export default function BOM() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="tour-bom-page animate-in fade-in duration-300" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -275,7 +371,7 @@ export default function BOM() {
             return (
               <div key={bom._id} style={{ backgroundColor: t.elev, border: `1px solid ${t.border}`, borderRadius: 4, padding: 16 }}>
                 {/* BOM header row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: t.fg }}>
                       {isAR ? bom.name : (bom.nameEn || bom.name)}
@@ -295,7 +391,7 @@ export default function BOM() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
                       onClick={() => openProduce(bom)}
                       title={canProduce ? (isAR ? 'تنفيذ الإنتاج' : 'Execute Production') : (isAR ? 'مكونات غير كافية' : 'Insufficient components')}
@@ -309,6 +405,20 @@ export default function BOM() {
                       }}
                     >
                       ▶ {isAR ? 'تشغيل' : 'Produce'}
+                    </button>
+                    <button onClick={() => openHistory(bom)}
+                      style={{ height: 30, padding: '0 10px', borderRadius: 4, border: `1px solid ${t.border}`, background: 'transparent', cursor: 'pointer', color: primary, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.sunken; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                      <Icon name="inventory" size={14} />
+                      {isAR ? 'السجل' : 'History'}
+                    </button>
+                    <button onClick={() => printBom(bom)}
+                      style={{ height: 30, padding: '0 10px', borderRadius: 4, border: `1px solid ${t.border}`, background: 'transparent', cursor: 'pointer', color: t.fgSubtle, fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = t.sunken; e.currentTarget.style.color = t.fg; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = t.fgSubtle; }}>
+                      <Icon name="document" size={14} />
+                      {isAR ? 'طباعة' : 'Print'}
                     </button>
                     {canEdit && (
                       <button onClick={() => openEdit(bom)}
@@ -330,8 +440,8 @@ export default function BOM() {
                 </div>
 
                 {/* Components table */}
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <div style={{ overflow: 'auto', maxHeight: 300 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 400 }}>
                     <thead>
                       <tr>
                         {[
@@ -340,7 +450,7 @@ export default function BOM() {
                           isAR ? 'المخزون الحالي'  : 'In Stock',
                           isAR ? 'الحالة'          : 'Status',
                         ].map(h => (
-                          <th key={h} style={{ padding: '5px 10px', textAlign: 'start', fontSize: 10, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken }}>
+                          <th key={h} style={{ padding: '5px 10px', textAlign: 'start', fontSize: 10, fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, borderBottom: `1px solid ${t.border}`, backgroundColor: t.sunken, position: 'sticky', top: 0, zIndex: 10 }}>
                             {h}
                           </th>
                         ))}
@@ -390,7 +500,7 @@ export default function BOM() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Names */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: company?.features?.projects ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10 }}>
             <div>
               {lbl(isAR ? 'الاسم (عربي) *' : 'Name (AR) *')}
               <input required value={bomForm.name} onChange={e => setBomForm(p => ({ ...p, name: e.target.value }))} style={inp()} />
@@ -399,10 +509,21 @@ export default function BOM() {
               {lbl(isAR ? 'الاسم (إنجليزي)' : 'Name (EN)')}
               <input value={bomForm.nameEn} onChange={e => setBomForm(p => ({ ...p, nameEn: e.target.value }))} style={inp()} />
             </div>
+            {company?.features?.projects && (
+              <div>
+                {lbl(isAR ? 'المشروع المرتبط' : 'Linked Project')}
+                <select value={bomForm.projectId} onChange={e => setBomForm(p => ({ ...p, projectId: e.target.value }))} style={inp()}>
+                  <option value="">{isAR ? '— عام (بدون مشروع) —' : '— General (No Project) —'}</option>
+                  {projects.filter(p => p.status === 'ACTIVE').map(p => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Output item */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
             <div>
               {lbl(isAR ? 'الصنف المنتج (Output Item) *' : 'Output Item (Finished Product) *')}
               {itemsLoading ? (
@@ -611,6 +732,51 @@ export default function BOM() {
               </button>
             </div>
           </form>
+        )}
+      </Modal>
+
+      {/* ── History Modal ──────────────────────────────────────────────────────── */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title={isAR ? 'سجل الإنتاج' : 'Production History'}>
+        {historyLoading ? (
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <div style={{ width: 22, height: 22, margin: '0 auto', borderRadius: '50%', border: `2px solid ${t.border}`, borderTopColor: primary, animation: 'spin 600ms linear infinite' }} />
+          </div>
+        ) : bomHistory.length === 0 ? (
+          <div style={{ padding: '30px', textAlign: 'center', color: t.fgMuted, fontSize: 13 }}>
+            {isAR ? 'لا يوجد سجل إنتاج.' : 'No production history yet.'}
+          </div>
+        ) : (
+          <div style={{ maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {bomHistory.map(h => (
+              <div key={h._id} style={{ padding: 12, border: `1px solid ${t.border}`, borderRadius: 4, backgroundColor: t.sunken }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <strong style={{ fontSize: 13, color: t.fg }}>
+                    {isAR ? 'إنتاج:' : 'Produced:'} {h.qtyProduced} × {h.outputItemId?.name || ''}
+                  </strong>
+                  <span style={{ fontSize: 11, color: t.fgSubtle }}>
+                    {new Date(h.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: t.fgMuted, marginBottom: 8 }}>
+                  {isAR ? 'بواسطة:' : 'By:'} {h.userId?.name || '—'}
+                  {h.projectId && <span style={{ marginLeft: 8 }}>| {isAR ? 'المشروع:' : 'Project:'} {h.projectId?.name}</span>}
+                </div>
+                <div style={{ fontSize: 11, color: t.fg, padding: '6px 8px', backgroundColor: t.canvas, borderRadius: 4, border: `1px solid ${t.border}` }}>
+                  <div style={{ marginBottom: 4, fontWeight: 600, color: t.fgSubtle }}>{isAR ? 'المكونات المستخدمة:' : 'Components Used:'}</div>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {h.componentsUsed.map((c, i) => (
+                      <li key={i}>{c.qty} × {c.itemId?.name || '—'}</li>
+                    ))}
+                  </ul>
+                </div>
+                {h.notes && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: t.fgSubtle, fontStyle: 'italic' }}>
+                    "{h.notes}"
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </Modal>
 

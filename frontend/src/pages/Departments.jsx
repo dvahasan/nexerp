@@ -74,7 +74,7 @@ export default function Departments() {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
+    <div className="tour-departments-page" style={{ maxWidth: 900, margin: '0 auto', padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: t.fg }}>
@@ -96,20 +96,20 @@ export default function Departments() {
       </div>
 
       <div style={{
-        backgroundColor: t.canvas, borderRadius: 4, border: `1px solid ${t.border}`, overflowX: 'auto'
+        backgroundColor: t.canvas, borderRadius: 4, border: `1px solid ${t.border}`, overflow: 'auto', maxHeight: 'calc(100vh - 220px)'
       }}>
         {depts.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: t.fgMuted }}>
             {isAR ? 'لا توجد أقسام حالياً' : 'No departments found'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isAR ? 'right' : 'left' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isAR ? 'right' : 'left', minWidth: 600 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${t.border}`, backgroundColor: `${t.fg}06` }}>
-                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{isAR ? 'اللون' : 'Color'}</th>
-                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{isAR ? tr.name : tr.nameEn}</th>
-                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>{isAR ? 'الاسم الإنجليزي' : 'Arabic Name'}</th>
-                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', width: 100 }}>{isAR ? 'إجراءات' : 'Actions'}</th>
+                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? 'اللون' : 'Color'}</th>
+                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? tr.name : tr.nameEn}</th>
+                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? 'الاسم الإنجليزي' : 'Arabic Name'}</th>
+                <th style={{ padding: '12px 16px', color: t.fgMuted, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', width: 100, position: 'sticky', top: 0, zIndex: 10, backgroundColor: t.sunken }}>{isAR ? 'إجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody>

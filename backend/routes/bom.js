@@ -1,6 +1,6 @@
 const express   = require('express');
 const mongoose  = require('mongoose');
-const { BomTemplate, Item, Transaction } = require('../models');
+const { BomTemplate, Item, Transaction, BomProduction } = require('../models');
 const { protect, need }       = require('../middleware/auth');
 const { friendly, statusFor } = require('../errors');
 
@@ -61,6 +61,19 @@ router.delete('/:id', protect, need('canDelete'), async (req, res) => {
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
+// ── GET /api/bom/:id/production-history ──────────────────────────────────────
+router.get('/:id/production-history', protect, async (req, res) => {
+  try {
+    const history = await BomProduction.find({ bomId: req.params.id, companyId: req.user.companyId })
+      .populate('userId', 'name')
+      .populate('projectId', 'name')
+      .populate('outputItemId', 'name nameEn sku')
+      .populate('componentsUsed.itemId', 'name nameEn')
+      .sort({ createdAt: -1 });
+    res.json(history);
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
 // ── POST /api/bom/:id/produce ─────────────────────────────────────────────────
 // Execute production: consume components (StockOut) → create output (StockIn).
 // Body: { qty: number, warehouseId?, notes? }
@@ -115,12 +128,39 @@ router.post('/:id/produce', protect, need('canTxIn'), async (req, res) => {
       ...(warehouseId ? { warehouseId } : {}),
     }], { session: dbSession });
 
+    // 3. Log to BomProduction History
+    const prodLog = await BomProduction.create([{
+      companyId: cid,
+      bomId: bom._id,
+      userId: req.user._id,
+      projectId: bom.projectId, // Inherit project from BOM if assigned
+      qtyProduced: outputQtyTotal,
+      outputItemId: outputItem._id,
+      componentsUsed: bom.components.map(c => ({ itemId: c.itemId._id, qty: c.qty * runQty })),
+      notes: notes
+    }], { session: dbSession });
+
     await dbSession.commitTransaction();
-    res.status(201).json({ success: true, produced: outputQtyTotal, inTx, outTxs });
+    res.status(201).json({ success: true, produced: outputQtyTotal, prodLog: prodLog[0], inTx, outTxs });
   } catch (e) {
     await dbSession.abortTransaction();
     res.status(statusFor(e)).json({ message: friendly(e) });
   } finally { dbSession.endSession(); }
+});
+
+// ── GET /api/bom/:id/production-history ──────────────────────────────────────
+router.get('/:id/production-history', protect, async (req, res) => {
+  try {
+    const history = await BomProduction.find({ bomId: req.params.id, companyId: req.user.companyId })
+      .populate('userId', 'name nameEn')
+      .populate('projectId', 'name')
+      .populate('outputItemId', 'name nameEn')
+      .populate('componentsUsed.itemId', 'name nameEn')
+      .sort({ createdAt: -1 });
+    res.json(history);
+  } catch (e) {
+    res.status(statusFor(e)).json({ message: friendly(e) });
+  }
 });
 
 module.exports = router;
