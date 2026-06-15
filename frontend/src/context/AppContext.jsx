@@ -171,6 +171,9 @@ export const AppProvider = ({ children }) => {
         .hover\\:bg-blue-500:hover, .hover\\:bg-blue-600:hover { background-color: var(--primary) !important; color: var(--primary-text) !important; filter: brightness(0.9); }
         .hover\\:text-blue-500:hover, .hover\\:text-blue-600:hover { color: var(--primary) !important; filter: brightness(0.9); }
       `;
+    } else {
+      const style = document.getElementById('dynamic-theme');
+      if (style) style.remove();
     }
   }, [company?.primaryColor]);
 
@@ -307,12 +310,15 @@ export const AppProvider = ({ children }) => {
   const [socketStatus, setSocketStatus] = useState('offline');
 
   useEffect(() => {
-    if (authed && (company?.liveSync ?? true) && !user?.isDemo && !isTourActive) {
+    if (authed && company && (company.liveSync ?? true) && !user?.isDemo && !isTourActive) {
       setSocketStatus('connecting');
       const token = localStorage.getItem('nexinv_token');
       const url = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       
-      const socket = io(url, { auth: { token } });
+      const socket = io(url, { 
+        auth: { token },
+        transports: ['websocket']
+      });
       socketRef.current = socket;
       
       socket.on('connect', () => setSocketStatus('online'));
@@ -396,7 +402,7 @@ export const AppProvider = ({ children }) => {
 
   // ── Live polling — fallback refresh every 30 s if socket is offline ───────
   useEffect(() => {
-    if (!authed || !(company?.fastRefresh ?? true) || socketStatus === 'online' || isTourActive) return;
+    if (!authed || !company || !(company.fastRefresh ?? true) || socketStatus === 'online' || isTourActive) return;
     const id = setInterval(() => loadData(true), 30_000);
     return () => clearInterval(id);
   }, [authed, loadData, company?.fastRefresh, socketStatus, isTourActive]);

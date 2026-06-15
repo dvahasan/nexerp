@@ -42,6 +42,7 @@ const destRoutes         = require("./routes/destinations");
 const projectRoutes      = require("./routes/projects");
 const reasonRoutes       = require("./routes/reasons");
 const publicApiRoutes    = require("./routes/publicApi");
+const developerRoutes    = require("./routes/developer");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
@@ -70,7 +71,7 @@ io.on("connection", (socket) => {
 });
 
 // ── Global middleware ─────────────────────────────────────────────────────────
-app.use(cors({ origin: "*", credentials: true }));
+app.use(cors({ origin: function (origin, callback) { callback(null, true); }, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 
 // Prevent aggressive caching of GET requests (e.g. by Edge/Chrome)
@@ -79,6 +80,56 @@ app.use((req, res, next) => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   res.setHeader("Surrogate-Control", "no-store");
+  next();
+});
+
+// ── Global Action Tracking Middleware ─────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  // Only track mutating actions (POST, PUT, DELETE) and skip dev/public routes
+  if (['POST', 'PUT', 'DELETE'].includes(req.method) && !req.path.startsWith('/api/dev')) {
+    res.on('finish', async () => {
+      try {
+        const ActionLog = require('./models/ActionLog');
+        
+        // Attempt to extract user/company info if available
+        let userId = null;
+        let companyId = null;
+        
+        if (req.user) {
+          userId = req.user._id;
+          companyId = req.user.companyId;
+        } else if (req.body && req.body.username && req.path.includes('/login')) {
+          // If it's a login attempt, try to find the user
+          const User = require('./models/User');
+          const u = await User.findOne({ username: req.body.username.toLowerCase() });
+          if (u) {
+            userId = u._id;
+            companyId = u.companyId;
+          }
+        }
+
+        // Sanitize body (remove passwords)
+        const safeBody = { ...req.body };
+        if (safeBody.password) safeBody.password = '***';
+
+        await ActionLog.create({
+          userId,
+          companyId,
+          action: `${req.method} ${req.path}`,
+          method: req.method,
+          path: req.path,
+          body: safeBody,
+          ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          userAgent: req.headers['user-agent'] || '',
+          statusCode: res.statusCode,
+          durationMs: Date.now() - start
+        });
+      } catch (e) {
+        console.error("ActionLog Error:", e.message);
+      }
+    });
+  }
   next();
 });
 
@@ -106,6 +157,7 @@ app.use("/api/destinations", destRoutes);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/reasons",      reasonRoutes);
 app.use("/api/public",       publicApiRoutes);
+app.use("/api/dev",          developerRoutes);
 
 // ── Database connection & seed ────────────────────────────────────────────────
 connectDB(seedData);

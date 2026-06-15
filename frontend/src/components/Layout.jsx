@@ -519,7 +519,7 @@ export default function Layout({ children }) {
         </span>
 
         {/* Socket Status */}
-        {socketStatus && socketStatus !== 'offline' && (
+        {socketStatus === 'online' && (
           <div
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-sm ml-2"
             style={{

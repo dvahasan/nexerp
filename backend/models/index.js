@@ -23,10 +23,13 @@ const Ledger            = require("./Ledger");
 const ItemStockLocation = require("./ItemStockLocation");
 const Reservation       = require("./Reservation");
 const Alert             = require("./Alert");
+const DemoVisit         = require("./DemoVisit");
+const ActionLog         = require("./ActionLog");
 
 module.exports = { 
   Company, Department, Category, User, Item, Transaction, 
   Setting, File, Warehouse, Bin, BomTemplate, BomProduction,
   Source, Destination, Project, Reason,
-  Ledger, ItemStockLocation, Reservation, Alert
+  Ledger, ItemStockLocation, Reservation, Alert, DemoVisit,
+  ActionLog
 };

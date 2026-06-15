@@ -9,6 +9,14 @@ export default function DemoSelect() {
   const [loading, setLoading] = useState(null);
 
   const handleSelect = async (type) => {
+    try {
+      await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/dev/track-demo` : "http://localhost:5000/api/dev/track-demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type })
+      }).catch(() => {}); // silently fail if backend is down
+    } catch(e) {}
+
     setLoading(type);
     try {
       await loginDemo(type);
