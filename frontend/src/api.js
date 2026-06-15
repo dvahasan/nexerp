@@ -1,6 +1,7 @@
 import { getMockDataForPath } from './demoData';
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+export const apiUrl = BASE;
 
 function token() { return localStorage.getItem("nexinv_token"); }
 
@@ -136,6 +137,7 @@ export const api = {
 
   // Settings & Company
   getSettings:    ()  => req("GET", "/settings"),
+  exportSettings:    ()          => req("GET",    "/settings/export"),
   updateSettings: (d) => req("PUT", "/settings", d),
   updateCompany:  (d) => req("PUT", "/company", d),
   uploadCompanyLogo:(file)=> { const fd = new FormData(); fd.append("logo", file); return req("POST", `/company/logo`, fd, true); },

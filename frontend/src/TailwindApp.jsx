@@ -20,6 +20,7 @@ const Permissions = lazy(() => import('./pages/Permissions'));
 const CompanyProfile = lazy(() => import('./pages/CompanyProfile'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 const FileManager = lazy(() => import('./pages/FileManager'));
+const DeveloperDashboard = lazy(() => import('./pages/DeveloperDashboard'));
 const EnterpriseDashboard = lazy(() => import('./pages/EnterpriseDashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Import = lazy(() => import('./pages/Import'));
@@ -140,7 +141,10 @@ function AppRoutes() {
         <Route path="/"             element={<Guest><Landing /></Guest>} />
         <Route path="/demo-select"  element={<Guest><DemoSelect /></Guest>} />
         <Route path="/login"        element={<Guest><Login /></Guest>} />
-        <Route path="/register" element={<Guest><Register /></Guest>} />
+        <Route path="/register"     element={<Guest><Register /></Guest>} />
+        
+        {/* ── Developer ───────────────────────────────────────── */}
+        <Route path="/dev-dashboard" element={<DeveloperDashboard />} />
 
         {/* ── Protected (inside Layout) ────────────────────── */}
         <Route path="/dashboard"    element={<Protected><Layout><Dashboard /></Layout></Protected>} />

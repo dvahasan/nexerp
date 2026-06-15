@@ -71,6 +71,16 @@ export default function Warehouses() {
     return () => clearInterval(id);
   }, [socketStatus, company?.fastRefresh]);
 
+  // ── Fetch selected warehouse detail ───────────────────────────────────────
+  const loadDetail = useCallback(async (id) => {
+    setDetailLoading(true);
+    try {
+      const data = await api.getWarehouse(id);
+      setSelected(data);
+    } catch { setSelected(null); }
+    finally { setDetailLoading(false); }
+  }, []);
+
   // ── Live Sync Refetch ──
   useEffect(() => {
     if (liveTx?.type === 'refresh_warehouses') {
@@ -81,16 +91,6 @@ export default function Warehouses() {
       }
     }
   }, [liveTx, selected, loadDetail]);
-
-  // ── Fetch selected warehouse detail ───────────────────────────────────────
-  const loadDetail = useCallback(async (id) => {
-    setDetailLoading(true);
-    try {
-      const data = await api.getWarehouse(id);
-      setSelected(data);
-    } catch { setSelected(null); }
-    finally { setDetailLoading(false); }
-  }, []);
 
   // ── Warehouse CRUD ────────────────────────────────────────────────────────
   const openAddWh  = ()       => { setEditWh(null); setWhForm({ ...defaultWhForm }); setWhModal(true); };

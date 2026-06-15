@@ -765,40 +765,87 @@ export default function BOM() {
             <div style={{ width: 22, height: 22, margin: '0 auto', borderRadius: '50%', border: `2px solid ${t.border}`, borderTopColor: primary, animation: 'spin 600ms linear infinite' }} />
           </div>
         ) : bomHistory.length === 0 ? (
-          <div style={{ padding: '30px', textAlign: 'center', color: t.fgMuted, fontSize: 13 }}>
-            {isAR ? 'لا يوجد سجل إنتاج.' : 'No production history yet.'}
+          <div style={{ padding: '40px', textAlign: 'center', color: t.fgMuted, fontSize: 13, backgroundColor: t.sunken, borderRadius: 6, border: `1px dashed ${t.border}` }}>
+            <div style={{ fontSize: 24, marginBottom: 8, opacity: 0.5 }}>📭</div>
+            {isAR ? 'لا يوجد سجل إنتاج حتى الآن.' : 'No production history yet.'}
           </div>
         ) : (
-          <div style={{ maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {bomHistory.map(h => (
-              <div key={h._id} style={{ padding: 12, border: `1px solid ${t.border}`, borderRadius: 4, backgroundColor: t.sunken }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <strong style={{ fontSize: 13, color: t.fg }}>
-                    {isAR ? 'إنتاج:' : 'Produced:'} {h.qtyProduced} × {h.outputItemId?.name || ''}
-                  </strong>
-                  <span style={{ fontSize: 11, color: t.fgSubtle }}>
-                    {new Date(h.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, color: t.fgMuted, marginBottom: 8 }}>
-                  {isAR ? 'بواسطة:' : 'By:'} {h.userId?.name || '—'}
-                  {h.projectId && <span style={{ marginLeft: 8 }}>| {isAR ? 'المشروع:' : 'Project:'} {h.projectId?.name}</span>}
-                </div>
-                <div style={{ fontSize: 11, color: t.fg, padding: '6px 8px', backgroundColor: t.canvas, borderRadius: 4, border: `1px solid ${t.border}` }}>
-                  <div style={{ marginBottom: 4, fontWeight: 600, color: t.fgSubtle }}>{isAR ? 'المكونات المستخدمة:' : 'Components Used:'}</div>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    {h.componentsUsed.map((c, i) => (
-                      <li key={i}>{c.qty} × {c.itemId?.name || '—'}</li>
-                    ))}
-                  </ul>
-                </div>
-                {h.notes && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: t.fgSubtle, fontStyle: 'italic' }}>
-                    "{h.notes}"
+          <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {bomHistory.map(h => (
+                <div key={h._id} style={{ 
+                  padding: 16, border: `1px solid ${t.border}`, borderRadius: 6, 
+                  backgroundColor: t.elev, boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                  {/* Header Row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${t.border}` }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <div style={{ 
+                          padding: '2px 8px', borderRadius: 12, backgroundColor: `${primary}15`, 
+                          color: primary, fontSize: 11, fontWeight: 700, fontFamily: 'ui-monospace, monospace' 
+                        }}>
+                          {isAR ? 'إنتاج' : 'PRODUCED'}
+                        </div>
+                        <strong style={{ fontSize: 14, color: t.fg, fontWeight: 800 }}>
+                          {h.qtyProduced} × {h.outputItemId?.name || ''}
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: 12, color: t.fgMuted, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="user" size={12} /> {h.userId?.name || '—'}
+                        {h.projectId && (
+                          <>
+                            <span style={{ color: t.border }}>|</span>
+                            <Icon name="company" size={12} /> {h.projectId?.name}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 12, color: t.fg, fontWeight: 600 }}>
+                        {new Date(h.createdAt).toLocaleDateString()}
+                      </div>
+                      <div style={{ fontSize: 11, color: t.fgSubtle }}>
+                        {new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Components Used Table */}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: t.fgSubtle, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                      {isAR ? 'المكونات المستهلكة' : 'Components Consumed'}
+                    </div>
+                    <div style={{ borderRadius: 4, border: `1px solid ${t.border}`, overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, textAlign: isAR ? 'right' : 'left' }}>
+                        <tbody style={{ backgroundColor: t.canvas }}>
+                          {h.componentsUsed.map((c, i) => (
+                            <tr key={i} style={{ borderBottom: i === h.componentsUsed.length - 1 ? 'none' : `1px solid ${t.border}` }}>
+                              <td style={{ padding: '6px 12px', color: t.fg, width: '70%' }}>
+                                {c.itemId?.name || '—'}
+                              </td>
+                              <td style={{ padding: '6px 12px', color: t.fgMuted, fontWeight: 600, fontFamily: 'ui-monospace, monospace', textAlign: isAR ? 'left' : 'right' }}>
+                                {c.qty} {isAR ? 'وحدة' : 'units'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {h.notes && (
+                    <div style={{ 
+                      marginTop: 10, padding: '8px 12px', backgroundColor: t.sunken, 
+                      borderRadius: 4, fontSize: 12, color: t.fgMuted, borderLeft: `3px solid ${t.border}`
+                    }}>
+                      {h.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </Modal>

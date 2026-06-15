@@ -130,7 +130,7 @@ const MOCK_COMPANY = {
   code: 'DEMO',
   name: 'ElectroTech Demo',
   baseCurrency: 'USD',
-  theme: 'dark',
+  theme: 'light',
   primaryColor: '#3b82f6',
   activeIconPack: 'lucide',
   features: { projects: true, reasons: true }
