@@ -2,18 +2,21 @@ const express = require("express");
 const multer = require("multer");
 const { parse } = require("csv-parse/sync");
 const { Item, Company } = require("../models");
-const { protect } = require("../middleware/auth");
+const { protect, need } = require("../middleware/auth");
 const { friendly, statusFor } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // match the server's 10mb JSON limit
+});
 
 // Core fields we natively support
 const CORE_FIELDS = ["name", "nameEn", "sku", "barcode", "price", "qty", "minThreshold", "description"];
 
 // ── POST /api/import/csv ──────────────────────────────────────────────────
-router.post("/csv", protect, upload.single("file"), async (req, res) => {
+router.post("/csv", protect, need("canAdd"), upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 

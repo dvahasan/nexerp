@@ -553,7 +553,7 @@ export default function Settings() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {apiKeys.map((key, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input readOnly value={key} style={{ ...fieldInput('api'+idx), fontFamily: 'ui-monospace, monospace', flex: 1 }} />
+                    <input readOnly value={typeof key === 'string' ? key : (key?.key || '')} style={{ ...fieldInput('api'+idx), fontFamily: 'ui-monospace, monospace', flex: 1 }} />
                     <button type="button" onClick={() => setApiKeys(apiKeys.filter((_, i) => i !== idx))} style={{ color: tok.neg, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
                       <Icon name="delete" size={16} />
                     </button>
@@ -566,8 +566,9 @@ export default function Settings() {
                 )}
                 <div>
                   <button type="button" onClick={() => {
-                    const newKey = 'nex_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                    setApiKeys([...apiKeys, newKey]);
+                    const bytes = window.crypto.getRandomValues(new Uint8Array(24));
+                    const newKey = 'nex_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+                    setApiKeys([...apiKeys, { key: newKey, name: '', createdAt: new Date().toISOString() }]);
                   }} style={{ height: 32, padding: '0 14px', borderRadius: 4, backgroundColor: 'transparent', border: `1px solid ${primary}`, color: primary, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                     {isAR ? '+ توليد مفتاح جديد' : '+ Generate New Key'}
                   </button>

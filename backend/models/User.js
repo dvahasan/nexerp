@@ -17,7 +17,16 @@ const UserSchema = new mongoose.Schema(
     ownedCompanies:    [{ type: mongoose.Schema.Types.ObjectId, ref: "Company" }],
     active:            { type: Boolean, default: true },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // Never serialize the password hash, regardless of which route returns the doc
+    toJSON: {
+      transform(_doc, ret) {
+        delete ret.passwordHash;
+        return ret;
+      },
+    },
+  }
 );
 
 // Unique username per company (compound); enterprise users (no companyId) excluded via partial filter

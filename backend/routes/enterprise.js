@@ -1,5 +1,4 @@
 const express  = require("express");
-const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
 const { Company, User, Department, Category, Item, Transaction, File } = require("../models");
 const { protectEnterprise, resolvePerms, SECRET } = require("../middleware/auth");
@@ -89,19 +88,6 @@ router.post("/exit", protectEnterprise, async (req, res) => {
   try {
     const token = jwt.sign({ id: req.user._id, isEnterprise: true }, SECRET, { expiresIn: "7d" });
     res.json({ token, isEnterprise: true });
-  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
-});
-
-// ── POST /api/enterprise/create ──────────────────────────────────────────────
-router.post("/create", async (req, res) => {
-  try {
-    const { name, username, password, email } = req.body;
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      name, username, email, passwordHash, role: "admin", isEnterprise: true, ownedCompanies: [],
-    });
-    const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: "7d" });
-    res.status(201).json({ token, user });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 

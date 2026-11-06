@@ -1,16 +1,25 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const os = require("os");
+const crypto = require("crypto");
 const { User, Company, Transaction, Item } = require("../models");
+const { rateLimit } = require("../utils/rateLimit");
 
 const router = express.Router();
 
-// Middleware to enforce developer master key
+// Middleware to enforce developer master key.
+// No fallback: the router is only mounted when DEV_MASTER_KEY is set (see server.js),
+// and the comparison is constant-time.
 const requireDevKey = (req, res, next) => {
-  const masterKey = process.env.DEV_MASTER_KEY || "nexdev2026";
+  const masterKey = process.env.DEV_MASTER_KEY;
   const providedKey = req.headers["x-dev-key"];
-  
-  if (!providedKey || providedKey !== masterKey) {
+
+  if (!masterKey || typeof providedKey !== "string") {
+    return res.status(401).json({ message: "Unauthorized: Invalid or missing Developer Key" });
+  }
+  const a = crypto.createHash("sha256").update(providedKey).digest();
+  const b = crypto.createHash("sha256").update(masterKey).digest();
+  if (!crypto.timingSafeEqual(a, b)) {
     return res.status(401).json({ message: "Unauthorized: Invalid or missing Developer Key" });
   }
   next();
@@ -115,7 +124,10 @@ router.get("/details", requireDevKey, async (req, res) => {
 });
 
 // ── POST /api/dev/track-demo ──────────────────────────────────────────────────
-router.post("/track-demo", async (req, res) => {
+// Public (no dev key) by design — the demo page calls it anonymously — but
+// rate-limited, and mounted separately so it works even when /api/dev is disabled.
+const trackDemoRouter = express.Router();
+trackDemoRouter.post("/", rateLimit({ windowMs: 60 * 1000, max: 5, message: "Too many requests" }), async (req, res) => {
   try {
     const { DemoVisit } = require("../models");
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || "";
@@ -308,4 +320,4 @@ router.post("/personnel/toggle-active/:id", requireDevKey, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = { router, trackDemoRouter };

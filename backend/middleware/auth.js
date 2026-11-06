@@ -1,7 +1,11 @@
 const jwt  = require("jsonwebtoken");
 const { User } = require("../models");
 
-const SECRET = process.env.JWT_SECRET || "nexinv_secret";
+const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+  console.error("❌ JWT_SECRET is not set. Refusing to start — add a strong random JWT_SECRET to the environment (see .env.example).");
+  process.exit(1);
+}
 
 // ── Role default permissions ─────────────────────────────────────────────────
 const ROLE_PERMS = {
