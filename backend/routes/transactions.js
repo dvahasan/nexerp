@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const { Transaction, Item, Ledger, ItemStockLocation } = require("../models");
 const AlertService = require("../services/AlertService");
 const { protect, need }     = require("../middleware/auth");
-const { friendly, statusFor } = require("../errors");
+const { friendly, statusFor, httpError } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
 
 const router = express.Router();
@@ -113,7 +113,7 @@ async function txCreateHandler(req, res) {
       }];
     }
 
-    if (itemsArr.length === 0) throw new Error("No items provided");
+    if (itemsArr.length === 0) throw httpError(400, "No items provided");
 
     const invoiceNo = `INV-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     const txDocs = [];
@@ -123,11 +123,11 @@ async function txCreateHandler(req, res) {
     for (const itemData of itemsArr) {
       const { itemId, qty: rawQty, unitCost, landedCost, warehouseId, binId, binCode } = itemData;
       const qty = Number(rawQty);
-      if (qty <= 0) throw new Error("Quantity must be positive");
+      if (qty <= 0) throw httpError(400, "Quantity must be positive");
 
       // Read current state to determine prevQty
       const currentItem = await Item.findOne({ _id: itemId, companyId: req.user.companyId }).session(session);
-      if (!currentItem) throw new Error(`Item not found: ${itemId}`);
+      if (!currentItem) throw httpError(404, `Item not found: ${itemId}`);
       
       const prevQty = currentItem.qty;
       const qtyChange = type === "IN" ? qty : -qty;
@@ -139,7 +139,7 @@ async function txCreateHandler(req, res) {
           { $inc: { qty: qtyChange } },
           { new: true, session }
         );
-        if (!updatedItem) throw new Error(`Insufficient stock for ${currentItem.name} — available: ${prevQty}`);
+        if (!updatedItem) throw httpError(400, `Insufficient stock for ${currentItem.name} — available: ${prevQty}`);
       } else {
         // IN
         let updateOps = { $inc: { qty: qtyChange } };
@@ -258,20 +258,20 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
   session.startTransaction();
   try {
     const tx = await Transaction.findOne({ _id: req.params.id, companyId: req.user.companyId }).session(session);
-    if (!tx) throw new Error("Transaction not found");
-    if (tx.status === "cancelled") throw new Error("Transaction is already cancelled");
+    if (!tx) throw httpError(404, "Transaction not found");
+    if (tx.status === "cancelled") throw httpError(400, "Transaction is already cancelled");
 
     // SOFT CANCEL LOGIC
     if (req.body.status === "cancelled") {
       const item = await Item.findOne({ _id: tx.itemId, companyId: req.user.companyId }).session(session);
-      if (!item) throw new Error("Item not found");
+      if (!item) throw httpError(404, "Item not found");
 
       const qtyChange = tx.type === "IN" ? -tx.qty : tx.qty;
       const prevQty = item.qty;
 
       // Reversal logic
       if (tx.type === "IN") {
-        if (item.qty < tx.qty) throw new Error(`Cannot reverse IN transaction: insufficient stock to deduct ${tx.qty}`);
+        if (item.qty < tx.qty) throw httpError(400, `Cannot reverse IN transaction: insufficient stock to deduct ${tx.qty}`);
         await Item.findOneAndUpdate(
           { _id: item._id, companyId: req.user.companyId, qty: { $gte: tx.qty } },
           { $inc: { qty: qtyChange } },
@@ -327,7 +327,7 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
     // To be perfectly safe, we shouldn't allow changing item/qty on an active transaction without
     // cancelling it and creating a new one. But for backwards compatibility, we handle it:
     
-    throw new Error("Direct editing of quantities is deprecated. Please cancel this transaction and record a new one.");
+    throw httpError(400, "Direct editing of quantities is deprecated. Please cancel this transaction and record a new one.");
 
   } catch (e) {
     await session.abortTransaction();
