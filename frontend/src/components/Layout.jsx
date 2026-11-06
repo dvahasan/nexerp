@@ -127,6 +127,7 @@ export default function Layout({ children }) {
   const canTxIn  = isOwner || user?.perms?.canTxIn;
   const canTxOut = isOwner || user?.perms?.canTxOut;
   const canTx    = canTxIn || canTxOut;
+  const canManagePurchases = isOwner || user?.perms?.canManagePurchases;
 
   const txChildren = [
     ...(canTxIn  ? [{ path: '/stock-in',  icon: 'arrow_down', label: isAR ? '↓ وارد (IN)'    : '↓ Stock In'  }] : []),
@@ -137,6 +138,7 @@ export default function Layout({ children }) {
     { path: '/inventory',  icon: 'inventory',  label: t.inventory },
     // Transactions group (rendered specially in SidebarContent)
     ...(canTx ? [{ type: 'group', id: 'tx', icon: 'transactions', label: isAR ? 'الحركات' : 'Transactions', children: txChildren }] : []),
+    ...(canManagePurchases ? [{ path: '/purchase-orders', icon: 'import_data', label: isAR ? 'أوامر الشراء' : 'Purchase Orders' }] : []),
     { path: '/warehouses', icon: 'warehouse',  label: isAR ? 'المستودعات' : 'Warehouses' },
     { path: '/bom',        icon: 'bom',        label: isAR ? 'بيانات المواد' : 'Bill of Materials' },
     { path: '/files',      icon: 'copy',       label: isAR ? 'الملفات' : 'Files' },

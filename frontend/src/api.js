@@ -166,6 +166,15 @@ export const api = {
   getItemLedger:      (itemId)      => req("GET", `/ledger/item/${itemId}`),
   getLedgerIntegrity: ()            => req("GET", "/ledger/integrity"),
 
+  // Purchase Orders (procurement)
+  getPurchaseOrders:    (params = {}) => req("GET", "/purchase-orders?" + new URLSearchParams({ _t: Date.now(), ...params })),
+  getPurchaseOrder:     (id)          => req("GET",  `/purchase-orders/${id}`),
+  addPurchaseOrder:     (d)           => req("POST", "/purchase-orders", d),
+  updatePurchaseOrder:  (id, d)       => req("PUT",  `/purchase-orders/${id}`, d),
+  confirmPurchaseOrder: (id)          => req("POST", `/purchase-orders/${id}/confirm`),
+  cancelPurchaseOrder:  (id)          => req("POST", `/purchase-orders/${id}/cancel`),
+  receivePurchaseOrder: (id, d)       => req("POST", `/purchase-orders/${id}/receive`, d),
+
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),
 

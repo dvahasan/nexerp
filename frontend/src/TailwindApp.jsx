@@ -31,6 +31,8 @@ const Categories  = lazy(() => import('./pages/Categories'));
 const Warehouses  = lazy(() => import('./pages/Warehouses'));
 const BOM         = lazy(() => import('./pages/BOM'));
 const Sources     = lazy(() => import('./pages/Sources'));
+const PurchaseOrders      = lazy(() => import('./pages/PurchaseOrders'));
+const PurchaseOrderDetail = lazy(() => import('./pages/PurchaseOrderDetail'));
 const Destinations = lazy(() => import('./pages/Destinations'));
 const Projects    = lazy(() => import('./pages/Projects'));
 const Reasons     = lazy(() => import('./pages/Reasons'));
@@ -156,6 +158,8 @@ function AppRoutes() {
         <Route path="/stock-in"     element={<Protected><Layout><PermGuard perm="canTxIn"><StockIn /></PermGuard></Layout></Protected>} />
         <Route path="/stock-out"    element={<Protected><Layout><PermGuard perm="canTxOut"><StockOut /></PermGuard></Layout></Protected>} />
         <Route path="/bom"             element={<Protected><Layout><PermGuard perm="canManageBOM"><BOM /></PermGuard></Layout></Protected>} />
+        <Route path="/purchase-orders"     element={<Protected><Layout><PermGuard perm="canManagePurchases"><PurchaseOrders /></PermGuard></Layout></Protected>} />
+        <Route path="/purchase-orders/:id" element={<Protected><Layout><PermGuard perm="canManagePurchases"><PurchaseOrderDetail /></PermGuard></Layout></Protected>} />
         
         {/* Modular Features */}
         <Route path="/sources"         element={<Protected><Layout><Sources /></Layout></Protected>} />
