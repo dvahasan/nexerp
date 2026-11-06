@@ -20,6 +20,7 @@ const Reason      = require("./Reason");
 
 // Architecture upgrade models
 const Ledger            = require("./Ledger");
+const PurchaseOrder     = require("./PurchaseOrder");
 const ItemStockLocation = require("./ItemStockLocation");
 const Reservation       = require("./Reservation");
 const Alert             = require("./Alert");
@@ -31,5 +32,5 @@ module.exports = {
   Setting, File, Warehouse, Bin, BomTemplate, BomProduction,
   Source, Destination, Project, Reason,
   Ledger, ItemStockLocation, Reservation, Alert, DemoVisit,
-  ActionLog
+  ActionLog, PurchaseOrder
 };

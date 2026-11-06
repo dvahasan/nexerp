@@ -43,6 +43,7 @@ const projectRoutes      = require("./routes/projects");
 const reasonRoutes       = require("./routes/reasons");
 const publicApiRoutes    = require("./routes/publicApi");
 const ledgerRoutes       = require("./routes/ledger");
+const purchaseOrderRoutes = require("./routes/purchaseOrders");
 const billingRoutes      = require("./routes/billing");
 const developerRoutes    = require("./routes/developer");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
@@ -187,6 +188,7 @@ app.use("/api/destinations", destRoutes);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/reasons",      reasonRoutes);
 app.use("/api/ledger",       ledgerRoutes);
+app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/billing",      billingRoutes.router);
 app.use("/api/public",       publicApiRoutes);
 
