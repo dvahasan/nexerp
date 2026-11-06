@@ -166,6 +166,10 @@ export const api = {
   getItemLedger:      (itemId)      => req("GET", `/ledger/item/${itemId}`),
   getLedgerIntegrity: ()            => req("GET", "/ledger/integrity"),
 
+  // Batches (lot/expiry tracking)
+  getItemBatches:     (itemId)    => req("GET", `/items/${itemId}/batches`),
+  getExpiringBatches: (days = 30) => req("GET", `/batches/expiring?days=${days}`),
+
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),
 
