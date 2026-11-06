@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const AlertSchema = new mongoose.Schema(
   {
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
-    type:      { type: String, enum: ["low_stock", "out_of_stock", "expiration", "warehouse_capacity", "system"], required: true },
+    type:      { type: String, enum: ["low_stock", "out_of_stock", "expiration", "expiring_batch", "warehouse_capacity", "system"], required: true },
     severity:  { type: String, enum: ["info", "warning", "critical"], default: "warning" },
     
     itemId:      { type: mongoose.Schema.Types.ObjectId, ref: "Item", default: null },

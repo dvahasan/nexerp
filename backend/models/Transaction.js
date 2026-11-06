@@ -25,6 +25,15 @@ const TxSchema = new mongoose.Schema(
     unitCost:    { type: Number, default: 0, min: 0 },   // cost per unit at time of tx
     landedCost:  { type: Number, default: 0, min: 0 },   // total landed extras (shipping, duties)
 
+    // ── Lot/batch traceability ────────────────────────────────────────────
+    // IN: the batch(es) created/incremented. OUT: FEFO consumption breakdown.
+    batches: [{
+      batchId:    { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
+      batchNo:    { type: String, trim: true },
+      qty:        { type: Number, min: 0 },
+      expiryDate: { type: Date, default: null },
+    }],
+
     // ── Status & Reversals (Soft Cancel) ──────────────────────────────────
     status:       { type: String, enum: ["active", "cancelled"], default: "active" },
     cancelledAt:  { type: Date, default: null },
