@@ -42,6 +42,7 @@ const destRoutes         = require("./routes/destinations");
 const projectRoutes      = require("./routes/projects");
 const reasonRoutes       = require("./routes/reasons");
 const publicApiRoutes    = require("./routes/publicApi");
+const ledgerRoutes       = require("./routes/ledger");
 const developerRoutes    = require("./routes/developer");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
@@ -150,6 +151,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const dbUp = mongoose.connection.readyState === 1;
+  res.status(dbUp ? 200 : 503).json({ status: dbUp ? "ok" : "degraded", db: dbUp ? "connected" : "disconnected" });
+});
+
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use("/api/auth",         authRoutes);
 app.use("/api/departments",  departmentRoutes);
@@ -173,6 +181,7 @@ app.use("/api/sources",      sourceRoutes);
 app.use("/api/destinations", destRoutes);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/reasons",      reasonRoutes);
+app.use("/api/ledger",       ledgerRoutes);
 app.use("/api/public",       publicApiRoutes);
 
 // Demo-visit tracking stays public (rate-limited inside the router) even when

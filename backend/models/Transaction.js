@@ -43,6 +43,12 @@ TxSchema.index({ companyId: 1, date: -1 });
 TxSchema.index({ companyId: 1, itemId: 1, date: -1 });
 TxSchema.index({ companyId: 1, type: 1, date: -1 });
 TxSchema.index({ companyId: 1, userId: 1, date: -1 });
-TxSchema.index({ companyId: 1, idempotencyKey: 1 }); // Useful for external API uniqueness
+// Enforce external-API idempotency at the database level: two concurrent
+// checkouts with the same key collide here and the loser surfaces as E11000.
+// Partial filter keeps the default-"" rows (internal transactions) out of it.
+TxSchema.index(
+  { companyId: 1, idempotencyKey: 1, itemId: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $exists: true, $gt: "" } } }
+);
 
 module.exports = mongoose.model("Transaction", TxSchema);
