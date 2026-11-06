@@ -97,6 +97,7 @@ export const api = {
   updateItem:     (id, d)       => req("PUT",    `/items/${id}`, d),
   deleteItem:     (id)          => req("DELETE", `/items/${id}`),
   importItems:    (items)       => req("POST",   "/items/import", { items }),
+  getReorderSuggestions: ()     => req("GET",    "/items/reorder/suggestions"),
   uploadPhoto:       (id, file)  => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
   importPhotoFromUrl:(id, url)   => req("POST", `/items/${id}/photo-from-url`, { url }),
   addItemPhoto:    (id, file)     => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
@@ -154,6 +155,16 @@ export const api = {
 
   // AI
   aiChat: (prompt, history = []) => req("POST", "/ai/chat", { prompt, history }),
+
+  // Billing
+  getBilling:      ()     => req("GET",  "/billing"),
+  billingCheckout: (tier) => req("POST", "/billing/checkout", { tier }),
+  billingPortal:   ()     => req("POST", "/billing/portal"),
+
+  // Ledger
+  getLedger:          (params = {}) => req("GET", "/ledger?" + new URLSearchParams(params)),
+  getItemLedger:      (itemId)      => req("GET", `/ledger/item/${itemId}`),
+  getLedgerIntegrity: ()            => req("GET", "/ledger/integrity"),
 
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),

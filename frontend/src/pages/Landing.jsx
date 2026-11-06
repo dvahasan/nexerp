@@ -950,7 +950,7 @@ export default function Landing() {
           <LazyScroll alwaysRender rootMargin="150px">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Simple, Transparent Pricing</h2>
-              <p className="text-slate-400 max-w-xl mx-auto">Choose the plan that fits your business. Upgrade anytime as you scale. <span className="text-slate-500">(Upcoming)</span></p>
+              <p className="text-slate-400 max-w-xl mx-auto">Choose the plan that fits your business. Start free, upgrade anytime as you scale.</p>
             </div>
           </LazyScroll>
           <div className="grid md:grid-cols-3 gap-8 items-center">
@@ -966,7 +966,7 @@ export default function Landing() {
                   <li className="flex items-center gap-3"><MdCheckCircle className="text-green-500" /> Core Inventory Modules</li>
                   <li className="flex items-center gap-3 text-slate-600"><span className="w-4 h-px bg-slate-700 mr-2 inline-block" /> No Advanced AI</li>
                 </ul>
-                <button disabled className="w-full py-3 rounded font-bold bg-slate-700 text-slate-500 cursor-not-allowed">Coming Soon</button>
+                <a href="/register?plan=starter" className="block w-full py-3 rounded font-bold bg-slate-700 hover:bg-slate-600 text-white transition-colors">Start with Starter</a>
               </div>
             </LazyScroll>
             {/* Professional */}
@@ -982,7 +982,7 @@ export default function Landing() {
                   <li className="flex items-center gap-3"><MdCheckCircle className="text-white" /> Advanced AI Insights</li>
                   <li className="flex items-center gap-3"><MdCheckCircle className="text-white" /> Multi-Currency Support</li>
                 </ul>
-                <button disabled className="w-full py-3 rounded font-bold bg-white text-blue-600 cursor-not-allowed">Coming Soon</button>
+                <a href="/register?plan=professional" className="block w-full py-3 rounded font-bold bg-white hover:bg-blue-50 text-blue-600 transition-colors">Start with Professional</a>
               </div>
             </LazyScroll>
             {/* Enterprise */}
@@ -997,7 +997,7 @@ export default function Landing() {
                   <li className="flex items-center gap-3"><MdCheckCircle className="text-blue-500" /> Master Enterprise Dashboard</li>
                   <li className="flex items-center gap-3"><MdCheckCircle className="text-blue-500" /> 24/7 Priority Support</li>
                 </ul>
-                <button disabled className="w-full py-3 rounded font-bold bg-slate-700 text-slate-500 cursor-not-allowed">Coming Soon</button>
+                <a href="/register?plan=enterprise" className="block w-full py-3 rounded font-bold bg-slate-700 hover:bg-slate-600 text-white transition-colors">Start with Enterprise</a>
               </div>
             </LazyScroll>
           </div>

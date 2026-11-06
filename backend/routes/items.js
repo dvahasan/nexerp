@@ -80,6 +80,44 @@ router.get("/", protect, async (req, res) => {
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 
+// ── GET /api/items/reorder/suggestions ───────────────────────────────────────
+// Items at or below their reorder point, with a suggested purchase quantity.
+// Must stay above the /:id route so "reorder" isn't matched as an id.
+router.get("/reorder/suggestions", protect, async (req, res) => {
+  try {
+    const items = await Item.find({
+      companyId: req.user.companyId,
+      status: "active",
+      $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
+      reorderPoint: { $gt: 0 },
+      $expr: { $lte: ["$qty", "$reorderPoint"] },
+    })
+      .select("name nameEn sku barcode qty reorderPoint reorderQty minThreshold avgCost price warehouseId")
+      .populate("warehouseId", "name code")
+      .sort({ qty: 1 });
+
+    const suggestions = items.map((i) => {
+      // Order up to 2× the reorder point by default, or the configured reorderQty
+      const suggestedQty = i.reorderQty > 0 ? i.reorderQty : Math.max(i.reorderPoint * 2 - i.qty, 1);
+      return {
+        itemId: i._id,
+        name: i.name, nameEn: i.nameEn, sku: i.sku, barcode: i.barcode,
+        qty: i.qty, reorderPoint: i.reorderPoint,
+        suggestedQty,
+        estimatedCost: +(suggestedQty * (i.avgCost || 0)).toFixed(2),
+        warehouse: i.warehouseId || null,
+        urgency: i.qty <= 0 ? "critical" : i.qty <= (i.minThreshold || 0) ? "high" : "normal",
+      };
+    });
+
+    res.json({
+      count: suggestions.length,
+      totalEstimatedCost: +suggestions.reduce((s, x) => s + x.estimatedCost, 0).toFixed(2),
+      suggestions,
+    });
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
 // ── GET /api/items/barcode/:code ─────────────────────────────────────────────
 router.get("/barcode/:code", protect, async (req, res) => {
   try {

@@ -43,6 +43,7 @@ const projectRoutes      = require("./routes/projects");
 const reasonRoutes       = require("./routes/reasons");
 const publicApiRoutes    = require("./routes/publicApi");
 const ledgerRoutes       = require("./routes/ledger");
+const billingRoutes      = require("./routes/billing");
 const developerRoutes    = require("./routes/developer");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
@@ -90,6 +91,10 @@ app.use(cors({
     originAllowed(origin) ? callback(null, true) : callback(new Error("CORS: origin not allowed")),
   credentials: true,
 }));
+// Stripe webhook needs the raw body for signature verification — mount it
+// before the JSON body parser.
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingRoutes.webhookHandler);
+
 app.use(express.json({ limit: "10mb" }));
 
 // Prevent aggressive caching of GET requests (e.g. by Edge/Chrome)
@@ -182,6 +187,7 @@ app.use("/api/destinations", destRoutes);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/reasons",      reasonRoutes);
 app.use("/api/ledger",       ledgerRoutes);
+app.use("/api/billing",      billingRoutes.router);
 app.use("/api/public",       publicApiRoutes);
 
 // Demo-visit tracking stays public (rate-limited inside the router) even when

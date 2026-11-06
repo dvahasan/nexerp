@@ -492,6 +492,25 @@ export default function Layout({ children }) {
   return (
     <div className="flex flex-col h-screen" style={{ '--color-primary': primaryColor, backgroundColor: tok.canvas }}>
 
+      {/* Demo-mode conversion banner */}
+      {user?.isDemo && (
+        <div
+          className="flex items-center justify-center gap-3 flex-shrink-0 px-3 py-1.5 text-[12px] font-semibold"
+          style={{ backgroundColor: '#1d4ed8', color: '#fff' }}
+        >
+          <span>
+            {isAR ? 'أنت في وضع التجربة — بياناتك لن تُحفظ.' : "You're exploring the demo — nothing you do here is saved."}
+          </span>
+          <a
+            href="/register"
+            className="px-3 py-1 rounded font-bold"
+            style={{ backgroundColor: '#fff', color: '#1d4ed8', textDecoration: 'none', whiteSpace: 'nowrap' }}
+          >
+            {isAR ? 'أنشئ مساحة عملك مجاناً' : 'Create your free workspace'}
+          </a>
+        </div>
+      )}
+
       {/* ════════════════════════════════════════════════════════════════════
           TOP BAR  (h-12 = 48 px, like DMMAS)
           ════════════════════════════════════════════════════════════════════ */}

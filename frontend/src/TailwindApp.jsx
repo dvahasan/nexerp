@@ -175,7 +175,6 @@ function AppRoutes() {
         <Route path="/import"          element={<Protected><Layout><Import /></Layout></Protected>} />
         <Route path="/barcode-lookup"  element={<Protected><Layout><BarcodeLookup /></Layout></Protected>} />
         <Route path="/warehouses"      element={<Protected><Layout><Warehouses /></Layout></Protected>} />
-        <Route path="/bom"             element={<Protected><Layout><BOM /></Layout></Protected>} />
 
         {/* ── Catch all ───────────────────────────────────────── */}
         <Route path="*" element={authed ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />

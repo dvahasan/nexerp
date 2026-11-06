@@ -39,7 +39,16 @@ const CompanySchema = new mongoose.Schema(
         name: { type: String },
         createdAt: { type: Date, default: Date.now }
       }
-    ]
+    ],
+
+    // ── Subscription (Stripe) ─────────────────────────────────────────────
+    plan: {
+      tier:                 { type: String, enum: ["free", "starter", "professional", "enterprise"], default: "free" },
+      status:               { type: String, enum: ["none", "active", "past_due", "cancelled"], default: "none" },
+      stripeCustomerId:     { type: String, default: "" },
+      stripeSubscriptionId: { type: String, default: "" },
+      currentPeriodEnd:     { type: Date, default: null },
+    }
   },
   { timestamps: true }
 );

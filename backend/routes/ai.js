@@ -2,6 +2,7 @@ const express = require("express");
 const { Company, Item, Transaction } = require("../models");
 const { protect }             = require("../middleware/auth");
 const { friendly, statusFor } = require("../errors");
+const { planFor, billingEnabled } = require("../config/plans");
 
 const router = express.Router();
 
@@ -12,7 +13,15 @@ router.post("/chat", protect, async (req, res) => {
     if (!prompt) return res.status(400).json({ message: "No prompt provided" });
 
     const cid     = req.user.companyId;
-    const company = await Company.findById(cid).select("name baseCurrency industry features");
+    const company = await Company.findById(cid).select("name baseCurrency industry features plan");
+
+    // Plan gating: AI is a Professional+ feature once billing is configured
+    if (billingEnabled() && !planFor(company).ai) {
+      return res.status(402).json({
+        message: "AI assistant is available on the Professional plan and above",
+        upgradeRequired: true,
+      });
+    }
 
     const [items, txs] = await Promise.all([
       Item.find({ companyId: cid })

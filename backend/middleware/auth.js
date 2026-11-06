@@ -9,11 +9,11 @@ if (!SECRET) {
 
 // ── Role default permissions ─────────────────────────────────────────────────
 const ROLE_PERMS = {
-  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true  },
-  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true  },
-  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false },
-  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false },
-  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false },
+  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true  },
+  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true  },
+  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false, canManageBOM:true  },
+  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false },
+  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false },
 };
 
 /**

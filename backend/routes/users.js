@@ -1,7 +1,8 @@
 const express = require("express");
 const bcrypt  = require("bcryptjs");
-const { User }                 = require("../models");
+const { User, Company }        = require("../models");
 const { protect, need }        = require("../middleware/auth");
+const { planFor, billingEnabled } = require("../config/plans");
 const { broadcast }            = require("../utils/broadcast");
 const { friendly, statusFor }  = require("../errors");
 
@@ -80,6 +81,21 @@ router.post("/", protect, need("canManageUsers"), async (req, res) => {
     const { name, nameEn, username, email, phone, password, role, permissions, preferredLanguage } = req.body;
     if (!name || !username || !password)
       return res.status(400).json({ message: "Missing fields" });
+
+    // Plan gating: staff seat limit once billing is configured
+    if (billingEnabled()) {
+      const company = await Company.findById(req.user.companyId).select("plan");
+      const plan = planFor(company);
+      if (plan.staff !== null) {
+        const staffCount = await User.countDocuments({ companyId: req.user.companyId });
+        if (staffCount >= plan.staff) {
+          return res.status(402).json({
+            message: `Your plan allows up to ${plan.staff} staff accounts — upgrade to add more`,
+            upgradeRequired: true,
+          });
+        }
+      }
+    }
 
     const passwordHash = await bcrypt.hash(password, 12);
     let safeRole  = role;
