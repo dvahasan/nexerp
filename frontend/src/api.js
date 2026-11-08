@@ -169,6 +169,14 @@ export const api = {
   // Batches (lot/expiry tracking)
   getItemBatches:     (itemId)    => req("GET", `/items/${itemId}/batches`),
   getExpiringBatches: (days = 30) => req("GET", `/batches/expiring?days=${days}`),
+  // Purchase Orders (procurement)
+  getPurchaseOrders:    (params = {}) => req("GET", "/purchase-orders?" + new URLSearchParams({ _t: Date.now(), ...params })),
+  getPurchaseOrder:     (id)          => req("GET",  `/purchase-orders/${id}`),
+  addPurchaseOrder:     (d)           => req("POST", "/purchase-orders", d),
+  updatePurchaseOrder:  (id, d)       => req("PUT",  `/purchase-orders/${id}`, d),
+  confirmPurchaseOrder: (id)          => req("POST", `/purchase-orders/${id}/confirm`),
+  cancelPurchaseOrder:  (id)          => req("POST", `/purchase-orders/${id}/cancel`),
+  receivePurchaseOrder: (id, d)       => req("POST", `/purchase-orders/${id}/receive`, d),
 
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),

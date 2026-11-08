@@ -9,11 +9,11 @@ if (!SECRET) {
 
 // ── Role default permissions ─────────────────────────────────────────────────
 const ROLE_PERMS = {
-  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true  },
-  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true  },
-  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false, canManageBOM:true  },
-  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false },
-  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false },
+  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true,  canManagePurchases:true  },
+  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true,  canManagePurchases:true  },
+  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false, canManageBOM:true,  canManagePurchases:true  },
+  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false, canManagePurchases:false },
+  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false, canManagePurchases:false },
 };
 
 /**

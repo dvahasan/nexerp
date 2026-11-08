@@ -12,6 +12,7 @@ function buildApp() {
   const app = express();
   app.use(express.json({ limit: "10mb" }));
   app.use("/api/transactions", require("../../routes/transactions"));
+  app.use("/api/purchase-orders", require("../../routes/purchaseOrders"));
   app.use("/api/auth", require("../../routes/auth"));
   app.use("/api/users", require("../../routes/users"));
   app.use("/api/company", require("../../routes/company"));
