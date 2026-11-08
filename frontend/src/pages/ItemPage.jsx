@@ -34,6 +34,7 @@ const defaultForm = {
   currency: '', active: true, isFavorite: false, serialCode: '', publish: true,
   attributes: {},
   warehouseId: '', binLocation: '',
+  trackBatches: false,
 };
 
 function fmt(bytes) {
@@ -103,6 +104,17 @@ export default function ItemPage() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [deletingAtt,  setDeletingAtt]  = useState(null); // publicId
 
+  // ── Batches (lot/expiry) state ─────────────────────────────────────────────
+  const [batchData, setBatchData] = useState(null); // { batches, totalRemaining }
+
+  useEffect(() => {
+    if (editItem?._id && editItem?.trackBatches) {
+      api.getItemBatches(editItem._id).then(setBatchData).catch(() => setBatchData(null));
+    } else {
+      setBatchData(null);
+    }
+  }, [editItem]);
+
   // ── Scanner state ──────────────────────────────────────────────────────────
   const [scannerOpen,     setScannerOpen]     = useState(false);
   const [scanLookup,      setScanLookup]      = useState(false);
@@ -159,6 +171,7 @@ export default function ItemPage() {
         attributes:      editItem.attributes      || {},
         warehouseId:     editItem.warehouseId?._id || editItem.warehouseId || '',
         binLocation:     editItem.binLocation     || '',
+        trackBatches:    editItem.trackBatches    ?? false,
       });
       // Load bins for the item's assigned warehouse
       if (editItem.warehouseId) {
@@ -1353,6 +1366,10 @@ export default function ItemPage() {
                 <input type="checkbox" checked={form.isFavorite} onChange={e => set('isFavorite', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: primary }} />
                 {isAR ? 'مفضل (نجمة)' : 'Favorite'}
               </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: t.fg, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.trackBatches} onChange={e => set('trackBatches', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: primary }} />
+                {isAR ? 'تتبّع التشغيلات والصلاحية (FEFO)' : 'Track batches & expiry (FEFO)'}
+              </label>
             </div>
 
             {/* Extra standard fields */}
@@ -1440,7 +1457,82 @@ export default function ItemPage() {
               )}
             </div>
 
-            
+            {/* ── Batches / lots (edit mode, batch-tracked items only) ────── */}
+            {editItem && editItem.trackBatches && (
+              <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: t.fg }}>
+                      {isAR ? 'التشغيلات والصلاحية (Batches)' : 'Batches & Expiry'}
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: t.fgMuted }}>
+                      {isAR
+                        ? 'يتم صرف المخزون تلقائياً من التشغيلة الأقرب انتهاءً (FEFO).'
+                        : 'Stock is issued from the earliest-expiring batch first (FEFO).'}
+                    </p>
+                  </div>
+                  {batchData && (
+                    <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted }}>
+                      {isAR ? 'الإجمالي المتبقي:' : 'Total remaining:'} <b style={{ color: t.fg }}>{batchData.totalRemaining}</b>
+                    </span>
+                  )}
+                </div>
+
+                {!batchData || batchData.batches.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: t.fgSubtle, backgroundColor: t.sunken, borderRadius: 4, fontSize: 12 }}>
+                    {isAR ? 'لا توجد تشغيلات بعد — سجّل حركة وارد مع رقم تشغيلة.' : 'No batches yet — record a Stock IN with a batch number.'}
+                  </div>
+                ) : (
+                  <div style={{ border: `1px solid ${t.border}`, borderRadius: 4, overflow: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+                      <thead>
+                        <tr style={{ backgroundColor: t.sunken }}>
+                          {[
+                            isAR ? 'رقم التشغيلة' : 'Batch No',
+                            isAR ? 'المتبقي' : 'Remaining',
+                            isAR ? 'تاريخ الانتهاء' : 'Expiry',
+                            isAR ? 'الصلاحية' : 'Status',
+                            isAR ? 'تاريخ الاستلام' : 'Received',
+                          ].map(h => (
+                            <th key={h} style={{ padding: '8px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, textAlign: 'left', borderBottom: `1px solid ${t.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchData.batches.map(b => {
+                          const d = b.daysToExpiry;
+                          const badge = d == null
+                            ? { bg: t.sunken,  fg: t.fgMuted, label: isAR ? 'بدون صلاحية' : 'No expiry' }
+                            : d < 0
+                            ? { bg: '#fee2e2', fg: '#b91c1c', label: isAR ? `منتهي منذ ${-d} يوم` : `Expired ${-d}d ago` }
+                            : d <= 30
+                            ? { bg: '#ffedd5', fg: '#c2410c', label: isAR ? `${d} يوم متبقٍ` : `${d}d left` }
+                            : { bg: '#dcfce7', fg: '#15803d', label: isAR ? `${d} يوم متبقٍ` : `${d}d left` };
+                          return (
+                            <tr key={b._id} style={{ borderBottom: `1px solid ${t.border}`, opacity: b.qtyRemaining === 0 ? 0.5 : 1 }}>
+                              <td style={{ padding: '8px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 12, fontWeight: 600, color: t.fg }}>{b.batchNo}</td>
+                              <td style={{ padding: '8px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: b.qtyRemaining > 0 ? t.fg : t.fgSubtle }}>{b.qtyRemaining}</td>
+                              <td style={{ padding: '8px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgMuted, whiteSpace: 'nowrap' }}>
+                                {b.expiryDate ? new Date(b.expiryDate).toLocaleDateString(isAR ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 3, backgroundColor: badge.bg, color: badge.fg, fontSize: 10, fontWeight: 700, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
+                                  {badge.label}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 11, color: t.fgSubtle, whiteSpace: 'nowrap' }}>
+                                {b.createdAt ? new Date(b.createdAt).toLocaleDateString(isAR ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
 

@@ -1,5 +1,5 @@
 const express = require("express");
-const { Item, Company }     = require("../models");
+const { Item, Company, Batch } = require("../models");
 const { protect, need }     = require("../middleware/auth");
 const upload                = require("../middleware/upload");
 const { broadcast }         = require("../utils/broadcast");
@@ -122,6 +122,34 @@ router.get("/reorder/suggestions", protect, async (req, res) => {
 router.get("/barcode/:code", protect, async (req, res) => {
   try {
     res.json(await Item.findOne({ barcode: req.params.code, companyId: req.user.companyId, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] }) || null);
+  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+});
+
+// ── GET /api/items/:id/batches ───────────────────────────────────────────────
+// All lots/batches of one item, FEFO order, with days-to-expiry per batch.
+router.get("/:id/batches", protect, async (req, res) => {
+  try {
+    const item = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId })
+      .select("name nameEn sku qty trackBatches");
+    if (!item) return res.status(404).json({ message: "Not found" });
+
+    const batches = await Batch.find({ companyId: req.user.companyId, itemId: item._id })
+      .populate("warehouseId", "name code")
+      .sort({ expiryDate: 1, createdAt: 1 });
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const rows = batches.map((b) => ({
+      ...b.toObject(),
+      daysToExpiry: b.expiryDate == null
+        ? null
+        : Math.ceil((new Date(b.expiryDate) - Date.now()) / DAY_MS),
+    }));
+
+    res.json({
+      item: { _id: item._id, name: item.name, nameEn: item.nameEn, sku: item.sku, qty: item.qty, trackBatches: item.trackBatches },
+      batches: rows,
+      totalRemaining: rows.reduce((s, b) => s + b.qtyRemaining, 0),
+    });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 

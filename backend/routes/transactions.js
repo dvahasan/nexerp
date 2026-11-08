@@ -1,6 +1,6 @@
 const express  = require("express");
 const mongoose = require("mongoose");
-const { Transaction, Item, Ledger, ItemStockLocation } = require("../models");
+const { Transaction, Item, Ledger, ItemStockLocation, Batch } = require("../models");
 const AlertService = require("../services/AlertService");
 const { protect, need }     = require("../middleware/auth");
 const { friendly, statusFor, httpError } = require("../errors");
@@ -109,7 +109,11 @@ async function txCreateHandler(req, res) {
         landedCost: req.body.landedCost,
         warehouseId: req.body.warehouseId,
         binId: req.body.binId,
-        binCode: req.body.binCode
+        binCode: req.body.binCode,
+        batchNo: req.body.batchNo,
+        mfgDate: req.body.mfgDate,
+        expiryDate: req.body.expiryDate,
+        supplierLot: req.body.supplierLot
       }];
     }
 
@@ -121,7 +125,8 @@ async function txCreateHandler(req, res) {
     const updatedItemsMap = {};
 
     for (const itemData of itemsArr) {
-      const { itemId, qty: rawQty, unitCost, landedCost, warehouseId, binId, binCode } = itemData;
+      const { itemId, qty: rawQty, unitCost, landedCost, warehouseId, binId, binCode,
+              batchNo, mfgDate, expiryDate, supplierLot } = itemData;
       const qty = Number(rawQty);
       if (qty <= 0) throw httpError(400, "Quantity must be positive");
 
@@ -166,6 +171,64 @@ async function txCreateHandler(req, res) {
 
       updatedItemsMap[itemId] = updatedItem;
 
+      // ── Lot/batch handling (only for batch-tracked items) ───────────────
+      const txBatches = [];
+      if (currentItem.trackBatches) {
+        if (type === "IN" && batchNo) {
+          // Create or increment the (item, batchNo) batch.
+          const bNo = String(batchNo).trim();
+          let batch = await Batch.findOne({
+            companyId: req.user.companyId, itemId, batchNo: bNo,
+          }).session(session);
+          if (batch) {
+            batch.qtyRemaining += qty;
+            if (mfgDate)      batch.mfgDate     = new Date(mfgDate);
+            if (expiryDate)   batch.expiryDate  = new Date(expiryDate);
+            if (supplierLot)  batch.supplierLot = String(supplierLot).trim();
+            await batch.save({ session });
+          } else {
+            [batch] = await Batch.create([{
+              companyId:    req.user.companyId,
+              itemId,
+              batchNo:      bNo,
+              mfgDate:      mfgDate    ? new Date(mfgDate)    : null,
+              expiryDate:   expiryDate ? new Date(expiryDate) : null,
+              supplierLot:  supplierLot ? String(supplierLot).trim() : "",
+              qtyRemaining: qty,
+              warehouseId:  warehouseId || null,
+              binId:        binId || null,
+            }], { session });
+          }
+          txBatches.push({ batchId: batch._id, batchNo: batch.batchNo, qty, expiryDate: batch.expiryDate });
+        } else if (type === "OUT") {
+          // FEFO: consume earliest expiryDate first (no-expiry batches last),
+          // ties broken by receipt order.
+          const batches = await Batch.find({
+            companyId: req.user.companyId, itemId, qtyRemaining: { $gt: 0 },
+          }).session(session);
+          batches.sort((a, b) => {
+            const ea = a.expiryDate ? a.expiryDate.getTime() : Infinity;
+            const eb = b.expiryDate ? b.expiryDate.getTime() : Infinity;
+            if (ea !== eb) return ea - eb;
+            return a.createdAt - b.createdAt;
+          });
+
+          const batchStock = batches.reduce((s, b) => s + b.qtyRemaining, 0);
+          if (batchStock < qty)
+            throw httpError(400, `Insufficient batch stock for ${currentItem.name} — batch stock available: ${batchStock}`);
+
+          let remaining = qty;
+          for (const b of batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(b.qtyRemaining, remaining);
+            b.qtyRemaining -= take;
+            await b.save({ session });
+            txBatches.push({ batchId: b._id, batchNo: b.batchNo, qty: take, expiryDate: b.expiryDate });
+            remaining -= take;
+          }
+        }
+      }
+
       // Update Location Tracking
       if (warehouseId) {
         await ItemStockLocation.findOneAndUpdate(
@@ -194,6 +257,7 @@ async function txCreateHandler(req, res) {
         ...(binCode     ? { binCode }     : {}),
         unitCost:    unitCost    ? Number(unitCost)    : 0,
         landedCost:  landedCost  ? Number(landedCost)  : 0,
+        ...(txBatches.length ? { batches: txBatches } : {}),
       });
 
       ledgerDocs.push({
@@ -206,6 +270,7 @@ async function txCreateHandler(req, res) {
         qtyAfter: updatedItem.qty,
         warehouseId: warehouseId || null,
         binId: binId || null,
+        batchId: txBatches.length === 1 ? txBatches[0].batchId : null,
         sourceId: type === "IN" ? source : undefined,
         destId: type === "OUT" ? dest : undefined,
         projectId: projectId || undefined,
@@ -221,6 +286,12 @@ async function txCreateHandler(req, res) {
     // Check alerts for all modified items
     for (const [itemId, updatedItem] of Object.entries(updatedItemsMap)) {
       await AlertService.checkStockAndAlert(updatedItem, session);
+      if (updatedItem.trackBatches) {
+        const itemBatches = await Batch.find({
+          companyId: req.user.companyId, itemId: updatedItem._id,
+        }).session(session);
+        await AlertService.checkExpiringBatchesAndAlert(updatedItem, itemBatches, session);
+      }
     }
 
     const populatedTxs = await Transaction.find({ _id: { $in: createdTxs.map(t => t._id) } }).session(session)
@@ -293,6 +364,30 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
         );
       }
 
+      // Restore batch quantities symmetrically: reversing an IN takes the
+      // received qty back out of its batch (guarded — it may have been
+      // consumed since); reversing an OUT returns each consumed slice.
+      if (Array.isArray(tx.batches) && tx.batches.length > 0) {
+        for (const bl of tx.batches) {
+          if (!bl.batchId || !bl.qty) continue;
+          if (tx.type === "IN") {
+            const restored = await Batch.findOneAndUpdate(
+              { _id: bl.batchId, companyId: req.user.companyId, qtyRemaining: { $gte: bl.qty } },
+              { $inc: { qtyRemaining: -bl.qty } },
+              { new: true, session }
+            );
+            if (!restored)
+              throw httpError(400, `Cannot reverse IN transaction: batch ${bl.batchNo} no longer holds ${bl.qty} units`);
+          } else {
+            await Batch.findOneAndUpdate(
+              { _id: bl.batchId, companyId: req.user.companyId },
+              { $inc: { qtyRemaining: bl.qty } },
+              { session }
+            );
+          }
+        }
+      }
+
       tx.status = "cancelled";
       tx.cancelledAt = new Date();
       tx.cancelledBy = req.user._id;
@@ -309,12 +404,19 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
         qtyAfter: prevQty + qtyChange,
         warehouseId: tx.warehouseId || null,
         binId: tx.binId || null,
+        batchId: tx.batches?.length === 1 ? tx.batches[0].batchId : null,
         userId: req.user._id,
         notes: `Reversed Tx ${tx.invoiceNo || tx._id}`,
       }], { session });
 
       const updatedItem = await Item.findById(item._id).session(session);
       await AlertService.checkStockAndAlert(updatedItem, session);
+      if (updatedItem.trackBatches) {
+        const itemBatches = await Batch.find({
+          companyId: req.user.companyId, itemId: updatedItem._id,
+        }).session(session);
+        await AlertService.checkExpiringBatchesAndAlert(updatedItem, itemBatches, session);
+      }
       await session.commitTransaction();
 
       broadcast(req, "tx_updated", tx);
