@@ -16,7 +16,10 @@ NexERP is a multi-tenant inventory management system with full bilingual operati
 
 - **Inventory** — items with multi-image galleries (Cloudinary), categories/departments, custom attributes, soft delete, favorites, datasheets
 - **Transactions** — atomic multi-item stock IN/OUT (MongoDB sessions), moving-average cost, soft-cancel with reversal, invoice printing (bilingual, stamped, A4/A5)
-- **Stock ledger** — double-entry-style audit trail per movement, item history, and a company-wide integrity report (`/api/ledger/integrity`) that flags drift between ledger sums and item quantities
+- **Stock ledger** — audit trail of every stock movement, item history, and a company-wide integrity report (`/api/ledger/integrity`) that flags drift between ledger sums and item quantities. Every quantity change goes through the ledger: transactions, purchase-order receipts, item edits and imports (as `ADJUST` rows); item deletes are soft deletes
+- **Procurement** — purchase orders (draft → confirmed → partially received → received) with goods receipt feeding the transaction engine
+- **Lot / batch tracking** — per-item opt-in; lots with expiry dates, FEFO (first-expired-first-out) picking on stock-out, expiring-batch alerts and report
+- **Reorder suggestions** — items at or below their reorder point with suggested quantity and cost
 - **WMS** — warehouses, bins, per-location stock tracking, transfers
 - **BOM / production** — bill-of-material templates and production runs
 - **Roles & permissions** — owner/admin/manager/warehouse/viewer with per-user permission overrides
@@ -34,7 +37,7 @@ nexerp/
 │   ├── server.js            # App entry: middleware, route mounts, Socket.IO
 │   ├── config/              # db connect, cloudinary
 │   ├── middleware/          # JWT auth, roles/permissions, upload
-│   ├── models/              # 23 Mongoose models (Item, Transaction, Ledger, …)
+│   ├── models/              # 24 Mongoose models (Item, Transaction, Ledger, Batch, PurchaseOrder, …)
 │   ├── routes/              # 25 route modules (one per resource)
 │   ├── services/            # AlertService
 │   ├── utils/               # broadcast (Socket.IO), rateLimit, sanitize
@@ -67,6 +70,7 @@ Complete reference in [backend/.env.example](backend/.env.example) and [frontend
 | `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET` | No | Image/logo/stamp uploads fail |
 | `SMTP_HOST/PORT/SECURE/USER/PASS/FROM` | No | Welcome emails are skipped |
 | `PORT` | No | Defaults to 5000 |
+| `ACTION_LOG_RETENTION_DAYS` | No | Audit-log entries expire after this many days (default 90) |
 | `VITE_API_URL` (frontend) | Prod | Dev uses the Vite proxy to `localhost:5000` |
 
 ---
@@ -123,6 +127,9 @@ All `/api/*` routes except auth, public and track-demo require `Authorization: B
 | Items | `GET/POST /api/items`, `GET/PUT/DELETE /api/items/:id`, photo upload/enrichment |
 | Transactions | `GET/POST /api/transactions` (atomic, multi-item), `GET /api/transactions/invoice/:no`, `PUT /api/transactions/:id` (soft-cancel only) |
 | Ledger | `GET /api/ledger`, `GET /api/ledger/item/:itemId`, `GET /api/ledger/integrity` (admin) |
+| Purchase orders | `GET/POST /api/purchase-orders`, `PUT /:id` (draft), `POST /:id/confirm`, `POST /:id/cancel`, `POST /:id/receive` (supports `batchNo`/`expiryDate` per line) |
+| Batches | `GET /api/items/:id/batches`, `GET /api/batches/expiring?days=30` |
+| Reorder | `GET /api/items/reorder/suggestions` |
 | Reference data | `/api/departments`, `/api/categories`, `/api/sources`, `/api/destinations`, `/api/projects`, `/api/reasons` |
 | WMS | `/api/warehouses`, `/api/bins` |
 | BOM | `/api/bom` (templates + production) |

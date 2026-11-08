@@ -101,10 +101,11 @@ describe("OUT consumes batches FEFO", () => {
 
   test("insufficient batch stock is rejected atomically with 400", async () => {
     const item = await makeItem(company, { trackBatches: true });
-    // 5 batched + 5 un-batched: item-level stock allows an OUT of 8,
-    // but batch stock (5) does not — the batch guard must reject it.
+    // 5 batched + 5 un-batched legacy stock (new INs always land in a batch,
+    // so the shortage is written directly): item-level stock allows an OUT of
+    // 8, but batch stock (5) does not — the batch guard must reject it.
     await post(admin.token, { type: "IN", itemId: item._id, qty: 5, batchNo: "LOT-A", expiryDate: days(30) });
-    await post(admin.token, { type: "IN", itemId: item._id, qty: 5 });
+    await Item.updateOne({ _id: item._id }, { $inc: { qty: 5 } });
 
     const res = await post(admin.token, { type: "OUT", itemId: item._id, qty: 8 });
     expect(res.status).toBe(400);
@@ -249,12 +250,17 @@ describe("regression: non-tracked items behave exactly as before", () => {
     expect(ledger.every((l) => l.batchId === null)).toBe(true);
   });
 
-  test("IN on a tracked item without batch info still works (un-batched stock)", async () => {
+  test("IN on a tracked item without batch info lands in a batch named after the invoice", async () => {
     const item = await makeItem(company, { trackBatches: true });
     const res = await post(admin.token, { type: "IN", itemId: item._id, qty: 5 });
     expect(res.status).toBe(201);
     expect((await Item.findById(item._id)).qty).toBe(5);
-    expect(await Batch.countDocuments({ itemId: item._id })).toBe(0);
+
+    const batches = await Batch.find({ itemId: item._id });
+    expect(batches).toHaveLength(1);
+    expect(batches[0].qtyRemaining).toBe(5);
+    expect(batches[0].batchNo).toBe(res.body.transaction.invoiceNo);
+    expect(batches[0].expiryDate).toBeNull();
   });
 
   test("batchNo on a non-tracked item is ignored", async () => {

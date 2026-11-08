@@ -21,6 +21,8 @@ export default function PurchaseOrderDetail() {
 
   // Receive form: { [lineId]: qty }, one warehouse for the whole receipt
   const [recvQty, setRecvQty] = useState({});
+  // Lot details for batch-tracked lines: { [lineId]: { batchNo, expiryDate } }
+  const [recvBatch, setRecvBatch] = useState({});
   const [warehouses, setWarehouses] = useState([]);
   const [warehouseId, setWarehouseId] = useState('');
 
@@ -35,6 +37,7 @@ export default function PurchaseOrderDetail() {
       const init = {};
       (data.lines || []).forEach(l => { init[l._id] = ''; });
       setRecvQty(init);
+      setRecvBatch({});
     } catch (e) {
       showToast(e.message || 'Error', 'error');
       navigate('/purchase-orders');
@@ -62,7 +65,15 @@ export default function PurchaseOrderDetail() {
   const handleReceive = () => {
     const lines = Object.entries(recvQty)
       .filter(([, q]) => Number(q) > 0)
-      .map(([lineId, q]) => ({ lineId, qty: Number(q), ...(warehouseId ? { warehouseId } : {}) }));
+      .map(([lineId, q]) => {
+        const b = recvBatch[lineId] || {};
+        return {
+          lineId, qty: Number(q),
+          ...(warehouseId ? { warehouseId } : {}),
+          ...(b.batchNo ? { batchNo: b.batchNo.trim() } : {}),
+          ...(b.expiryDate ? { expiryDate: b.expiryDate } : {}),
+        };
+      });
     if (lines.length === 0) return;
     act(() => api.receivePurchaseOrder(id, { lines }), isAR ? 'تم استلام البضاعة' : 'Goods received');
   };
@@ -161,10 +172,24 @@ export default function PurchaseOrderDetail() {
                   {receivable && canReceive && (
                     <td style={{ padding: 12 }}>
                       {remaining > 0 ? (
-                        <input type="number" min="0" max={remaining} placeholder={`≤ ${remaining}`}
-                               value={recvQty[l._id] ?? ''}
-                               onChange={e => setRecvQty(q => ({ ...q, [l._id]: e.target.value }))}
-                               style={{ ...inputStyle(t), width: 90, height: 30 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <input type="number" min="0" max={remaining} placeholder={`≤ ${remaining}`}
+                                 value={recvQty[l._id] ?? ''}
+                                 onChange={e => setRecvQty(q => ({ ...q, [l._id]: e.target.value }))}
+                                 style={{ ...inputStyle(t), width: 90, height: 30 }} />
+                          {l.itemId?.trackBatches && Number(recvQty[l._id]) > 0 && (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <input placeholder={isAR ? 'رقم التشغيلة' : 'Batch / lot no.'}
+                                     value={recvBatch[l._id]?.batchNo ?? ''}
+                                     onChange={e => setRecvBatch(b => ({ ...b, [l._id]: { ...b[l._id], batchNo: e.target.value } }))}
+                                     style={{ ...inputStyle(t), width: 130, height: 30 }} />
+                              <input type="date" title={isAR ? 'تاريخ الانتهاء' : 'Expiry date'}
+                                     value={recvBatch[l._id]?.expiryDate ?? ''}
+                                     onChange={e => setRecvBatch(b => ({ ...b, [l._id]: { ...b[l._id], expiryDate: e.target.value } }))}
+                                     style={{ ...inputStyle(t), width: 140, height: 30 }} />
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <span style={{ color: '#16a34a', fontSize: 12, fontWeight: 700 }}>✓</span>
                       )}

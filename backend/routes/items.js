@@ -1,10 +1,15 @@
-const express = require("express");
-const { Item, Company, Batch } = require("../models");
+const express  = require("express");
+const mongoose = require("mongoose");
+const { Item, Company, Batch, Ledger } = require("../models");
 const { protect, need }     = require("../middleware/auth");
 const upload                = require("../middleware/upload");
 const { broadcast }         = require("../utils/broadcast");
 const { cloudinary, uploadToCloudinary } = require("../config/cloudinary");
-const { friendly, statusFor } = require("../errors");
+const { friendly, statusFor, httpError } = require("../errors");
+const AlertService          = require("../services/AlertService");
+const { openingBatchForExistingStock } = require("../services/batchStock");
+const { fetchPublicImage }  = require("../utils/safeFetch");
+const { recordAdjustment, PROTECTED_ITEM_FIELDS } = require("../services/stockAdjust");
 
 const router = express.Router();
 
@@ -166,7 +171,7 @@ router.get("/:id", protect, async (req, res) => {
 
 // ── POST /api/items/import  (owner only — bulk upsert from Odoo export) ──────
 // NOTE: must appear before POST /:id routes so Express doesn't capture "import" as an id.
-router.post("/import", protect, async (req, res) => {
+router.post("/import", protect, need("canAdd"), need("canEdit"), async (req, res) => {
   try {
     if (req.user.role !== "owner") return res.status(403).json({ message: "Owner only" });
     const { items } = req.body;
@@ -229,13 +234,31 @@ router.post("/import", protect, async (req, res) => {
         if (!existing && payload.barcode)
           existing = await Item.findOne({ barcode: payload.barcode, companyId: req.user.companyId });
 
-        if (existing) {
-          await Item.findByIdAndUpdate(existing._id, payload, { runValidators: true });
-          results.updated++;
-        } else {
-          await Item.create(payload);
-          results.created++;
-        }
+        if (existing && existing.trackBatches && payload.qty !== undefined && payload.qty !== existing.qty)
+          throw new Error("Quantity of a batch-tracked item can only change through Stock In / Stock Out");
+
+        // Each row is its own DB transaction so a qty change and its ADJUST
+        // ledger row land together.
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => {
+            if (existing) {
+              const updated = await Item.findByIdAndUpdate(existing._id, payload,
+                { runValidators: true, returnDocument: "after", session });
+              await recordAdjustment({
+                companyId: req.user.companyId, item: updated, qtyBefore: existing.qty, qtyAfter: updated.qty,
+                userId: req.user._id, notes: "Quantity set by item import", session,
+              });
+            } else {
+              const [created] = await Item.create([payload], { session });
+              await recordAdjustment({
+                companyId: req.user.companyId, item: created, qtyBefore: 0, qtyAfter: created.qty,
+                userId: req.user._id, notes: "Opening stock (item import)", session,
+              });
+            }
+          });
+        } finally { session.endSession(); }
+        if (existing) results.updated++; else results.created++;
       } catch (rowErr) {
         results.errors.push({ row: raw.name || raw.nameEn || "?", error: rowErr.message });
       }
@@ -248,8 +271,11 @@ router.post("/import", protect, async (req, res) => {
 // ── POST /api/items ──────────────────────────────────────────────────────────
 router.post("/", protect, need("canAdd"), async (req, res) => {
   try {
-    const itemDoc = { ...req.body, companyId: req.user.companyId };
-    
+    const itemDoc = { ...req.body };
+    for (const k of [...PROTECTED_ITEM_FIELDS, "deletedAt"]) delete itemDoc[k];
+    itemDoc.companyId = req.user.companyId;
+    itemDoc.qty = Math.max(0, Number(itemDoc.qty) || 0);
+
     if (!itemDoc.sku) {
       const company = await Company.findById(req.user.companyId);
       if (company?.skuConfig?.segments?.length > 0) {
@@ -269,7 +295,20 @@ router.post("/", protect, need("canAdd"), async (req, res) => {
       }
     }
 
-    const doc = await Item.create(itemDoc);
+    // Opening stock is recorded in the ledger in the same DB transaction.
+    const session = await mongoose.startSession();
+    let doc;
+    try {
+      await session.withTransaction(async () => {
+        [doc] = await Item.create([itemDoc], { session });
+        await recordAdjustment({
+          companyId: req.user.companyId, item: doc, qtyBefore: 0, qtyAfter: doc.qty,
+          userId: req.user._id, notes: "Opening stock (item created)", session,
+        });
+        if (doc.trackBatches) await openingBatchForExistingStock({ companyId: req.user.companyId, item: doc, session });
+      });
+    } finally { session.endSession(); }
+
     broadcast(req, "item_added", doc);
     res.status(201).json(doc);
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
@@ -277,8 +316,32 @@ router.post("/", protect, need("canAdd"), async (req, res) => {
 
 // ── PUT /api/items/:id ───────────────────────────────────────────────────────
 router.put("/:id", protect, need("canEdit"), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const update = { ...req.body };
+
+    // Fields that are owned by the transaction engine or the tenant boundary
+    // must never be written from an edit form.
+    for (const k of ["_id", "companyId", "avgCost", "reservedQty", "deletedAt", "createdAt", "updatedAt"])
+      delete update[k];
+
+    const current = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId }).session(session);
+    if (!current) throw httpError(404, "Not found");
+
+    // A changed qty is a stock adjustment: apply it with a ledger entry so the
+    // ledger keeps reconciling with Item.qty.
+    let adjust = null;
+    if (update.qty !== undefined) {
+      const newQty = Number(update.qty);
+      delete update.qty;
+      if (!Number.isFinite(newQty) || newQty < 0) throw httpError(400, "Quantity must be zero or more");
+      if (newQty !== current.qty) {
+        if (current.trackBatches)
+          throw httpError(400, "Quantity of a batch-tracked item can only change through Stock In / Stock Out");
+        adjust = { qtyBefore: current.qty, qtyAfter: newQty };
+      }
+    }
 
     // Never persist an empty SKU — it collides on the unique index.
     // Preserve the existing one or run the smart-SKU engine.
@@ -309,23 +372,57 @@ router.put("/:id", protect, need("canEdit"), async (req, res) => {
       }
     }
 
+    if (adjust) update.qty = adjust.qtyAfter;
+
     const item = await Item.findOneAndUpdate(
       { _id: req.params.id, companyId: req.user.companyId },
       update,
-      { returnDocument: "after", runValidators: true }
-    ).populate("deptId", "name nameEn color").populate("catId", "name nameEn");
-    if (!item) return res.status(404).json({ message: "Not found" });
-    broadcast(req, "item_updated", item);
-    res.json(item);
-  } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
+      { returnDocument: "after", runValidators: true, session }
+    );
+
+    if (adjust) {
+      await Ledger.create([{
+        companyId: req.user.companyId,
+        itemId: item._id,
+        type: "ADJUST",
+        qtyChange: adjust.qtyAfter - adjust.qtyBefore,
+        qtyBefore: adjust.qtyBefore,
+        qtyAfter: adjust.qtyAfter,
+        warehouseId: item.warehouseId || null,
+        userId: req.user._id,
+        notes: req.body.adjustReason || "Manual quantity adjustment (item edit)",
+      }], { session });
+      await AlertService.checkStockAndAlert(item, session);
+    }
+
+    // Turning batch tracking on: existing stock goes into an OPENING batch.
+    if (item.trackBatches && !current.trackBatches) {
+      await openingBatchForExistingStock({ companyId: req.user.companyId, item, session });
+    }
+
+    await session.commitTransaction();
+
+    const populated = await Item.findById(item._id)
+      .populate("deptId", "name nameEn color").populate("catId", "name nameEn");
+    broadcast(req, "item_updated", populated);
+    res.json(populated);
+  } catch (e) {
+    await session.abortTransaction();
+    res.status(statusFor(e)).json({ message: friendly(e) });
+  } finally { session.endSession(); }
 });
 
 // ── DELETE /api/items/:id ────────────────────────────────────────────────────
 router.delete("/:id", protect, need("canDelete"), async (req, res) => {
   try {
-    const item = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId });
+    // Soft delete: transactions, ledger rows and batches keep pointing at a
+    // real item, and every item query already excludes deletedAt != null.
+    const item = await Item.findOneAndUpdate(
+      { _id: req.params.id, companyId: req.user.companyId, deletedAt: null },
+      { $set: { deletedAt: new Date(), status: "inactive" } },
+      { returnDocument: "after" }
+    );
     if (!item) return res.status(404).json({ message: "Not found" });
-    await Item.findOneAndDelete({ _id: req.params.id, companyId: req.user.companyId });
     broadcast(req, "item_deleted", { _id: item._id });
     res.json({ success: true });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
@@ -339,18 +436,10 @@ router.post("/:id/photo-from-url", protect, need("canAdd"), async (req, res) => 
     const { url } = req.body;
     if (!url || typeof url !== "string") return res.status(400).json({ message: "url required" });
 
-    // Fetch image server-side (9 s timeout to keep things snappy)
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 9000);
-    let imgRes;
-    try {
-      imgRes = await fetch(url, { signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!imgRes.ok) return res.status(400).json({ message: `Could not fetch image (HTTP ${imgRes.status})` });
+    const item = await Item.findOne({ _id: req.params.id, companyId: req.user.companyId, deletedAt: null });
+    if (!item) return res.status(404).json({ message: "Not found" });
 
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const buffer = await fetchPublicImage(url);
     const result = await uploadToCloudinary(buffer);
     const image  = { url: result.secure_url, publicId: result.public_id };
 

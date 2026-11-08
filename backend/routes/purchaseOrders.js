@@ -1,7 +1,8 @@
 const express  = require("express");
 const mongoose = require("mongoose");
-const { PurchaseOrder, Source, Item, Transaction, Ledger, ItemStockLocation } = require("../models");
+const { PurchaseOrder, Source, Item, Transaction, Ledger, ItemStockLocation, Batch } = require("../models");
 const AlertService = require("../services/AlertService");
+const { receiveIntoBatch } = require("../services/batchStock");
 const { protect, need } = require("../middleware/auth");
 const { friendly, statusFor, httpError } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
@@ -17,7 +18,7 @@ const genPoNo = () =>
 
 const POPULATE = [
   { path: "supplier", select: "name contact" },
-  { path: "lines.itemId", select: "name nameEn sku barcode qty avgCost" },
+  { path: "lines.itemId", select: "name nameEn sku barcode qty avgCost trackBatches" },
   { path: "createdBy", select: "name" },
 ];
 
@@ -158,7 +159,11 @@ router.post("/:id/cancel", async (req, res) => {
 });
 
 // ── POST /api/purchase-orders/:id/receive — goods receipt ────────────────────
-// Body: { lines: [{ lineId, qty, warehouseId?, binId? }], date?, notes? }
+// Body: { lines: [{ lineId, qty, warehouseId?, binId?,
+//                  batchNo?, mfgDate?, expiryDate?, supplierLot? }], date?, notes? }
+// Batch fields apply to batch-tracked items; without a batchNo the receipt
+// becomes its own batch (named after the GRN number) so batch totals stay
+// equal to Item.qty.
 // Runs the same stock path as POST /api/transactions type IN: atomic Item
 // update with moving-average cost, ItemStockLocation upsert, IN Transaction
 // (invoiceNo GRN-…) and Ledger rows — all in one mongoose session.
@@ -181,7 +186,7 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
     const updatedItemsMap = {};
 
     for (const recv of recvLines) {
-      const { lineId, warehouseId, binId } = recv;
+      const { lineId, warehouseId, binId, batchNo, mfgDate, expiryDate, supplierLot } = recv;
       const qty = Number(recv.qty);
       if (!Number.isFinite(qty) || qty <= 0) throw httpError(400, "Received quantity must be positive");
 
@@ -192,7 +197,7 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
       if (qty > remaining)
         throw httpError(400, `Cannot receive ${qty} — only ${remaining} remaining on this line`);
 
-      const currentItem = await Item.findOne({ _id: line.itemId, companyId: req.user.companyId }).session(session);
+      const currentItem = await Item.findOne({ _id: line.itemId, companyId: req.user.companyId, deletedAt: null }).session(session);
       if (!currentItem) throw httpError(404, `Item not found: ${line.itemId}`);
 
       const prevQty  = currentItem.qty;
@@ -228,6 +233,15 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
         );
       }
 
+      const txBatches = [];
+      if (currentItem.trackBatches) {
+        txBatches.push(await receiveIntoBatch({
+          companyId: req.user.companyId, itemId: line.itemId, qty,
+          batchNo, fallbackBatchNo: invoiceNo,
+          mfgDate, expiryDate, supplierLot, warehouseId, binId, session,
+        }));
+      }
+
       const txDocId = new mongoose.Types.ObjectId();
       txDocs.push({
         _id: txDocId,
@@ -244,6 +258,7 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
         ...(warehouseId ? { warehouseId } : {}),
         ...(binId ? { binId } : {}),
         unitCost: unitCost || 0,
+        ...(txBatches.length ? { batches: txBatches } : {}),
       });
 
       ledgerDocs.push({
@@ -259,6 +274,7 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
         sourceId: po.supplier,
         userId: req.user._id,
         notes: req.body.notes || `Goods receipt for ${po.poNo}`,
+        batchId: txBatches.length === 1 ? txBatches[0].batchId : null,
       });
 
       line.receivedQty += qty;
@@ -272,6 +288,12 @@ router.post("/:id/receive", need("canTxIn"), async (req, res) => {
 
     for (const updatedItem of Object.values(updatedItemsMap)) {
       await AlertService.checkStockAndAlert(updatedItem, session);
+      if (updatedItem.trackBatches) {
+        const itemBatches = await Batch.find({
+          companyId: req.user.companyId, itemId: updatedItem._id, qtyRemaining: { $gt: 0 },
+        }).session(session);
+        await AlertService.checkExpiringBatchesAndAlert(updatedItem, itemBatches, session);
+      }
     }
 
     const populatedTxs = await Transaction.find({ _id: { $in: createdTxs.map(t => t._id) } }).session(session)

@@ -94,7 +94,7 @@ router.post("/checkout", rateLimit({ windowMs: 60 * 1000, max: 120 }), authentic
       if (qty <= 0) throw httpError(400, "Quantity must be positive");
 
       // Find item
-      const query = { companyId };
+      const query = { companyId, deletedAt: null };
       if (sku) query.sku = sku;
       else if (barcode) query.barcode = barcode;
       else throw httpError(400, "Each item must have a sku or barcode");

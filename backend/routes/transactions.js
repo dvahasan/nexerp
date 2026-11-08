@@ -2,6 +2,7 @@ const express  = require("express");
 const mongoose = require("mongoose");
 const { Transaction, Item, Ledger, ItemStockLocation, Batch } = require("../models");
 const AlertService = require("../services/AlertService");
+const { receiveIntoBatch } = require("../services/batchStock");
 const { protect, need }     = require("../middleware/auth");
 const { friendly, statusFor, httpError } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
@@ -131,7 +132,7 @@ async function txCreateHandler(req, res) {
       if (qty <= 0) throw httpError(400, "Quantity must be positive");
 
       // Read current state to determine prevQty
-      const currentItem = await Item.findOne({ _id: itemId, companyId: req.user.companyId }).session(session);
+      const currentItem = await Item.findOne({ _id: itemId, companyId: req.user.companyId, deletedAt: null }).session(session);
       if (!currentItem) throw httpError(404, `Item not found: ${itemId}`);
       
       const prevQty = currentItem.qty;
@@ -174,32 +175,12 @@ async function txCreateHandler(req, res) {
       // ── Lot/batch handling (only for batch-tracked items) ───────────────
       const txBatches = [];
       if (currentItem.trackBatches) {
-        if (type === "IN" && batchNo) {
-          // Create or increment the (item, batchNo) batch.
-          const bNo = String(batchNo).trim();
-          let batch = await Batch.findOne({
-            companyId: req.user.companyId, itemId, batchNo: bNo,
-          }).session(session);
-          if (batch) {
-            batch.qtyRemaining += qty;
-            if (mfgDate)      batch.mfgDate     = new Date(mfgDate);
-            if (expiryDate)   batch.expiryDate  = new Date(expiryDate);
-            if (supplierLot)  batch.supplierLot = String(supplierLot).trim();
-            await batch.save({ session });
-          } else {
-            [batch] = await Batch.create([{
-              companyId:    req.user.companyId,
-              itemId,
-              batchNo:      bNo,
-              mfgDate:      mfgDate    ? new Date(mfgDate)    : null,
-              expiryDate:   expiryDate ? new Date(expiryDate) : null,
-              supplierLot:  supplierLot ? String(supplierLot).trim() : "",
-              qtyRemaining: qty,
-              warehouseId:  warehouseId || null,
-              binId:        binId || null,
-            }], { session });
-          }
-          txBatches.push({ batchId: batch._id, batchNo: batch.batchNo, qty, expiryDate: batch.expiryDate });
+        if (type === "IN") {
+          txBatches.push(await receiveIntoBatch({
+            companyId: req.user.companyId, itemId, qty,
+            batchNo, fallbackBatchNo: invoiceNo,
+            mfgDate, expiryDate, supplierLot, warehouseId, binId, session,
+          }));
         } else if (type === "OUT") {
           // FEFO: consume earliest expiryDate first (no-expiry batches last),
           // ties broken by receipt order.
