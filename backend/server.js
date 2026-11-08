@@ -17,6 +17,7 @@ require("./config/cloudinary");           // configures cloudinary globally
 const { setBroadcastIO } = require("./utils/broadcast");
 const { SECRET }         = require("./middleware/auth");
 const seedData           = require("./seedData");
+const { redactBody }     = require("./utils/redact");
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 const authRoutes         = require("./routes/auth");
@@ -135,8 +136,7 @@ app.use((req, res, next) => {
         }
 
         // Sanitize body (remove passwords)
-        const safeBody = { ...req.body };
-        if (safeBody.password) safeBody.password = '***';
+        const safeBody = redactBody(req.body || {});
 
         await ActionLog.create({
           userId,

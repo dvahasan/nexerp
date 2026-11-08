@@ -67,8 +67,8 @@ export default function AiChat({ open, onClose }) {
     setMessages(prev => [...prev, { role: 'user', text: q }]);
     setLoading(true);
     try {
-      const { response } = await api.aiChat(q, historyForApi());
-      setMessages(prev => [...prev, { role: 'bot', text: response }]);
+      const { response, mode } = await api.aiChat(q, historyForApi());
+      setMessages(prev => [...prev, { role: 'bot', text: response, basic: mode === 'basic' }]);
     } catch (e) {
       setMessages(prev => [...prev, { role: 'bot', text: `⚠️ Error: ${e.message}` }]);
     } finally {
@@ -273,6 +273,11 @@ export default function AiChat({ open, onClose }) {
                   ? <MsgContent text={msg.text} color={p.fg} />
                   : msg.text
                 }
+                {msg.basic && (
+                  <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'ui-monospace, monospace', textTransform: 'uppercase', letterSpacing: '0.06em', color: p.fgMuted }}>
+                    {isAR ? 'الوضع الأساسي — إجابة آلية بدون ذكاء اصطناعي' : 'Basic mode — automatic answer, not AI'}
+                  </div>
+                )}
               </div>
             </div>
           ))}

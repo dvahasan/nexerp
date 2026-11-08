@@ -24,7 +24,7 @@ router.post("/chat", protect, async (req, res) => {
     }
 
     const [items, txs] = await Promise.all([
-      Item.find({ companyId: cid })
+      Item.find({ companyId: cid, deletedAt: null })
         .select("name nameEn sku qty minThreshold status price").limit(200),
       Transaction.find({ companyId: cid }).sort({ date: -1 }).limit(30)
         .populate("itemId", "name nameEn")
@@ -71,7 +71,7 @@ Be concise, helpful, and data-driven. Answer in the same language the user write
             history.map(m => `User: ${m.user}\nAssistant: ${m.bot}`).join("\n") +
             `\n\nUser: ${prompt}`,
         });
-        return res.json({ response: response.text });
+        return res.json({ response: response.text, mode: "ai" });
       } catch (aiErr) {
         console.error("Gemini error:", aiErr.message);
         // Fall through to smart simulation
@@ -106,7 +106,7 @@ Be concise, helpful, and data-driven. Answer in the same language the user write
       response = `I can help you with your inventory at **${company?.name}**! Try asking:\n• "What items are low on stock?"\n• "What's my total inventory value?"\n• "What transactions happened today?"\n• "Which items are out of stock?"\n\n*(Connect a Gemini API key in .env for full AI capabilities.)*`;
     }
 
-    res.json({ response });
+    res.json({ response, mode: "basic" });
   } catch (e) { res.status(statusFor(e)).json({ message: friendly(e) }); }
 });
 

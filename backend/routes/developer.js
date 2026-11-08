@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const os = require("os");
 const crypto = require("crypto");
+const net = require("net");
+const { isPrivateAddress } = require("../utils/safeFetch");
 const { User, Company, Transaction, Item } = require("../models");
 const { rateLimit } = require("../utils/rateLimit");
 
@@ -132,24 +134,34 @@ trackDemoRouter.post("/", rateLimit({ windowMs: 60 * 1000, max: 5, message: "Too
     const { DemoVisit } = require("../models");
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || "";
     if (ip.includes(',')) ip = ip.split(',')[0].trim();
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
     
-    // Attempt to get location using free IP API
+    // Coarse geolocation over HTTPS, with a short timeout so a slow provider
+    // never delays the demo.
     let country = "Unknown", city = "Unknown";
     try {
-      if (ip && ip !== "127.0.0.1" && ip !== "::1") {
-        const ipRes = await fetch(`http://ip-api.com/json/${ip}`);
+      if (ip && net.isIP(ip) && !isPrivateAddress(ip)) {
+        const ipRes = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,city`, {
+          signal: AbortSignal.timeout(3000),
+        });
         const ipData = await ipRes.json();
-        if (ipData.status === "success") {
-          country = ipData.country;
-          city = ipData.city;
+        if (ipData.success) {
+          country = ipData.country || "Unknown";
+          city = ipData.city || "Unknown";
         }
       }
     } catch (err) {
       console.warn("Failed to fetch IP geolocation:", err.message);
     }
 
+    // Store a truncated IP (last IPv4 octet / last 80 IPv6 bits zeroed):
+    // enough for traffic analysis, not enough to identify a visitor.
+    const truncatedIp = net.isIPv4(ip)
+      ? ip.split(".").slice(0, 3).concat("0").join(".")
+      : net.isIPv6(ip) ? ip.split(":").slice(0, 3).join(":") + "::" : "";
+
     const visit = new DemoVisit({
-      ip,
+      ip: truncatedIp,
       country,
       city,
       location: country !== "Unknown" ? `${city}, ${country}` : "Local/Unknown",
