@@ -139,6 +139,7 @@ export default function Layout({ children }) {
     // Transactions group (rendered specially in SidebarContent)
     ...(canTx ? [{ type: 'group', id: 'tx', icon: 'transactions', label: isAR ? 'الحركات' : 'Transactions', children: txChildren }] : []),
     ...(canManagePurchases ? [{ path: '/purchase-orders', icon: 'import_data', label: isAR ? 'أوامر الشراء' : 'Purchase Orders' }] : []),
+    { path: '/ledger',     icon: 'table',      label: isAR ? 'سجل المخزون' : 'Stock Ledger' },
     { path: '/warehouses', icon: 'warehouse',  label: isAR ? 'المستودعات' : 'Warehouses' },
     { path: '/bom',        icon: 'bom',        label: isAR ? 'بيانات المواد' : 'Bill of Materials' },
     { path: '/files',      icon: 'copy',       label: isAR ? 'الملفات' : 'Files' },

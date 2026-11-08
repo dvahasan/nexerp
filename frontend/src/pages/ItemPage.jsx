@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import RichTextEditor from '../components/RichTextEditor';
 import BarcodeScanner from '../components/BarcodeScanner';
+import ItemMovementHistory from '../components/ItemMovementHistory';
 import Icon from '../components/Icon';
 import { useAppContext } from '../context/AppContext';
 import { T } from '../theme';
@@ -1726,6 +1727,9 @@ export default function ItemPage() {
         )}
                </div>
         </div>
+
+        {/* ── Movement history (ledger) — edit mode only ──────────────────── */}
+        {!isNew && editItem && <ItemMovementHistory itemId={id} />}
       </div>
 
       {/* ── Barcode scanner (portal-like, renders outside modal) ─────────────── */}

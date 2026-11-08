@@ -36,6 +36,8 @@ const PurchaseOrderDetail = lazy(() => import('./pages/PurchaseOrderDetail'));
 const Destinations = lazy(() => import('./pages/Destinations'));
 const Projects    = lazy(() => import('./pages/Projects'));
 const Reasons     = lazy(() => import('./pages/Reasons'));
+const StockLedger = lazy(() => import('./pages/StockLedger'));
+const ReorderSuggestions = lazy(() => import('./pages/ReorderSuggestions'));
 
 /* ── Loading spinner ─────────────────────────────────────────────────────── */
 function Spinner() {
@@ -155,6 +157,8 @@ function AppRoutes() {
         <Route path="/item/:id"     element={<Protected><Layout><ItemPage /></Layout></Protected>} />
         {/* Legacy redirect — old /transactions link lands on stock-in */}
         <Route path="/transactions" element={<Protected><Layout><Transactions /></Layout></Protected>} />
+        <Route path="/ledger"       element={<Protected><Layout><StockLedger /></Layout></Protected>} />
+        <Route path="/reorder"      element={<Protected><Layout><ReorderSuggestions /></Layout></Protected>} />
         <Route path="/stock-in"     element={<Protected><Layout><PermGuard perm="canTxIn"><StockIn /></PermGuard></Layout></Protected>} />
         <Route path="/stock-out"    element={<Protected><Layout><PermGuard perm="canTxOut"><StockOut /></PermGuard></Layout></Protected>} />
         <Route path="/bom"             element={<Protected><Layout><PermGuard perm="canManageBOM"><BOM /></PermGuard></Layout></Protected>} />
