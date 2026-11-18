@@ -189,6 +189,11 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
             qty: parseInt(r.qty) || 0,
             unitCost: parseFloat(r.unitCost) || 0,
             binId: r.binId || undefined,
+            ...(header.type === 'IN' && r.item.trackBatches && r.batchNo ? {
+              batchNo: r.batchNo,
+              expiryDate: r.expiryDate || undefined,
+              mfgDate: r.mfgDate || undefined,
+            } : {}),
           }))
         };
         await saveTx(payload);
@@ -379,6 +384,34 @@ export default function TxModal({ open, onClose, editTx = null, onSaved, forcedT
                     <button type="button" onClick={() => removeRow(row.id)} style={{ width: 30, height: 30, border: 'none', backgroundColor: 'transparent', color: t.neg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyItems: 'center', padding: 0 }}>
                       <Icon name="delete" size={16} style={{ margin: 'auto' }} />
                     </button>
+                  )}
+
+                  {/* ── Lot/batch fields — IN on batch-tracked items only ── */}
+                  {header.type === 'IN' && row.item.trackBatches && (
+                    <div style={{ flexBasis: '100%', display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: 8, borderTop: `1px dashed ${t.border}` }}>
+                      <div style={{ flex: '1 1 120px', minWidth: 110 }}>
+                        <label style={{ display: 'block', fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, marginBottom: 3 }}>
+                          {isAR ? 'رقم التشغيلة' : 'Batch No'}
+                        </label>
+                        <input value={row.batchNo || ''} onChange={e => updateRow(row.id, 'batchNo', e.target.value)}
+                          placeholder={isAR ? 'مثال: LOT-001' : 'e.g. LOT-001'}
+                          style={{ width: '100%', height: 28, padding: '0 8px', borderRadius: 4, border: `1px solid ${t.border}`, backgroundColor: t.canvas, color: t.fg, fontSize: 12, fontFamily: 'ui-monospace, monospace', outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ flex: '0 1 140px' }}>
+                        <label style={{ display: 'block', fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, marginBottom: 3 }}>
+                          {isAR ? 'تاريخ الانتهاء' : 'Expiry Date'}
+                        </label>
+                        <input type="date" value={row.expiryDate || ''} onChange={e => updateRow(row.id, 'expiryDate', e.target.value)}
+                          style={{ width: '100%', height: 28, padding: '0 8px', borderRadius: 4, border: `1px solid ${t.border}`, backgroundColor: t.canvas, color: t.fg, fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ flex: '0 1 140px' }}>
+                        <label style={{ display: 'block', fontFamily: 'ui-monospace, monospace', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: t.fgSubtle, marginBottom: 3 }}>
+                          {isAR ? 'تاريخ الإنتاج' : 'Mfg Date'}
+                        </label>
+                        <input type="date" value={row.mfgDate || ''} onChange={e => updateRow(row.id, 'mfgDate', e.target.value)}
+                          style={{ width: '100%', height: 28, padding: '0 8px', borderRadius: 4, border: `1px solid ${t.border}`, backgroundColor: t.canvas, color: t.fg, fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}

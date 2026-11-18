@@ -17,6 +17,7 @@ require("./config/cloudinary");           // configures cloudinary globally
 const { setBroadcastIO } = require("./utils/broadcast");
 const { SECRET }         = require("./middleware/auth");
 const seedData           = require("./seedData");
+const { redactBody }     = require("./utils/redact");
 
 // ── Route modules ─────────────────────────────────────────────────────────────
 const authRoutes         = require("./routes/auth");
@@ -42,15 +43,32 @@ const destRoutes         = require("./routes/destinations");
 const projectRoutes      = require("./routes/projects");
 const reasonRoutes       = require("./routes/reasons");
 const publicApiRoutes    = require("./routes/publicApi");
+const ledgerRoutes       = require("./routes/ledger");
+const batchRoutes        = require("./routes/batches");
+const purchaseOrderRoutes = require("./routes/purchaseOrders");
+const billingRoutes      = require("./routes/billing");
 const developerRoutes    = require("./routes/developer");
 // ── App & HTTP server ─────────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 5000;
 
+// ── Allowed browser origins (CORS) ────────────────────────────────────────────
+// CLIENT_URL may hold one or more comma-separated production origins.
+const ALLOWED_ORIGINS = [
+  ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map(s => s.trim().replace(/\/$/, "")) : []),
+  "http://localhost:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:5173",
+];
+const originAllowed = (origin) => !origin || ALLOWED_ORIGINS.includes(origin.replace(/\/$/, ""));
+
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] },
+  cors: {
+    origin: (origin, cb) => originAllowed(origin) ? cb(null, true) : cb(new Error("CORS: origin not allowed")),
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
 });
 setBroadcastIO(io); // make io available to all route handlers
 
@@ -71,7 +89,15 @@ io.on("connection", (socket) => {
 });
 
 // ── Global middleware ─────────────────────────────────────────────────────────
-app.use(cors({ origin: function (origin, callback) { callback(null, true); }, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) =>
+    originAllowed(origin) ? callback(null, true) : callback(new Error("CORS: origin not allowed")),
+  credentials: true,
+}));
+// Stripe webhook needs the raw body for signature verification — mount it
+// before the JSON body parser.
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), billingRoutes.webhookHandler);
+
 app.use(express.json({ limit: "10mb" }));
 
 // Prevent aggressive caching of GET requests (e.g. by Edge/Chrome)
@@ -110,8 +136,7 @@ app.use((req, res, next) => {
         }
 
         // Sanitize body (remove passwords)
-        const safeBody = { ...req.body };
-        if (safeBody.password) safeBody.password = '***';
+        const safeBody = redactBody(req.body || {});
 
         await ActionLog.create({
           userId,
@@ -131,6 +156,13 @@ app.use((req, res, next) => {
     });
   }
   next();
+});
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const dbUp = mongoose.connection.readyState === 1;
+  res.status(dbUp ? 200 : 503).json({ status: dbUp ? "ok" : "degraded", db: dbUp ? "connected" : "disconnected" });
 });
 
 // ── API routes ────────────────────────────────────────────────────────────────
@@ -156,11 +188,27 @@ app.use("/api/sources",      sourceRoutes);
 app.use("/api/destinations", destRoutes);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/reasons",      reasonRoutes);
+app.use("/api/ledger",       ledgerRoutes);
+app.use("/api/batches",      batchRoutes);
+app.use("/api/purchase-orders", purchaseOrderRoutes);
+app.use("/api/billing",      billingRoutes.router);
 app.use("/api/public",       publicApiRoutes);
-app.use("/api/dev",          developerRoutes);
+
+// Demo-visit tracking stays public (rate-limited inside the router) even when
+// the developer console is disabled.
+app.use("/api/dev/track-demo", developerRoutes.trackDemoRouter);
+
+// The developer console (raw DB explorer, logs, settings) only mounts when a
+// strong DEV_MASTER_KEY is configured — it fails closed otherwise.
+if (process.env.DEV_MASTER_KEY && process.env.DEV_MASTER_KEY.length >= 16) {
+  app.use("/api/dev", developerRoutes.router);
+} else {
+  console.warn("⚠️  /api/dev disabled — set DEV_MASTER_KEY (≥16 chars) to enable the developer console.");
+}
 
 // ── Database connection & seed ────────────────────────────────────────────────
-connectDB(seedData);
+// Demo data is only seeded when explicitly requested — never implicitly in production.
+connectDB(process.env.SEED_DEMO === "true" ? seedData : null);
 
 // ── Start server ──────────────────────────────────────────────────────────────
 server.listen(PORT, () =>

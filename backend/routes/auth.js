@@ -5,18 +5,23 @@ const { Company, User, Department, Category } = require("../models");
 const { protect, resolvePerms, SECRET } = require("../middleware/auth");
 const { friendly, statusFor } = require("../errors");
 const { sendWelcome }          = require("../mailer");
+const { rateLimit }            = require("../utils/rateLimit");
+const { sanitizeCompany }      = require("../utils/sanitize");
 
 const router = express.Router();
+
+// Brute-force protection on the credential endpoints
+const loginLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: "Too many login attempts — try again later" });
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: "Too many registrations — try again later" });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const generateCompanyCode = () =>
   "NEX-" + Math.random().toString(36).substring(2, 6).toUpperCase();
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   try {
     const { companyName, adminUsername, adminEmail, password, isEnterprise } = req.body;
-    console.log("Register payload:", req.body);
 
     // ── Enterprise registration (no company needed) ──────────────────────────
     if (isEnterprise) {
@@ -77,7 +82,7 @@ router.post("/register", async (req, res) => {
 });
 
 // ── POST /api/auth/login ─────────────────────────────────────────────────────
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { code, username, password } = req.body;
     if (!username?.trim() || !password?.trim())
@@ -100,8 +105,9 @@ router.post("/login", async (req, res) => {
     if (!user || !(await user.checkPass(password)))
       return res.status(401).json({ message: "Invalid credentials" });
 
+    const perms = resolvePerms(user);
     const token = jwt.sign({ id: user._id, companyId: company._id }, SECRET, { expiresIn: "7d" });
-    res.json({ token, user, company, perms: resolvePerms(user) });
+    res.json({ token, user, company: sanitizeCompany(company, perms), perms });
   } catch (e) {
     res.status(statusFor(e)).json({ message: friendly(e) });
   }
@@ -112,7 +118,7 @@ router.get("/me", protect, async (req, res) => {
   const u = req.user.toObject();
   delete u.passwordHash;
   const company = await Company.findById(u.companyId);
-  res.json({ user: u, company, perms: req.perms });
+  res.json({ user: u, company: sanitizeCompany(company, req.perms), perms: req.perms });
 });
 
 // ── PUT /api/auth/profile ────────────────────────────────────────────────────

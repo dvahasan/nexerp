@@ -1,9 +1,10 @@
 const express  = require("express");
 const mongoose = require("mongoose");
-const { Transaction, Item, Ledger, ItemStockLocation } = require("../models");
+const { Transaction, Item, Ledger, ItemStockLocation, Batch } = require("../models");
 const AlertService = require("../services/AlertService");
+const { receiveIntoBatch } = require("../services/batchStock");
 const { protect, need }     = require("../middleware/auth");
-const { friendly, statusFor } = require("../errors");
+const { friendly, statusFor, httpError } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
 
 const router = express.Router();
@@ -109,11 +110,15 @@ async function txCreateHandler(req, res) {
         landedCost: req.body.landedCost,
         warehouseId: req.body.warehouseId,
         binId: req.body.binId,
-        binCode: req.body.binCode
+        binCode: req.body.binCode,
+        batchNo: req.body.batchNo,
+        mfgDate: req.body.mfgDate,
+        expiryDate: req.body.expiryDate,
+        supplierLot: req.body.supplierLot
       }];
     }
 
-    if (itemsArr.length === 0) throw new Error("No items provided");
+    if (itemsArr.length === 0) throw httpError(400, "No items provided");
 
     const invoiceNo = `INV-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     const txDocs = [];
@@ -121,13 +126,14 @@ async function txCreateHandler(req, res) {
     const updatedItemsMap = {};
 
     for (const itemData of itemsArr) {
-      const { itemId, qty: rawQty, unitCost, landedCost, warehouseId, binId, binCode } = itemData;
+      const { itemId, qty: rawQty, unitCost, landedCost, warehouseId, binId, binCode,
+              batchNo, mfgDate, expiryDate, supplierLot } = itemData;
       const qty = Number(rawQty);
-      if (qty <= 0) throw new Error("Quantity must be positive");
+      if (qty <= 0) throw httpError(400, "Quantity must be positive");
 
       // Read current state to determine prevQty
-      const currentItem = await Item.findOne({ _id: itemId, companyId: req.user.companyId }).session(session);
-      if (!currentItem) throw new Error(`Item not found: ${itemId}`);
+      const currentItem = await Item.findOne({ _id: itemId, companyId: req.user.companyId, deletedAt: null }).session(session);
+      if (!currentItem) throw httpError(404, `Item not found: ${itemId}`);
       
       const prevQty = currentItem.qty;
       const qtyChange = type === "IN" ? qty : -qty;
@@ -139,7 +145,7 @@ async function txCreateHandler(req, res) {
           { $inc: { qty: qtyChange } },
           { new: true, session }
         );
-        if (!updatedItem) throw new Error(`Insufficient stock for ${currentItem.name} — available: ${prevQty}`);
+        if (!updatedItem) throw httpError(400, `Insufficient stock for ${currentItem.name} — available: ${prevQty}`);
       } else {
         // IN
         let updateOps = { $inc: { qty: qtyChange } };
@@ -165,6 +171,44 @@ async function txCreateHandler(req, res) {
       }
 
       updatedItemsMap[itemId] = updatedItem;
+
+      // ── Lot/batch handling (only for batch-tracked items) ───────────────
+      const txBatches = [];
+      if (currentItem.trackBatches) {
+        if (type === "IN") {
+          txBatches.push(await receiveIntoBatch({
+            companyId: req.user.companyId, itemId, qty,
+            batchNo, fallbackBatchNo: invoiceNo,
+            mfgDate, expiryDate, supplierLot, warehouseId, binId, session,
+          }));
+        } else if (type === "OUT") {
+          // FEFO: consume earliest expiryDate first (no-expiry batches last),
+          // ties broken by receipt order.
+          const batches = await Batch.find({
+            companyId: req.user.companyId, itemId, qtyRemaining: { $gt: 0 },
+          }).session(session);
+          batches.sort((a, b) => {
+            const ea = a.expiryDate ? a.expiryDate.getTime() : Infinity;
+            const eb = b.expiryDate ? b.expiryDate.getTime() : Infinity;
+            if (ea !== eb) return ea - eb;
+            return a.createdAt - b.createdAt;
+          });
+
+          const batchStock = batches.reduce((s, b) => s + b.qtyRemaining, 0);
+          if (batchStock < qty)
+            throw httpError(400, `Insufficient batch stock for ${currentItem.name} — batch stock available: ${batchStock}`);
+
+          let remaining = qty;
+          for (const b of batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(b.qtyRemaining, remaining);
+            b.qtyRemaining -= take;
+            await b.save({ session });
+            txBatches.push({ batchId: b._id, batchNo: b.batchNo, qty: take, expiryDate: b.expiryDate });
+            remaining -= take;
+          }
+        }
+      }
 
       // Update Location Tracking
       if (warehouseId) {
@@ -194,6 +238,7 @@ async function txCreateHandler(req, res) {
         ...(binCode     ? { binCode }     : {}),
         unitCost:    unitCost    ? Number(unitCost)    : 0,
         landedCost:  landedCost  ? Number(landedCost)  : 0,
+        ...(txBatches.length ? { batches: txBatches } : {}),
       });
 
       ledgerDocs.push({
@@ -206,6 +251,7 @@ async function txCreateHandler(req, res) {
         qtyAfter: updatedItem.qty,
         warehouseId: warehouseId || null,
         binId: binId || null,
+        batchId: txBatches.length === 1 ? txBatches[0].batchId : null,
         sourceId: type === "IN" ? source : undefined,
         destId: type === "OUT" ? dest : undefined,
         projectId: projectId || undefined,
@@ -221,6 +267,12 @@ async function txCreateHandler(req, res) {
     // Check alerts for all modified items
     for (const [itemId, updatedItem] of Object.entries(updatedItemsMap)) {
       await AlertService.checkStockAndAlert(updatedItem, session);
+      if (updatedItem.trackBatches) {
+        const itemBatches = await Batch.find({
+          companyId: req.user.companyId, itemId: updatedItem._id,
+        }).session(session);
+        await AlertService.checkExpiringBatchesAndAlert(updatedItem, itemBatches, session);
+      }
     }
 
     const populatedTxs = await Transaction.find({ _id: { $in: createdTxs.map(t => t._id) } }).session(session)
@@ -258,20 +310,20 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
   session.startTransaction();
   try {
     const tx = await Transaction.findOne({ _id: req.params.id, companyId: req.user.companyId }).session(session);
-    if (!tx) throw new Error("Transaction not found");
-    if (tx.status === "cancelled") throw new Error("Transaction is already cancelled");
+    if (!tx) throw httpError(404, "Transaction not found");
+    if (tx.status === "cancelled") throw httpError(400, "Transaction is already cancelled");
 
     // SOFT CANCEL LOGIC
     if (req.body.status === "cancelled") {
       const item = await Item.findOne({ _id: tx.itemId, companyId: req.user.companyId }).session(session);
-      if (!item) throw new Error("Item not found");
+      if (!item) throw httpError(404, "Item not found");
 
       const qtyChange = tx.type === "IN" ? -tx.qty : tx.qty;
       const prevQty = item.qty;
 
       // Reversal logic
       if (tx.type === "IN") {
-        if (item.qty < tx.qty) throw new Error(`Cannot reverse IN transaction: insufficient stock to deduct ${tx.qty}`);
+        if (item.qty < tx.qty) throw httpError(400, `Cannot reverse IN transaction: insufficient stock to deduct ${tx.qty}`);
         await Item.findOneAndUpdate(
           { _id: item._id, companyId: req.user.companyId, qty: { $gte: tx.qty } },
           { $inc: { qty: qtyChange } },
@@ -293,6 +345,30 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
         );
       }
 
+      // Restore batch quantities symmetrically: reversing an IN takes the
+      // received qty back out of its batch (guarded — it may have been
+      // consumed since); reversing an OUT returns each consumed slice.
+      if (Array.isArray(tx.batches) && tx.batches.length > 0) {
+        for (const bl of tx.batches) {
+          if (!bl.batchId || !bl.qty) continue;
+          if (tx.type === "IN") {
+            const restored = await Batch.findOneAndUpdate(
+              { _id: bl.batchId, companyId: req.user.companyId, qtyRemaining: { $gte: bl.qty } },
+              { $inc: { qtyRemaining: -bl.qty } },
+              { new: true, session }
+            );
+            if (!restored)
+              throw httpError(400, `Cannot reverse IN transaction: batch ${bl.batchNo} no longer holds ${bl.qty} units`);
+          } else {
+            await Batch.findOneAndUpdate(
+              { _id: bl.batchId, companyId: req.user.companyId },
+              { $inc: { qtyRemaining: bl.qty } },
+              { session }
+            );
+          }
+        }
+      }
+
       tx.status = "cancelled";
       tx.cancelledAt = new Date();
       tx.cancelledBy = req.user._id;
@@ -309,12 +385,19 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
         qtyAfter: prevQty + qtyChange,
         warehouseId: tx.warehouseId || null,
         binId: tx.binId || null,
+        batchId: tx.batches?.length === 1 ? tx.batches[0].batchId : null,
         userId: req.user._id,
         notes: `Reversed Tx ${tx.invoiceNo || tx._id}`,
       }], { session });
 
       const updatedItem = await Item.findById(item._id).session(session);
       await AlertService.checkStockAndAlert(updatedItem, session);
+      if (updatedItem.trackBatches) {
+        const itemBatches = await Batch.find({
+          companyId: req.user.companyId, itemId: updatedItem._id,
+        }).session(session);
+        await AlertService.checkExpiringBatchesAndAlert(updatedItem, itemBatches, session);
+      }
       await session.commitTransaction();
 
       broadcast(req, "tx_updated", tx);
@@ -327,7 +410,7 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
     // To be perfectly safe, we shouldn't allow changing item/qty on an active transaction without
     // cancelling it and creating a new one. But for backwards compatibility, we handle it:
     
-    throw new Error("Direct editing of quantities is deprecated. Please cancel this transaction and record a new one.");
+    throw httpError(400, "Direct editing of quantities is deprecated. Please cancel this transaction and record a new one.");
 
   } catch (e) {
     await session.abortTransaction();

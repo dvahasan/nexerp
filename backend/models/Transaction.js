@@ -25,6 +25,15 @@ const TxSchema = new mongoose.Schema(
     unitCost:    { type: Number, default: 0, min: 0 },   // cost per unit at time of tx
     landedCost:  { type: Number, default: 0, min: 0 },   // total landed extras (shipping, duties)
 
+    // ── Lot/batch traceability ────────────────────────────────────────────
+    // IN: the batch(es) created/incremented. OUT: FEFO consumption breakdown.
+    batches: [{
+      batchId:    { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
+      batchNo:    { type: String, trim: true },
+      qty:        { type: Number, min: 0 },
+      expiryDate: { type: Date, default: null },
+    }],
+
     // ── Status & Reversals (Soft Cancel) ──────────────────────────────────
     status:       { type: String, enum: ["active", "cancelled"], default: "active" },
     cancelledAt:  { type: Date, default: null },
@@ -43,6 +52,12 @@ TxSchema.index({ companyId: 1, date: -1 });
 TxSchema.index({ companyId: 1, itemId: 1, date: -1 });
 TxSchema.index({ companyId: 1, type: 1, date: -1 });
 TxSchema.index({ companyId: 1, userId: 1, date: -1 });
-TxSchema.index({ companyId: 1, idempotencyKey: 1 }); // Useful for external API uniqueness
+// Enforce external-API idempotency at the database level: two concurrent
+// checkouts with the same key collide here and the loser surfaces as E11000.
+// Partial filter keeps the default-"" rows (internal transactions) out of it.
+TxSchema.index(
+  { companyId: 1, idempotencyKey: 1, itemId: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $exists: true, $gt: "" } } }
+);
 
 module.exports = mongoose.model("Transaction", TxSchema);

@@ -127,6 +127,7 @@ export default function Layout({ children }) {
   const canTxIn  = isOwner || user?.perms?.canTxIn;
   const canTxOut = isOwner || user?.perms?.canTxOut;
   const canTx    = canTxIn || canTxOut;
+  const canManagePurchases = isOwner || user?.perms?.canManagePurchases;
 
   const txChildren = [
     ...(canTxIn  ? [{ path: '/stock-in',  icon: 'arrow_down', label: isAR ? '↓ وارد (IN)'    : '↓ Stock In'  }] : []),
@@ -137,6 +138,8 @@ export default function Layout({ children }) {
     { path: '/inventory',  icon: 'inventory',  label: t.inventory },
     // Transactions group (rendered specially in SidebarContent)
     ...(canTx ? [{ type: 'group', id: 'tx', icon: 'transactions', label: isAR ? 'الحركات' : 'Transactions', children: txChildren }] : []),
+    ...(canManagePurchases ? [{ path: '/purchase-orders', icon: 'import_data', label: isAR ? 'أوامر الشراء' : 'Purchase Orders' }] : []),
+    { path: '/ledger',     icon: 'table',      label: isAR ? 'سجل المخزون' : 'Stock Ledger' },
     { path: '/warehouses', icon: 'warehouse',  label: isAR ? 'المستودعات' : 'Warehouses' },
     { path: '/bom',        icon: 'bom',        label: isAR ? 'بيانات المواد' : 'Bill of Materials' },
     { path: '/files',      icon: 'copy',       label: isAR ? 'الملفات' : 'Files' },
@@ -491,6 +494,25 @@ export default function Layout({ children }) {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen" style={{ '--color-primary': primaryColor, backgroundColor: tok.canvas }}>
+
+      {/* Demo-mode conversion banner */}
+      {user?.isDemo && (
+        <div
+          className="flex items-center justify-center gap-3 flex-shrink-0 px-3 py-1.5 text-[12px] font-semibold"
+          style={{ backgroundColor: '#1d4ed8', color: '#fff' }}
+        >
+          <span>
+            {isAR ? 'أنت في وضع التجربة — بياناتك لن تُحفظ.' : "You're exploring the demo — nothing you do here is saved."}
+          </span>
+          <a
+            href="/register"
+            className="px-3 py-1 rounded font-bold"
+            style={{ backgroundColor: '#fff', color: '#1d4ed8', textDecoration: 'none', whiteSpace: 'nowrap' }}
+          >
+            {isAR ? 'أنشئ مساحة عملك مجاناً' : 'Create your free workspace'}
+          </a>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════════
           TOP BAR  (h-12 = 48 px, like DMMAS)

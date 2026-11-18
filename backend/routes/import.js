@@ -1,19 +1,23 @@
 const express = require("express");
 const multer = require("multer");
 const { parse } = require("csv-parse/sync");
-const { Item, Company } = require("../models");
-const { protect } = require("../middleware/auth");
+const mongoose = require("mongoose");
+const { Item, Company, Ledger } = require("../models");
+const { protect, need } = require("../middleware/auth");
 const { friendly, statusFor } = require("../errors");
 const { broadcast } = require("../utils/broadcast");
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // match the server's 10mb JSON limit
+});
 
 // Core fields we natively support
 const CORE_FIELDS = ["name", "nameEn", "sku", "barcode", "price", "qty", "minThreshold", "description"];
 
 // ── POST /api/import/csv ──────────────────────────────────────────────────
-router.post("/csv", protect, upload.single("file"), async (req, res) => {
+router.post("/csv", protect, need("canAdd"), upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -45,7 +49,14 @@ Example CSV row: ${JSON.stringify(records[0])}`;
         });
         
         let rawText = response.text.replace(/```json/g, "").replace(/```/g, "").trim();
-        columnMap = JSON.parse(rawText);
+        const parsed = JSON.parse(rawText);
+        // The model's output (and the CSV headers that steer it) are untrusted:
+        // keep only real headers mapped to allowed core fields.
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          for (const [header, field] of Object.entries(parsed)) {
+            if (headers.includes(header) && CORE_FIELDS.includes(field)) columnMap[header] = field;
+          }
+        }
       } catch (e) { console.error("LLM Mapping failed, falling back to deterministic:", e.message); }
     }
     
@@ -62,6 +73,13 @@ Example CSV row: ${JSON.stringify(records[0])}`;
     }
 
     // ── 2. Data Ingestion & SKU Generation ────────────────────
+    // Re-importing the same file must not duplicate items: skip rows whose
+    // SKU or barcode already exists in this company (or earlier in the file).
+    const existing = await Item.find({ companyId: company._id, deletedAt: null }, "sku barcode").lean();
+    const seenSku = new Set(existing.map(i => i.sku).filter(Boolean));
+    const seenBarcode = new Set(existing.map(i => i.barcode).filter(Boolean));
+    let skipped = 0;
+
     const itemsToInsert = [];
     for (const row of records) {
       const itemDoc = {
@@ -108,15 +126,45 @@ Example CSV row: ${JSON.stringify(records[0])}`;
           itemDoc.sku = `SKU-${Date.now().toString().slice(-6)}-${Math.floor(Math.random()*1000)}`;
       }
 
+      itemDoc.sku = String(itemDoc.sku).trim();
+      if (itemDoc.barcode) itemDoc.barcode = String(itemDoc.barcode).trim();
+      if (seenSku.has(itemDoc.sku) || (itemDoc.barcode && seenBarcode.has(itemDoc.barcode))) {
+        skipped++;
+        continue;
+      }
+      seenSku.add(itemDoc.sku);
+      if (itemDoc.barcode) seenBarcode.add(itemDoc.barcode);
+
+      if (!(itemDoc.qty >= 0)) itemDoc.qty = 0;
       itemsToInsert.push(itemDoc);
     }
 
-    const inserted = await Item.insertMany(itemsToInsert);
+    // Imported quantities are opening stock: record them in the ledger in the
+    // same database transaction so the integrity report stays consistent.
+    const session = await mongoose.startSession();
+    let inserted;
+    try {
+      await session.withTransaction(async () => {
+        inserted = await Item.insertMany(itemsToInsert, { session });
+        const ledgerDocs = inserted.filter(i => i.qty > 0).map(i => ({
+          companyId: company._id,
+          itemId: i._id,
+          type: "ADJUST",
+          qtyChange: i.qty,
+          qtyBefore: 0,
+          qtyAfter: i.qty,
+          userId: req.user._id,
+          notes: "Opening stock (CSV import)",
+        }));
+        if (ledgerDocs.length) await Ledger.insertMany(ledgerDocs, { session });
+      });
+    } finally { session.endSession(); }
     broadcast(req, "items_imported", inserted.length);
 
     res.json({
       success: true,
       count: inserted.length,
+      skippedDuplicates: skipped,
       mappedColumns: columnMap,
       unmappedColumns: headers.filter(h => !columnMap[h])
     });

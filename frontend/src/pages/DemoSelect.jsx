@@ -20,7 +20,8 @@ export default function DemoSelect() {
     setLoading(type);
     try {
       await loginDemo(type);
-      navigate(type === 'enterprise' ? '/enterprise' : '/dashboard');
+      // Enterprise demo users are intercepted by AppRoutes (no company → enterprise picker)
+      navigate('/dashboard');
     } catch (err) {
       console.error(err);
       alert('Demo login failed. Please ensure the backend is running and seeded.');

@@ -50,6 +50,47 @@ class AlertService {
     }
   }
 
+  /**
+   * Raises an `expiring_batch` alert when any batch of this item expires
+   * within `days` days and still has stock remaining; resolves the alert
+   * once no such batch is left. Called during transaction writes — no cron.
+   * @param {Object} item    The item document (companyId/_id/name used).
+   * @param {Array}  batches Batch docs of this item (post-write state).
+   * @param {mongoose.ClientSession} session (Optional)
+   * @param {number} days    Alert window, defaults to 30 days.
+   */
+  static async checkExpiringBatchesAndAlert(item, batches, session = null, days = 30) {
+    if (!item || !Array.isArray(batches)) return;
+
+    try {
+      const horizon = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      const expiring = batches.filter(
+        (b) => b.qtyRemaining > 0 && b.expiryDate && new Date(b.expiryDate) <= horizon
+      );
+
+      if (expiring.length > 0) {
+        // Soonest-expiring batch drives the message and severity.
+        expiring.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+        const soonest = expiring[0];
+        const daysLeft = Math.ceil((new Date(soonest.expiryDate) - Date.now()) / (24 * 60 * 60 * 1000));
+        await this._createOrUpdateAlert({
+          companyId: item.companyId,
+          itemId: item._id,
+          type: "expiring_batch",
+          severity: daysLeft <= 0 ? "critical" : "warning",
+          message: daysLeft <= 0
+            ? `Batch ${soonest.batchNo} of ${item.name} has expired (qty ${soonest.qtyRemaining})`
+            : `Batch ${soonest.batchNo} of ${item.name} expires in ${daysLeft} day(s) (qty ${soonest.qtyRemaining})`,
+          session,
+        });
+      } else {
+        await this._resolveAlerts(item.companyId, item._id, "expiring_batch", session);
+      }
+    } catch (err) {
+      console.error("AlertService checkExpiringBatchesAndAlert error:", err);
+    }
+  }
+
   static async _createOrUpdateAlert(data) {
     const { companyId, itemId, type, severity, message, session } = data;
 

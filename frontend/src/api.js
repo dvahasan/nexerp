@@ -97,6 +97,7 @@ export const api = {
   updateItem:     (id, d)       => req("PUT",    `/items/${id}`, d),
   deleteItem:     (id)          => req("DELETE", `/items/${id}`),
   importItems:    (items)       => req("POST",   "/items/import", { items }),
+  getReorderSuggestions: ()     => req("GET",    "/items/reorder/suggestions"),
   uploadPhoto:       (id, file)  => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photo`, fd, true); },
   importPhotoFromUrl:(id, url)   => req("POST", `/items/${id}/photo-from-url`, { url }),
   addItemPhoto:    (id, file)     => { const fd = new FormData(); fd.append("photo", file); return req("POST", `/items/${id}/photos`, fd, true); },
@@ -154,6 +155,28 @@ export const api = {
 
   // AI
   aiChat: (prompt, history = []) => req("POST", "/ai/chat", { prompt, history }),
+
+  // Billing
+  getBilling:      ()     => req("GET",  "/billing"),
+  billingCheckout: (tier) => req("POST", "/billing/checkout", { tier }),
+  billingPortal:   ()     => req("POST", "/billing/portal"),
+
+  // Ledger
+  getLedger:          (params = {}) => req("GET", "/ledger?" + new URLSearchParams(params)),
+  getItemLedger:      (itemId)      => req("GET", `/ledger/item/${itemId}`),
+  getLedgerIntegrity: ()            => req("GET", "/ledger/integrity"),
+
+  // Batches (lot/expiry tracking)
+  getItemBatches:     (itemId)    => req("GET", `/items/${itemId}/batches`),
+  getExpiringBatches: (days = 30) => req("GET", `/batches/expiring?days=${days}`),
+  // Purchase Orders (procurement)
+  getPurchaseOrders:    (params = {}) => req("GET", "/purchase-orders?" + new URLSearchParams({ _t: Date.now(), ...params })),
+  getPurchaseOrder:     (id)          => req("GET",  `/purchase-orders/${id}`),
+  addPurchaseOrder:     (d)           => req("POST", "/purchase-orders", d),
+  updatePurchaseOrder:  (id, d)       => req("PUT",  `/purchase-orders/${id}`, d),
+  confirmPurchaseOrder: (id)          => req("POST", `/purchase-orders/${id}/confirm`),
+  cancelPurchaseOrder:  (id)          => req("POST", `/purchase-orders/${id}/cancel`),
+  receivePurchaseOrder: (id, d)       => req("POST", `/purchase-orders/${id}/receive`, d),
 
   // Barcode lookup (server-side proxy — avoids CORS)
   lookupBarcode: (code) => req("GET", `/barcode/${encodeURIComponent(code)}`),

@@ -1,7 +1,8 @@
 const express = require("express");
 const bcrypt  = require("bcryptjs");
-const { User }                 = require("../models");
+const { User, Company }        = require("../models");
 const { protect, need }        = require("../middleware/auth");
+const { planFor, billingEnabled } = require("../config/plans");
 const { broadcast }            = require("../utils/broadcast");
 const { friendly, statusFor }  = require("../errors");
 
@@ -81,6 +82,21 @@ router.post("/", protect, need("canManageUsers"), async (req, res) => {
     if (!name || !username || !password)
       return res.status(400).json({ message: "Missing fields" });
 
+    // Plan gating: staff seat limit once billing is configured
+    if (billingEnabled()) {
+      const company = await Company.findById(req.user.companyId).select("plan");
+      const plan = planFor(company);
+      if (plan.staff !== null) {
+        const staffCount = await User.countDocuments({ companyId: req.user.companyId });
+        if (staffCount >= plan.staff) {
+          return res.status(402).json({
+            message: `Your plan allows up to ${plan.staff} staff accounts — upgrade to add more`,
+            upgradeRequired: true,
+          });
+        }
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 12);
     let safeRole  = role;
     let safePerms = permissions || null;
@@ -88,6 +104,7 @@ router.post("/", protect, need("canManageUsers"), async (req, res) => {
       safeRole  = "viewer";
       safePerms = null;
     }
+    if (safeRole === "owner") safeRole = "admin"; // never mint owners via API
 
     const user = await User.create({
       companyId: req.user.companyId, name, nameEn,
@@ -124,27 +141,26 @@ router.put("/:id", protect, need("canManageUsers"), async (req, res) => {
     if (!target) return res.status(404).json({ message: "User not found" });
     if (target.role === "owner") return res.status(403).json({ message: "The owner account cannot be modified" });
 
-    const { password, ...rest } = req.body;
-    if (password) rest.passwordHash = await bcrypt.hash(password, 12);
+    // Whitelist: identity flags (isEnterprise, ownedCompanies, companyId) and
+    // anything else outside this list must never be settable through this endpoint.
+    const UPDATABLE = ["name", "nameEn", "username", "email", "phone", "preferredLanguage", "active", "role", "permissions"];
+    const rest = {};
+    for (const k of UPDATABLE) if (req.body[k] !== undefined) rest[k] = req.body[k];
+
+    if (req.body.password) rest.passwordHash = await bcrypt.hash(req.body.password, 12);
     if (rest.role === "owner") delete rest.role; // Never promote to owner via API
     if (!req.perms.canManagePermissions) {
       delete rest.role;
       delete rest.permissions;
     }
 
-    console.log(`✏️  PUT /users/${req.params.id} by [${req.user.username}] →`, JSON.stringify(rest).slice(0, 200));
-
     const user = await User.findOneAndUpdate(
       { _id: req.params.id, companyId: req.user.companyId },
       { $set: rest },
-      { returnDocument: "after", runValidators: false }
+      { returnDocument: "after", runValidators: true }
     ).select("-passwordHash");
 
-    if (!user) {
-      console.log(`❌  User ${req.params.id} not found in company ${req.user.companyId}`);
-      return res.status(404).json({ message: "User not found" });
-    }
-    console.log(`✅  User updated → permissions:`, JSON.stringify(user.permissions));
+    if (!user) return res.status(404).json({ message: "User not found" });
     broadcast(req, "user_updated", user);
     res.json(user);
   } catch (e) {

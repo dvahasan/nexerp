@@ -20,16 +20,18 @@ const Reason      = require("./Reason");
 
 // Architecture upgrade models
 const Ledger            = require("./Ledger");
+const PurchaseOrder     = require("./PurchaseOrder");
 const ItemStockLocation = require("./ItemStockLocation");
 const Reservation       = require("./Reservation");
 const Alert             = require("./Alert");
 const DemoVisit         = require("./DemoVisit");
 const ActionLog         = require("./ActionLog");
+const Batch             = require("./Batch");
 
 module.exports = { 
   Company, Department, Category, User, Item, Transaction, 
   Setting, File, Warehouse, Bin, BomTemplate, BomProduction,
   Source, Destination, Project, Reason,
   Ledger, ItemStockLocation, Reservation, Alert, DemoVisit,
-  ActionLog
+  ActionLog, Batch, PurchaseOrder
 };

@@ -48,6 +48,9 @@ const ItemSchema = new mongoose.Schema(
 
     // ── Reservations ──────────────────────────────────────────────────────
     reservedQty:  { type: Number, default: 0, min: 0 },   // soft allocated stock
+
+    // ── Lot/batch traceability ────────────────────────────────────────────
+    trackBatches: { type: Boolean, default: false },      // OUT picks batches FEFO
   },
   { timestamps: true }
 );

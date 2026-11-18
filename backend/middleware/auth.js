@@ -1,15 +1,19 @@
 const jwt  = require("jsonwebtoken");
 const { User } = require("../models");
 
-const SECRET = process.env.JWT_SECRET || "nexinv_secret";
+const SECRET = process.env.JWT_SECRET;
+if (!SECRET) {
+  console.error("❌ JWT_SECRET is not set. Refusing to start — add a strong random JWT_SECRET to the environment (see .env.example).");
+  process.exit(1);
+}
 
 // ── Role default permissions ─────────────────────────────────────────────────
 const ROLE_PERMS = {
-  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true  },
-  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true  },
-  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false },
-  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false },
-  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false },
+  owner:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true,  canManagePurchases:true  },
+  admin:     { canAdd:true,  canEdit:true,  canDelete:true,  canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:true,  canManageBOM:true,  canManagePurchases:true  },
+  manager:   { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:true,  canManageDepts:true,  canManageCompany:true,  canManagePermissions:false, canManageBOM:true,  canManagePurchases:true  },
+  warehouse: { canAdd:false, canEdit:false, canDelete:false, canTxIn:true,  canTxOut:true,  canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false, canManagePurchases:false },
+  viewer:    { canAdd:false, canEdit:false, canDelete:false, canTxIn:false, canTxOut:false, canManageUsers:false, canManageDepts:false, canManageCompany:false, canManagePermissions:false, canManageBOM:false, canManagePurchases:false },
 };
 
 /**

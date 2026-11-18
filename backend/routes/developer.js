@@ -1,16 +1,27 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const os = require("os");
+const crypto = require("crypto");
+const net = require("net");
+const { isPrivateAddress } = require("../utils/safeFetch");
 const { User, Company, Transaction, Item } = require("../models");
+const { rateLimit } = require("../utils/rateLimit");
 
 const router = express.Router();
 
-// Middleware to enforce developer master key
+// Middleware to enforce developer master key.
+// No fallback: the router is only mounted when DEV_MASTER_KEY is set (see server.js),
+// and the comparison is constant-time.
 const requireDevKey = (req, res, next) => {
-  const masterKey = process.env.DEV_MASTER_KEY || "nexdev2026";
+  const masterKey = process.env.DEV_MASTER_KEY;
   const providedKey = req.headers["x-dev-key"];
-  
-  if (!providedKey || providedKey !== masterKey) {
+
+  if (!masterKey || typeof providedKey !== "string") {
+    return res.status(401).json({ message: "Unauthorized: Invalid or missing Developer Key" });
+  }
+  const a = crypto.createHash("sha256").update(providedKey).digest();
+  const b = crypto.createHash("sha256").update(masterKey).digest();
+  if (!crypto.timingSafeEqual(a, b)) {
     return res.status(401).json({ message: "Unauthorized: Invalid or missing Developer Key" });
   }
   next();
@@ -115,29 +126,42 @@ router.get("/details", requireDevKey, async (req, res) => {
 });
 
 // ── POST /api/dev/track-demo ──────────────────────────────────────────────────
-router.post("/track-demo", async (req, res) => {
+// Public (no dev key) by design — the demo page calls it anonymously — but
+// rate-limited, and mounted separately so it works even when /api/dev is disabled.
+const trackDemoRouter = express.Router();
+trackDemoRouter.post("/", rateLimit({ windowMs: 60 * 1000, max: 5, message: "Too many requests" }), async (req, res) => {
   try {
     const { DemoVisit } = require("../models");
     let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || "";
     if (ip.includes(',')) ip = ip.split(',')[0].trim();
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
     
-    // Attempt to get location using free IP API
+    // Coarse geolocation over HTTPS, with a short timeout so a slow provider
+    // never delays the demo.
     let country = "Unknown", city = "Unknown";
     try {
-      if (ip && ip !== "127.0.0.1" && ip !== "::1") {
-        const ipRes = await fetch(`http://ip-api.com/json/${ip}`);
+      if (ip && net.isIP(ip) && !isPrivateAddress(ip)) {
+        const ipRes = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,city`, {
+          signal: AbortSignal.timeout(3000),
+        });
         const ipData = await ipRes.json();
-        if (ipData.status === "success") {
-          country = ipData.country;
-          city = ipData.city;
+        if (ipData.success) {
+          country = ipData.country || "Unknown";
+          city = ipData.city || "Unknown";
         }
       }
     } catch (err) {
       console.warn("Failed to fetch IP geolocation:", err.message);
     }
 
+    // Store a truncated IP (last IPv4 octet / last 80 IPv6 bits zeroed):
+    // enough for traffic analysis, not enough to identify a visitor.
+    const truncatedIp = net.isIPv4(ip)
+      ? ip.split(".").slice(0, 3).concat("0").join(".")
+      : net.isIPv6(ip) ? ip.split(":").slice(0, 3).join(":") + "::" : "";
+
     const visit = new DemoVisit({
-      ip,
+      ip: truncatedIp,
       country,
       city,
       location: country !== "Unknown" ? `${city}, ${country}` : "Local/Unknown",
@@ -308,4 +332,4 @@ router.post("/personnel/toggle-active/:id", requireDevKey, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = { router, trackDemoRouter };

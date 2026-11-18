@@ -31,9 +31,13 @@ const Categories  = lazy(() => import('./pages/Categories'));
 const Warehouses  = lazy(() => import('./pages/Warehouses'));
 const BOM         = lazy(() => import('./pages/BOM'));
 const Sources     = lazy(() => import('./pages/Sources'));
+const PurchaseOrders      = lazy(() => import('./pages/PurchaseOrders'));
+const PurchaseOrderDetail = lazy(() => import('./pages/PurchaseOrderDetail'));
 const Destinations = lazy(() => import('./pages/Destinations'));
 const Projects    = lazy(() => import('./pages/Projects'));
 const Reasons     = lazy(() => import('./pages/Reasons'));
+const StockLedger = lazy(() => import('./pages/StockLedger'));
+const ReorderSuggestions = lazy(() => import('./pages/ReorderSuggestions'));
 
 /* ── Loading spinner ─────────────────────────────────────────────────────── */
 function Spinner() {
@@ -153,9 +157,13 @@ function AppRoutes() {
         <Route path="/item/:id"     element={<Protected><Layout><ItemPage /></Layout></Protected>} />
         {/* Legacy redirect — old /transactions link lands on stock-in */}
         <Route path="/transactions" element={<Protected><Layout><Transactions /></Layout></Protected>} />
+        <Route path="/ledger"       element={<Protected><Layout><StockLedger /></Layout></Protected>} />
+        <Route path="/reorder"      element={<Protected><Layout><ReorderSuggestions /></Layout></Protected>} />
         <Route path="/stock-in"     element={<Protected><Layout><PermGuard perm="canTxIn"><StockIn /></PermGuard></Layout></Protected>} />
         <Route path="/stock-out"    element={<Protected><Layout><PermGuard perm="canTxOut"><StockOut /></PermGuard></Layout></Protected>} />
         <Route path="/bom"             element={<Protected><Layout><PermGuard perm="canManageBOM"><BOM /></PermGuard></Layout></Protected>} />
+        <Route path="/purchase-orders"     element={<Protected><Layout><PermGuard perm="canManagePurchases"><PurchaseOrders /></PermGuard></Layout></Protected>} />
+        <Route path="/purchase-orders/:id" element={<Protected><Layout><PermGuard perm="canManagePurchases"><PurchaseOrderDetail /></PermGuard></Layout></Protected>} />
         
         {/* Modular Features */}
         <Route path="/sources"         element={<Protected><Layout><Sources /></Layout></Protected>} />
@@ -175,7 +183,6 @@ function AppRoutes() {
         <Route path="/import"          element={<Protected><Layout><Import /></Layout></Protected>} />
         <Route path="/barcode-lookup"  element={<Protected><Layout><BarcodeLookup /></Layout></Protected>} />
         <Route path="/warehouses"      element={<Protected><Layout><Warehouses /></Layout></Protected>} />
-        <Route path="/bom"             element={<Protected><Layout><BOM /></Layout></Protected>} />
 
         {/* ── Catch all ───────────────────────────────────────── */}
         <Route path="*" element={authed ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />} />

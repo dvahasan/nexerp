@@ -13,6 +13,9 @@ const LedgerSchema = new mongoose.Schema(
     
     warehouseId:   { type: mongoose.Schema.Types.ObjectId, ref: "Warehouse", default: null },
     binId:         { type: mongoose.Schema.Types.ObjectId, ref: "Bin", default: null },
+    // Set when the movement touched exactly one batch; multi-batch FEFO OUTs
+    // keep their full breakdown on Transaction.batches instead.
+    batchId:       { type: mongoose.Schema.Types.ObjectId, ref: "Batch", default: null },
     
     sourceId:      { type: mongoose.Schema.Types.ObjectId, ref: "Source", default: null },
     destId:        { type: mongoose.Schema.Types.ObjectId, ref: "Destination", default: null },

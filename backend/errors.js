@@ -106,9 +106,20 @@ function friendly(err) {
   return cleaned || 'An unexpected error occurred.';
 }
 
+// ── Domain errors ─────────────────────────────────────────────────────────────
+// Business-rule rejections (insufficient stock, not found, …) must surface as
+// 4xx, not 500, so monitoring can tell outages from ordinary rejections.
+function httpError(status, message) {
+  const e = new Error(message);
+  e.status = status;
+  e.isDomain = true;
+  return e;
+}
+
 // ── Pick an appropriate HTTP status code for an error ────────────────────────
 function statusFor(err) {
   if (!err) return 500;
+  if (Number.isInteger(err.status) && err.status >= 400 && err.status < 600) return err.status;
   const code = err.code;
   const name = err.name;
 
@@ -123,4 +134,4 @@ function statusFor(err) {
   return 500;
 }
 
-module.exports = { friendly, statusFor };
+module.exports = { friendly, statusFor, httpError };

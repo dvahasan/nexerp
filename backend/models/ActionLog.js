@@ -16,7 +16,10 @@ const ActionLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-ActionLogSchema.index({ createdAt: -1 });
+// TTL: MongoDB deletes entries older than the retention window, so the audit
+// log (which holds IPs and request details) doesn't grow forever.
+const RETENTION_DAYS = Number(process.env.ACTION_LOG_RETENTION_DAYS) || 90;
+ActionLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: RETENTION_DAYS * 86400 });
 ActionLogSchema.index({ companyId: 1 });
 ActionLogSchema.index({ userId: 1 });
 

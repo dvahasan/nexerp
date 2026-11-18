@@ -42,6 +42,32 @@ export default function Settings() {
   const [cloudUsage,   setCloudUsage]   = useState(null);
   const [focused,      setFocused]      = useState('');
 
+  // Billing
+  const [billing,        setBilling]        = useState(null);
+  const [billingBusy,    setBillingBusy]    = useState('');
+  useEffect(() => {
+    if (activeTab === 'billing' && user?.perms?.canManageCompany) {
+      api.getBilling().then(setBilling).catch(e => console.warn('Billing unavailable', e));
+    }
+  }, [activeTab, user]);
+
+  const startCheckout = async (tier) => {
+    setBillingBusy(tier);
+    try {
+      const { url } = await api.billingCheckout(tier);
+      if (url) window.location.href = url;
+    } catch (e) { alert(e.message); }
+    finally { setBillingBusy(''); }
+  };
+  const openPortal = async () => {
+    setBillingBusy('portal');
+    try {
+      const { url } = await api.billingPortal();
+      if (url) window.location.href = url;
+    } catch (e) { alert(e.message); }
+    finally { setBillingBusy(''); }
+  };
+
   useEffect(() => {
     if (user?.perms?.canManageUsers) {
       api.getCloudinaryUsage()
@@ -110,6 +136,7 @@ export default function Settings() {
     { id: 'modules', label: isAR ? 'الوحدات والمزامنة' : 'Modules & Sync', icon: 'inventory' },
     { id: 'print', label: isAR ? 'الطباعة' : 'Printing', icon: 'document' },
     { id: 'integrations', label: isAR ? 'الربط البرمجي' : 'Integrations', icon: 'company' },
+    ...(user?.perms?.canManageCompany ? [{ id: 'billing', label: isAR ? 'الاشتراك' : 'Billing', icon: 'wallet' }] : []),
   ];
 
   return (
@@ -553,7 +580,7 @@ export default function Settings() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {apiKeys.map((key, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input readOnly value={key} style={{ ...fieldInput('api'+idx), fontFamily: 'ui-monospace, monospace', flex: 1 }} />
+                    <input readOnly value={typeof key === 'string' ? key : (key?.key || '')} style={{ ...fieldInput('api'+idx), fontFamily: 'ui-monospace, monospace', flex: 1 }} />
                     <button type="button" onClick={() => setApiKeys(apiKeys.filter((_, i) => i !== idx))} style={{ color: tok.neg, background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
                       <Icon name="delete" size={16} />
                     </button>
@@ -566,14 +593,84 @@ export default function Settings() {
                 )}
                 <div>
                   <button type="button" onClick={() => {
-                    const newKey = 'nex_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                    setApiKeys([...apiKeys, newKey]);
+                    const bytes = window.crypto.getRandomValues(new Uint8Array(24));
+                    const newKey = 'nex_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+                    setApiKeys([...apiKeys, { key: newKey, name: '', createdAt: new Date().toISOString() }]);
                   }} style={{ height: 32, padding: '0 14px', borderRadius: 4, backgroundColor: 'transparent', border: `1px solid ${primary}`, color: primary, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                     {isAR ? '+ توليد مفتاح جديد' : '+ Generate New Key'}
                   </button>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── BILLING ─────────────────────────────────────────────── */}
+        {activeTab === 'billing' && (
+          <div style={{ ...panel }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingBottom: 14, borderBottom: `1px solid ${tok.border}` }}>
+              <Icon name="wallet" size={16} style={{ color: primary }} />
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: tok.fg }}>
+                {isAR ? 'الخطة والاشتراك' : 'Plan & Subscription'}
+              </span>
+            </div>
+
+            {!billing ? (
+              <div style={{ fontSize: 13, color: tok.fgMuted }}>{isAR ? 'جار التحميل…' : 'Loading…'}</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Current plan */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between', backgroundColor: tok.canvas, border: `1px solid ${tok.border}`, borderRadius: 4, padding: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: tok.fg }}>
+                      {billing.plans?.[billing.tier]?.label || billing.tier}
+                      {billing.status === 'active' && <span style={{ marginInlineStart: 8, fontSize: 11, color: tok.pos }}>{isAR ? 'نشط' : 'Active'}</span>}
+                      {billing.status === 'past_due' && <span style={{ marginInlineStart: 8, fontSize: 11, color: tok.neg }}>{isAR ? 'متأخر الدفع' : 'Past due'}</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: tok.fgMuted, marginTop: 4 }}>
+                      {isAR ? 'الموظفون' : 'Staff'}: {billing.usage?.staff}{billing.limits?.staff ? ` / ${billing.limits.staff}` : ` (${isAR ? 'بلا حدود' : 'unlimited'})`}
+                      {' · '}{isAR ? 'الذكاء الاصطناعي' : 'AI'}: {billing.limits?.ai ? '✓' : '✗'}
+                    </div>
+                  </div>
+                  {billing.billingEnabled && billing.status === 'active' && (
+                    <button type="button" onClick={openPortal} disabled={billingBusy === 'portal'}
+                      style={{ height: 34, padding: '0 16px', borderRadius: 4, backgroundColor: 'transparent', border: `1px solid ${tok.border}`, color: tok.fg, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      {isAR ? 'إدارة الاشتراك' : 'Manage subscription'}
+                    </button>
+                  )}
+                </div>
+
+                {!billing.billingEnabled && (
+                  <div style={{ fontSize: 12, color: tok.fgMuted, backgroundColor: tok.canvas, padding: 12, borderRadius: 4, border: `1px dashed ${tok.border}` }}>
+                    {isAR ? 'الدفع غير مفعّل على هذا الخادم — حدود الخطط غير مطبقة.' : 'Billing is not configured on this server — plan limits are not enforced.'}
+                  </div>
+                )}
+
+                {/* Upgrade options */}
+                {billing.billingEnabled && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                    {['starter', 'professional', 'enterprise'].map(tier => {
+                      const p = billing.plans?.[tier];
+                      if (!p) return null;
+                      const isCurrent = billing.tier === tier;
+                      return (
+                        <div key={tier} style={{ border: `1px solid ${isCurrent ? primary : tok.border}`, borderRadius: 4, padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: tok.fg }}>{p.label}</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: tok.fg }}>${p.priceUsd}<span style={{ fontSize: 11, fontWeight: 400, color: tok.fgMuted }}>/{isAR ? 'شهر' : 'mo'}</span></div>
+                          <div style={{ fontSize: 11, color: tok.fgMuted }}>
+                            {p.staff ? `${p.staff} ${isAR ? 'موظفين' : 'staff'}` : (isAR ? 'موظفون بلا حدود' : 'Unlimited staff')} · {isAR ? 'ذكاء اصطناعي' : 'AI'} {p.ai ? '✓' : '✗'}
+                          </div>
+                          <button type="button" disabled={isCurrent || billingBusy === tier} onClick={() => startCheckout(tier)}
+                            style={{ marginTop: 'auto', height: 32, borderRadius: 4, border: 'none', backgroundColor: isCurrent ? tok.border : primary, color: isCurrent ? tok.fgMuted : '#fff', cursor: isCurrent ? 'default' : 'pointer', fontSize: 12, fontWeight: 700 }}>
+                            {isCurrent ? (isAR ? 'الخطة الحالية' : 'Current plan') : (isAR ? 'ترقية' : 'Upgrade')}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

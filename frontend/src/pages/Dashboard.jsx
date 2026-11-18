@@ -1,7 +1,15 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { api } from '../api';
 import Icon from '../components/Icon';
 import Skeleton from '../components/Skeleton';
+
+const URGENCY = {
+  critical: { color: '#ef4444', rank: 0, en: 'Critical', ar: 'حرج' },
+  high:     { color: '#f59e0b', rank: 1, en: 'High',     ar: 'مرتفع' },
+  normal:   { color: '#10b981', rank: 2, en: 'Normal',   ar: 'عادي' },
+};
 
 // ── Same design tokens as Layout.jsx ─────────────────────────────────────────
 const T = {
@@ -23,6 +31,27 @@ export default function Dashboard() {
   const tok         = T[theme] || T.light;
   const primaryColor = company?.primaryColor || '#3b82f6';
   const currency     = company?.baseCurrency || 'USD';
+
+  // ── Reorder suggestions (ledger-aware endpoint) ────────────────────────────
+  const [reorder, setReorder] = useState(null); // { count, totalEstimatedCost, suggestions }
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getReorderSuggestions()
+      .then(res => {
+        if (cancelled) return;
+        if (res && Array.isArray(res.suggestions)) setReorder(res);
+        else setReorder(null); // demo mode / unknown shape — hide widget
+      })
+      .catch(() => { if (!cancelled) setReorder(null); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const topReorder = reorder
+    ? [...reorder.suggestions]
+        .sort((a, b) => (URGENCY[a.urgency]?.rank ?? 3) - (URGENCY[b.urgency]?.rank ?? 3) || (a.qty - b.qty))
+        .slice(0, 5)
+    : [];
 
   // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading || !stats) {
@@ -346,6 +375,62 @@ export default function Dashboard() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Reorder Suggestions widget ──────────────────────────────────────── */}
+      {reorder && reorder.count > 0 && (
+        <div style={{ ...panel, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${tok.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Icon name="refresh" size={14} style={{ color: primaryColor }} />
+              <span style={monoLabel}>
+                {isAR ? 'اقتراحات إعادة الطلب' : 'Reorder Suggestions'}
+                {' '}({reorder.count})
+              </span>
+              <span style={{ ...monoLabel, color: tok.fgMuted }} dir="ltr">
+                ≈ {reorder.totalEstimatedCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
+              </span>
+            </div>
+            <Link to="/reorder" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, fontWeight: 600, color: primaryColor, textDecoration: 'none' }}>
+              {isAR ? 'عرض الكل ←' : 'View all →'}
+            </Link>
+          </div>
+          <div>
+            {topReorder.map((s, i) => {
+              const u = URGENCY[s.urgency] || URGENCY.normal;
+              return (
+                <Link
+                  key={s.itemId || i}
+                  to={`/item/${s.itemId}`}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                  style={{
+                    borderBottom: i < topReorder.length - 1 ? `1px solid ${tok.border}` : 'none',
+                    textDecoration: 'none', transition: 'background 120ms ease-out',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = tok.sunken; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <span
+                    title={isAR ? u.ar : u.en}
+                    style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: u.color, flexShrink: 0 }}
+                  />
+                  <span className="flex-1 truncate" style={{ fontSize: 13, fontWeight: 500, color: tok.fg }}>
+                    {isAR ? (s.name || s.nameEn) : (s.nameEn || s.name)}
+                  </span>
+                  <span className="hidden sm:inline" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgSubtle, flexShrink: 0 }} dir="ltr">
+                    {s.qty} / {s.reorderPoint}
+                  </span>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 700, color: primaryColor, flexShrink: 0 }} dir="ltr">
+                    +{s.suggestedQty}
+                  </span>
+                  <span className="hidden md:inline" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10, color: tok.fgMuted, flexShrink: 0, minWidth: 70, textAlign: 'end' }} dir="ltr">
+                    {(s.estimatedCost || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} {currency}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
